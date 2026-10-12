@@ -25,7 +25,7 @@ const schema = z
     GOOGLE_SA_KEY: z
       .string()
       .optional()
-      .transform((val) => (val ? val.replace(/\\n/g, "\n") : undefined)),
+      .transform((val) => (val ? val.replace(/\\+n/g, "\n") : undefined)),
     SHEET_ID: z.string().optional(),
     FB_PIXEL_ID: z.string().optional(),
     FB_CAPI_TOKEN: z.string().optional(),

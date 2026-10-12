@@ -19,6 +19,10 @@ export function db() {
   return connection().db;
 }
 
+export function rawClient() {
+  return connection().client;
+}
+
 export async function closeDb() {
   await instance?.client.end({ timeout: 5 });
   instance = undefined;

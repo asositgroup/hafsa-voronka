@@ -17,6 +17,7 @@
     "@funnel/shared": "workspace:*",
     "@hono/node-server": "^2.1.4",
     "drizzle-orm": "^0.45.4",
+    "google-auth-library": "^11.2.0",
     "grammy": "^1.46.0",
     "hono": "^4.13.13",
     "postgres": "^3.4.9",

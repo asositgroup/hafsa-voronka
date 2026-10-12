@@ -70,6 +70,30 @@ export function ArrowRightIcon({ className }: IconProps) {
   );
 }
 
+export function LogoutIcon({ className }: IconProps) {
+  return (
+    <StrokeIcon className={className}>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+    </StrokeIcon>
+  );
+}
+
+export function DownloadIcon({ className }: IconProps) {
+  return (
+    <StrokeIcon className={className}>
+      <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />
+    </StrokeIcon>
+  );
+}
+
+export function FunnelIcon({ className }: IconProps) {
+  return (
+    <StrokeIcon className={className}>
+      <path d="M3 4h18l-7 8.5V19l-4 2v-8.5L3 4Z" />
+    </StrokeIcon>
+  );
+}
+
 export function SpinnerIcon({ className = "" }: IconProps) {
   return (
     <StrokeIcon className={`animate-spin motion-reduce:animate-none ${className}`}>

@@ -2,16 +2,14 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import type { AdminLeadsResponse, AdminStatsResponse } from "@funnel/shared";
+import type { AdminStatsResponse } from "@funnel/shared";
 import { AdminFilters } from "@/components/admin/AdminFilters";
-import { AdminHeader } from "@/components/admin/AdminHeader";
 import { CampaignTable } from "@/components/admin/CampaignTable";
 import { DailyChart } from "@/components/admin/DailyChart";
 import { DropoffBars } from "@/components/admin/DropoffBars";
 import { FunnelChart } from "@/components/admin/FunnelChart";
 import { KpiCards } from "@/components/admin/KpiCards";
-import { LeadsTable } from "@/components/admin/LeadsTable";
-import { adminMe, fetchAdminLeads, fetchAdminStats } from "@/lib/admin/api";
+import { adminMe, fetchAdminStats } from "@/lib/admin/api";
 import { adminUz } from "@/lib/i18n/admin";
 
 function getTashkentToday(): string {
@@ -41,11 +39,9 @@ function AdminDashboardContent() {
   const to = searchParams.get("to") || today;
   const source = searchParams.get("source") || "";
   const campaign = searchParams.get("campaign") || "";
-  const page = Number(searchParams.get("page")) || 1;
 
   const [authorized, setAuthorized] = useState<boolean | null>(null);
   const [stats, setStats] = useState<AdminStatsResponse | null>(null);
-  const [leads, setLeads] = useState<AdminLeadsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,13 +66,9 @@ function AdminDashboardContent() {
 
     async function fetchData() {
       try {
-        const [statsData, leadsData] = await Promise.all([
-          fetchAdminStats({ from, to, source, campaign }),
-          fetchAdminLeads({ from, to, source, campaign, page }),
-        ]);
+        const statsData = await fetchAdminStats({ from, to, source, campaign });
         if (!active) return;
         setStats(statsData);
-        setLeads(leadsData);
         setError(null);
       } catch (err: unknown) {
         if (!active) return;
@@ -96,7 +88,7 @@ function AdminDashboardContent() {
     return () => {
       active = false;
     };
-  }, [authorized, from, to, source, campaign, page, router]);
+  }, [authorized, from, to, source, campaign, router]);
 
   const updateFilters = (newFilters: {
     from: string;
@@ -110,27 +102,15 @@ function AdminDashboardContent() {
     params.set("to", newFilters.to);
     if (newFilters.source) params.set("source", newFilters.source);
     if (newFilters.campaign) params.set("campaign", newFilters.campaign);
-    params.set("page", "1");
-    router.replace(`/admin?${params.toString()}`);
-  };
-
-  const handlePageChange = (newPage: number) => {
-    setLoading(true);
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("page", String(newPage));
     router.replace(`/admin?${params.toString()}`);
   };
 
   const handleRetry = () => {
     setLoading(true);
     setError(null);
-    void Promise.all([
-      fetchAdminStats({ from, to, source, campaign }),
-      fetchAdminLeads({ from, to, source, campaign, page }),
-    ])
-      .then(([statsData, leadsData]) => {
+    void fetchAdminStats({ from, to, source, campaign })
+      .then((statsData) => {
         setStats(statsData);
-        setLeads(leadsData);
         setLoading(false);
       })
       .catch((err) => {
@@ -153,8 +133,6 @@ function AdminDashboardContent() {
 
   return (
     <div className="min-h-screen flex flex-col bg-varaq text-siyoh">
-      {stats && <AdminHeader health={stats.health} />}
-
       <main className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6 space-y-6 flex-1">
         <AdminFilters
           from={from}
@@ -187,19 +165,10 @@ function AdminDashboardContent() {
           <>
             <KpiCards kpis={stats.kpis} />
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <FunnelChart funnel={stats.funnel} />
-              <DropoffBars dropoff={stats.dropoff} />
-            </div>
+            <FunnelChart funnel={stats.funnel} />
+            <DropoffBars dropoff={stats.dropoff} />
 
             <DailyChart daily={stats.daily} />
-
-            {leads && (
-              <LeadsTable
-                data={leads}
-                onPageChange={handlePageChange}
-              />
-            )}
 
             <div className="grid grid-cols-1 gap-6">
               <CampaignTable campaigns={stats.campaigns} />

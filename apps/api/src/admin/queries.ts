@@ -13,17 +13,14 @@ import { env } from "@/env";
 import { formatTashkentDate, listDaysInRange } from "./dates";
 
 const FUNNEL_STEP_NAMES: Record<string, string> = {
-  landing_view: "Landing ko'rildi",
-  cta_click: "CTA bosildi",
-  lead_submitted: "Forma yuborildi",
-  bot_start: "Bot boshlandi",
-  registered: "Ro'yxatdan o'tdi",
-  video_start: "Video boshlandi",
-  progress_25: "25% ko'rildi",
-  progress_50: "50% ko'rildi",
-  progress_75: "75% ko'rildi",
-  video_complete: "Video tugatildi",
-  channel_click: "Kanalga o'tildi",
+  landing_view: "Saytga kirdi",
+  cta_click: "Tugmani bosdi",
+  lead_submitted: "Formani to‘ldirdi",
+  bot_start: "Botga o‘tdi",
+  registered: "Ro‘yxatdan o‘tdi",
+  video_start: "Videoni boshladi",
+  video_complete: "Darsni ko‘rdi (70%)",
+  channel_click: "Kanalga o‘tdi",
 };
 
 const ORDERED_FUNNEL_STEPS = [
@@ -33,9 +30,6 @@ const ORDERED_FUNNEL_STEPS = [
   "bot_start",
   "registered",
   "video_start",
-  "progress_25",
-  "progress_50",
-  "progress_75",
   "video_complete",
   "channel_click",
 ] as const;
@@ -68,7 +62,7 @@ export async function getFunnelAndKpis(filters: QueryFilters): Promise<{
       WHERE
         (e.created_at AT TIME ZONE 'Asia/Tashkent')::date >= ${filters.from}::date
         AND (e.created_at AT TIME ZONE 'Asia/Tashkent')::date <= ${filters.to}::date
-        AND e.type IN ('landing_view', 'cta_click', 'lead_submitted', 'bot_start', 'registered', 'video_start', 'progress_25', 'progress_50', 'progress_75', 'video_complete', 'channel_click')
+        AND e.type IN ('landing_view', 'cta_click', 'lead_submitted', 'bot_start', 'registered', 'video_start', 'video_complete', 'channel_click')
         AND (
           (e.type IN ('landing_view', 'cta_click', 'lead_submitted')
            AND (

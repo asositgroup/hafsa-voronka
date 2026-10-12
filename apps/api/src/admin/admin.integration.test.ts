@@ -312,9 +312,6 @@ describe.skipIf(!testDbUrl)("Admin Integration Tests", () => {
       bot_start: 3,
       registered: 3,
       video_start: 2,
-      progress_25: 2,
-      progress_50: 2,
-      progress_75: 1,
       video_complete: 1,
       channel_click: 1,
     });
@@ -326,10 +323,7 @@ describe.skipIf(!testDbUrl)("Admin Integration Tests", () => {
     expect(stepConv.bot_start).toBe(0);
     expect(stepConv.registered).toBe(100);
     expect(stepConv.video_start).toBe(66.7);
-    expect(stepConv.progress_25).toBe(100);
-    expect(stepConv.progress_50).toBe(100);
-    expect(stepConv.progress_75).toBe(50);
-    expect(stepConv.video_complete).toBe(100);
+    expect(stepConv.video_complete).toBe(50);
     expect(stepConv.channel_click).toBe(100);
 
     const may06Daily = stats.daily.find((d) => d.date === "2026-05-06");

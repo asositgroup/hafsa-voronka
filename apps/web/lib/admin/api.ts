@@ -1,7 +1,5 @@
 import {
-  adminLeadsResponseSchema,
   adminStatsResponseSchema,
-  type AdminLeadsResponse,
   type AdminStatsResponse,
 } from "@funnel/shared";
 import { API_URL } from "@/lib/api";
@@ -77,37 +75,6 @@ export async function fetchAdminStats(params: {
 
   const json = await res.json();
   return adminStatsResponseSchema.parse(json);
-}
-
-export async function fetchAdminLeads(params: {
-  from: string;
-  to: string;
-  source?: string;
-  campaign?: string;
-  page?: number;
-}): Promise<AdminLeadsResponse> {
-  const query = new URLSearchParams();
-  if (params.from) query.set("from", params.from);
-  if (params.to) query.set("to", params.to);
-  if (params.source) query.set("source", params.source);
-  if (params.campaign) query.set("campaign", params.campaign);
-  if (params.page) query.set("page", String(params.page));
-
-  const res = await fetch(`${API_URL}/admin/leads?${query.toString()}`, {
-    method: "GET",
-    credentials: "include",
-  });
-
-  if (res.status === 401) {
-    throw new Error("UNAUTHORIZED");
-  }
-
-  if (!res.ok) {
-    throw new Error(`LEADS_FAILED_${res.status}`);
-  }
-
-  const json = await res.json();
-  return adminLeadsResponseSchema.parse(json);
 }
 
 export function getLeadsCsvUrl(params: {

@@ -1,7 +1,6 @@
 "use client";
 
 import type { KpiStats } from "@funnel/shared";
-import { ArrowRightIcon } from "@/components/icons";
 import { adminUz } from "@/lib/i18n/admin";
 
 function formatNumber(num: number): string {
@@ -31,13 +30,7 @@ export function KpiCards({ kpis }: { kpis: KpiStats }) {
       note: adminUz.kpis.completionNote,
     },
     {
-      label: (
-        <span className="inline-flex items-center gap-1">
-          {adminUz.kpis.conversionRate[0]}
-          <ArrowRightIcon className="h-3.5 w-3.5" />
-          {adminUz.kpis.conversionRate[1]}
-        </span>
-      ),
+      label: adminUz.kpis.conversionRate,
       value: `${kpis.conversionRate}%`,
       note: adminUz.kpis.conversionNote,
     },

@@ -26,6 +26,7 @@ export function WatchScreen() {
   const [controlsVisible, setControlsVisible] = useState(true);
   const [toastVisible, setToastVisible] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
+  const [speedMenuOpen, setSpeedMenuOpen] = useState(false);
   const [unlockAnchor, setUnlockAnchor] = useState({
     remainingSecs: session.progress.remainingSecs,
     position: session.progress.lastPosition,
@@ -38,6 +39,7 @@ export function WatchScreen() {
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isCompletedRef = useRef(session.completed);
   const playbackRateRef = useRef(1);
+  const speedMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     isCompletedRef.current = session.completed;
@@ -63,6 +65,15 @@ export function WatchScreen() {
       }, 3500);
     }
   }, [isPlaying]);
+
+  useEffect(() => {
+    if (!speedMenuOpen) return;
+    const closeOnOutside = (event: PointerEvent) => {
+      if (!speedMenuRef.current?.contains(event.target as Node)) setSpeedMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutside);
+    return () => document.removeEventListener("pointerdown", closeOnOutside);
+  }, [speedMenuOpen]);
 
   const sendProgress = useCallback(
     async (position: number, event: ProgressEvent) => {
@@ -199,6 +210,8 @@ export function WatchScreen() {
     playbackRateRef.current = rate;
     video.playbackRate = rate;
     setPlaybackRate(rate);
+    setSpeedMenuOpen(false);
+    resetControlsTimeout();
   };
 
   const unlockRemainingSecs = Math.max(
@@ -332,7 +345,7 @@ export function WatchScreen() {
 
           <div
             className={`absolute inset-x-0 bottom-0 z-20 flex flex-col gap-1.5 px-3 pt-7 pb-2 bg-gradient-to-t from-black/78 to-transparent transition-opacity duration-300 ${
-              controlsVisible || !isPlaying
+              controlsVisible || !isPlaying || speedMenuOpen
                 ? "opacity-100 pointer-events-auto"
                 : "opacity-0 pointer-events-none"
             }`}
@@ -383,27 +396,64 @@ export function WatchScreen() {
                 </span>
               </div>
 
-              <button
-                type="button"
-                onClick={toggleFullscreen}
-                aria-label={
-                  isFullscreen ? watchUz.exitFullscreen : watchUz.fullscreen
-                }
-                className="flex h-11 w-11 items-center justify-center text-white"
-              >
-                <svg
-                  aria-hidden="true"
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
+              <div className="flex items-center">
+                <div ref={speedMenuRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setSpeedMenuOpen((open) => !open)}
+                    aria-label={`${watchUz.speed}: ${playbackRate}x`}
+                    aria-haspopup="menu"
+                    aria-expanded={speedMenuOpen}
+                    className="flex h-11 min-w-11 items-center justify-center px-2 text-[14px] font-semibold text-white tabular-nums"
+                  >
+                    {playbackRate}x
+                  </button>
+                  {speedMenuOpen && (
+                    <div
+                      role="menu"
+                      aria-label={watchUz.speed}
+                      className="absolute right-0 bottom-full mb-1 flex min-w-[96px] flex-col overflow-hidden rounded-[12px] bg-siyoh-deep/95 py-1 shadow-[0_8px_24px_rgba(0,0,0,.4)] backdrop-blur"
+                    >
+                      {PLAYBACK_RATES.map((rate) => (
+                        <button
+                          key={rate}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={playbackRate === rate}
+                          onClick={() => setSpeed(rate)}
+                          className={`min-h-[40px] px-4 text-left text-[14px] font-semibold tabular-nums transition-colors ${
+                            playbackRate === rate ? "text-oltin" : "text-varaq hover:bg-white/8"
+                          }`}
+                        >
+                          {rate}x
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={toggleFullscreen}
+                  aria-label={
+                    isFullscreen ? watchUz.exitFullscreen : watchUz.fullscreen
+                  }
+                  className="flex h-11 w-11 items-center justify-center text-white"
                 >
-                  <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
-                </svg>
-              </button>
+                  <svg
+                    aria-hidden="true"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  >
+                    <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -414,38 +464,6 @@ export function WatchScreen() {
           </h1>
           <p className="text-[15px] text-kumush m-0">{watchUz.lessonSubtitle}</p>
         </div>
-
-        {!isUnlocked && (
-          <div className="flex flex-col gap-2.5 px-5 pt-6">
-            <span className="text-[15px] font-semibold text-varaq">
-              {watchUz.speed}
-            </span>
-            <div
-              role="group"
-              aria-label={watchUz.speed}
-              className="grid grid-cols-4 gap-1 p-1 rounded-[14px] bg-siyoh-deep"
-            >
-              {PLAYBACK_RATES.map((rate) => {
-                const isSelected = playbackRate === rate;
-                return (
-                  <button
-                    key={rate}
-                    type="button"
-                    aria-pressed={isSelected}
-                    onClick={() => setSpeed(rate)}
-                    className={`min-h-[44px] rounded-[10px] text-[15px] font-semibold flex items-center justify-center transition active:scale-[0.98] ${
-                      isSelected
-                        ? "bg-zumrad text-varaq"
-                        : "bg-transparent text-kumush hover:text-varaq"
-                    }`}
-                  >
-                    {rate}x
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
         <div className="flex flex-col gap-3.5 px-5 pt-7">
           {!isUnlocked && (

@@ -535,7 +535,7 @@ Comprehensive reference for all environment variables used by the API and Web ap
 | `VIDEO_DURATION_SEC` | API (`apps/api`) | Required | `900` | Duration of the video in whole seconds |
 | `SEEK_LOCK` | API (`apps/api`) | Optional | `true` (default: `true`) | Lock player forward seeking |
 | `GATE_PROCEED` | API (`apps/api`) | Optional | `true` (default: `true`) | Lock Proceed button until completion threshold reached |
-| `COMPLETE_THRESHOLD` | API (`apps/api`) | Optional | `0.95` (default: `0.95`) | Proportion required for completion (0.5 to 1.0) |
+| `COMPLETE_THRESHOLD` | API (`apps/api`) | Optional | `0.7` (default: `0.7`) | Share of the video that must really be watched to unlock the channel button (0.5 to 1.0); playback up to 2× counts |
 | `CORS_ORIGINS` | API (`apps/api`) | Optional | `https://yourdomain.uz,http://localhost:3000` | Comma-separated allowed CORS origins |
 | `SHEETS_ENABLED` | API (`apps/api`) | Optional | `false` (default: `false`) | Enable Google Sheets sync queue and background retry |
 | `GOOGLE_SA_EMAIL` | API (`apps/api`) | Required if `SHEETS_ENABLED=true` | `sa@project.iam.gserviceaccount.com` | Google Cloud Service Account client email |

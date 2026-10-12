@@ -1,3 +1,5 @@
+import { MAX_PLAYBACK_RATE } from "@funnel/shared";
+
 export type WatchState = {
   maxPosition: number;
   watchedSecs: number;
@@ -54,7 +56,7 @@ export function applyBeat(
     const wall = (now.getTime() - state.lastBeatAt.getTime()) / 1000;
     if (wall <= MAX_BEAT_GAP_SECS) {
       const jump = position - state.lastPosition;
-      const maxCredit = wall * 1.1 + 2;
+      const maxCredit = wall * MAX_PLAYBACK_RATE * 1.1 + 2;
       credit = Math.max(0, Math.min(jump, maxCredit));
     }
   }
@@ -98,4 +100,9 @@ export function applyBeat(
     completedNow,
     ignored: false,
   };
+}
+
+export function remainingWatchSecs(watchedSecs: number, completed: boolean, config: WatchConfig) {
+  if (completed) return 0;
+  return Math.max(0, Math.ceil(config.threshold * config.duration - watchedSecs));
 }

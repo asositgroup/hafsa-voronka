@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ProgressEvent, ProgressResponse } from "@funnel/shared";
+import { MAX_PLAYBACK_RATE, PLAYBACK_RATES, type ProgressEvent, type ProgressResponse } from "@funnel/shared";
 import { miniAppBeacon, miniAppPost } from "@/lib/api";
 import { watchUz } from "@/lib/i18n/watch";
 import { getTelegramWebApp, hapticSuccess } from "@/lib/telegram";
@@ -26,6 +26,11 @@ export function WatchScreen() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [toastVisible, setToastVisible] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [unlockAnchor, setUnlockAnchor] = useState({
+    remainingSecs: session.progress.remainingSecs,
+    position: session.progress.lastPosition,
+  });
 
   const maxReachedRef = useRef(session.progress.maxPosition || 0);
   const hasSentStartRef = useRef(false);
@@ -33,6 +38,7 @@ export function WatchScreen() {
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isCompletedRef = useRef(session.completed);
+  const playbackRateRef = useRef(1);
 
   useEffect(() => {
     isCompletedRef.current = session.completed;
@@ -72,6 +78,9 @@ export function WatchScreen() {
             const nextMax = Math.max(maxReachedRef.current, data.maxPosition);
             maxReachedRef.current = nextMax;
             setMaxReached(nextMax);
+          }
+          if (typeof data.remainingSecs === "number") {
+            setUnlockAnchor({ remainingSecs: data.remainingSecs, position });
           }
           if (data.completed && !isCompletedRef.current) {
             hapticSuccess();
@@ -179,10 +188,27 @@ export function WatchScreen() {
   const handleRateChange = () => {
     const video = videoRef.current;
     if (!video) return;
-    if (video.playbackRate !== 1) {
-      video.playbackRate = 1;
+    if (video.playbackRate !== playbackRateRef.current) {
+      video.playbackRate = playbackRateRef.current;
     }
   };
+
+  const cycleSpeed = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    const index = PLAYBACK_RATES.indexOf(playbackRateRef.current as (typeof PLAYBACK_RATES)[number]);
+    const next = PLAYBACK_RATES[(index + 1) % PLAYBACK_RATES.length];
+    playbackRateRef.current = next;
+    video.playbackRate = next;
+    setPlaybackRate(next);
+    resetControlsTimeout();
+  };
+
+  const unlockRemainingSecs = Math.max(
+    0,
+    unlockAnchor.remainingSecs - Math.max(0, currentTime - unlockAnchor.position),
+  );
+  const showUnlockCountdown = !isProceedVisible && unlockRemainingSecs > 0;
 
   const handlePlay = () => {
     const video = videoRef.current;
@@ -381,6 +407,14 @@ export function WatchScreen() {
               <div className="flex items-center gap-1">
                 <button
                   type="button"
+                  onClick={cycleSpeed}
+                  aria-label={watchUz.speed}
+                  className="flex h-8 min-w-11 items-center justify-center rounded-lg px-2 font-mono text-white hover:bg-white/10 active:scale-95 transition-all"
+                >
+                  {playbackRate}x
+                </button>
+                <button
+                  type="button"
                   onClick={toggleFullscreen}
                   aria-label={isFullscreen ? watchUz.exitFullscreen : watchUz.fullscreen}
                   className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-white/10 active:scale-95 transition-all text-white"
@@ -408,6 +442,17 @@ export function WatchScreen() {
             {watchUz.lessonSubtitle}
           </p>
         </div>
+
+        {showUnlockCountdown && (
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 px-4 py-3 text-center">
+            <p className="text-sm font-medium text-zinc-200">
+              {watchUz.unlockIn(formatTime(Math.ceil(unlockRemainingSecs / playbackRate)))}
+            </p>
+            {playbackRate < MAX_PLAYBACK_RATE && (
+              <p className="mt-1 text-xs text-zinc-500">{watchUz.unlockHint}</p>
+            )}
+          </div>
+        )}
 
         <div className="pt-2">
           <ProceedButton

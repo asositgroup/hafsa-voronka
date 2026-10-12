@@ -14,6 +14,7 @@ export const sessionResponseSchema = z.object({
   progress: z.object({
     lastPosition: z.number(),
     maxPosition: z.number(),
+    remainingSecs: z.number(),
   }),
   config: z.object({
     videoUrl: z.string(),

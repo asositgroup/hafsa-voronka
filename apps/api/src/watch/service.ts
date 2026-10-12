@@ -10,13 +10,14 @@ import { uz } from "@/i18n/uz";
 import { bot } from "@/telegram/bot";
 import {
   applyBeat,
+  remainingWatchSecs,
   type WatchBeat,
   type WatchConfig,
   type WatchState,
 } from "./credit";
 
 export type ProgressResult =
-  | { ok: true; completed: boolean; maxPosition: number }
+  | { ok: true; completed: boolean; maxPosition: number; remainingSecs: number }
   | { ok: false; error: "not_registered" };
 
 export type EventResult =
@@ -127,6 +128,7 @@ export async function recordProgress(
     ok: true,
     completed: result.state.completed,
     maxPosition: result.state.maxPosition,
+    remainingSecs: remainingWatchSecs(result.state.watchedSecs, result.state.completed, watchConfig),
   };
 }
 

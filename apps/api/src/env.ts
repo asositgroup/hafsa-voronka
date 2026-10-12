@@ -18,7 +18,7 @@ const schema = z
     VIDEO_DURATION_SEC: z.coerce.number().int().positive(),
     SEEK_LOCK: booleanEnv(true),
     GATE_PROCEED: booleanEnv(true),
-    COMPLETE_THRESHOLD: z.coerce.number().min(0.5).max(1).default(0.95),
+    COMPLETE_THRESHOLD: z.coerce.number().min(0.5).max(1).default(0.7),
     CORS_ORIGINS: z.string().optional(),
     SHEETS_ENABLED: booleanEnv(false),
     GOOGLE_SA_EMAIL: z.string().optional(),

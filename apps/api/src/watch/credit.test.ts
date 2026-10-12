@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyBeat, type WatchConfig, type WatchState } from "./credit";
+import { applyBeat, remainingWatchSecs, type WatchConfig, type WatchState } from "./credit";
 
 const config: WatchConfig = {
   duration: 100,
@@ -144,7 +144,7 @@ describe("applyBeat crediting rules", () => {
       config,
     );
 
-    const expectedCredit = 10 * 1.1 + 2;
+    const expectedCredit = 10 * 2 * 1.1 + 2;
     expect(res.state.watchedSecs).toBeCloseTo(expectedCredit);
     expect(res.state.maxPosition).toBeCloseTo(10 + expectedCredit);
     expect(res.state.lastPosition).toBe(80);
@@ -453,6 +453,43 @@ describe("applyBeat crediting rules", () => {
     const res = applyBeat(state, { position: 25, event: "tick" }, new Date(25_000), config);
     expect(res.state.watchedSecs).toBe(25);
     expect(res.state.maxPosition).toBe(25);
+  });
+
+  it("credits full content time when watching at 2x speed", () => {
+    let state = applyBeat(initialState(), { position: 0, event: "play" }, new Date(0), config).state;
+    state = applyBeat(state, { position: 20, event: "tick" }, new Date(10_000), config).state;
+    expect(state.watchedSecs).toBe(20);
+    expect(state.maxPosition).toBe(20);
+  });
+
+  it("caps credit above 2x speed", () => {
+    const state = applyBeat(initialState(), { position: 0, event: "play" }, new Date(0), config).state;
+    const res = applyBeat(state, { position: 40, event: "tick" }, new Date(10_000), config);
+    expect(res.state.watchedSecs).toBeCloseTo(10 * 2 * 1.1 + 2);
+  });
+
+  it("completes at the configured threshold when watched at 2x", () => {
+    const halfway: WatchConfig = { duration: 100, threshold: 0.7 };
+    let state = applyBeat(initialState(), { position: 0, event: "play" }, new Date(0), halfway).state;
+    let completedAt = -1;
+    for (let second = 5; second <= 50; second += 5) {
+      const res = applyBeat(state, { position: second * 2, event: "tick" }, new Date(second * 1000), halfway);
+      state = res.state;
+      if (res.completedNow) completedAt = second;
+    }
+    expect(completedAt).toBe(35);
+  });
+});
+
+describe("remainingWatchSecs", () => {
+  it("returns the unwatched part of the threshold, rounded up", () => {
+    expect(remainingWatchSecs(0, false, { duration: 1049, threshold: 0.7 })).toBe(735);
+    expect(remainingWatchSecs(700.2, false, { duration: 1049, threshold: 0.7 })).toBe(35);
+    expect(remainingWatchSecs(800, false, { duration: 1049, threshold: 0.7 })).toBe(0);
+  });
+
+  it("returns 0 once completed", () => {
+    expect(remainingWatchSecs(10, true, { duration: 1049, threshold: 0.7 })).toBe(0);
   });
 });
 

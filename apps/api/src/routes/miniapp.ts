@@ -8,6 +8,7 @@ import { env } from "@/env";
 import { completeRegistration } from "@/funnel/registration";
 import { logEvent, upsertUser } from "@/funnel/users";
 import { capiClient } from "@/http/clientIp";
+import { remainingWatchSecs } from "@/watch/credit";
 import { validateRegistration } from "./registration";
 
 async function readJson(request: { json: () => Promise<unknown> }) {
@@ -42,6 +43,11 @@ miniappRoutes.post("/session", async (c) => {
     progress: {
       lastPosition: progress?.lastPosition ?? 0,
       maxPosition: progress?.maxPosition ?? 0,
+      remainingSecs: remainingWatchSecs(
+        progress?.watchedSecs ?? 0,
+        user.completedAt !== null || Boolean(progress?.completed),
+        { duration: env.VIDEO_DURATION_SEC, threshold: env.COMPLETE_THRESHOLD },
+      ),
     },
     config: {
       videoUrl: env.VIDEO_URL,

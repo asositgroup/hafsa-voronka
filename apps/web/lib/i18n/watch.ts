@@ -10,5 +10,8 @@ export const watchUz = {
   lessonTitle: "Maxsus video dars",
   lessonSubtitle: "Darsni diqqat bilan tomosha qiling",
   congratulations: "Dars yakunlandi! 🎉",
+  speed: "Tezlik",
+  unlockIn: (time: string) => `Kanal tugmasi ${time} dan keyin ochiladi`,
+  unlockHint: "Tezlikni 2x gacha oshirib, tezroq ochishingiz mumkin",
   proceedDescription: "Kanalimizga ulanib, qimmatli materiallarni olishingiz mumkin.",
 };

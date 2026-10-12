@@ -2,42 +2,45 @@ import { CtaButton } from "@/components/landing/CtaButton";
 import { landingContent } from "@/content/landing";
 
 export function WhatYouWillLearn() {
-  const { whatYouWillLearn } = landingContent;
+  const { lesson } = landingContent;
 
   return (
-    <section className="pt-10 flex flex-col">
-      <h2 className="text-2xl font-bold leading-[1.2] text-siyoh mb-3 m-0">
-        {whatYouWillLearn.title}
-      </h2>
+    <section className="bg-varaq py-[72px] lg:py-28">
+      <div className="mx-auto w-full max-w-[1180px] px-5 md:px-8">
+        <h2 className="m-0 text-[32px] font-bold leading-[1.1] tracking-[-0.02em] text-siyoh lg:text-[48px]">
+          {lesson.title}
+        </h2>
+        <p className="m-0 mt-4 max-w-[560px] text-[16px] leading-[1.6] text-qalam">
+          {lesson.intro}
+        </p>
 
-      <div className="flex flex-col">
-        {whatYouWillLearn.items.map((item, index) => (
-          <div
-            key={index}
-            className="flex items-start justify-between gap-4 py-4 border-t border-chiziq"
-          >
-            <div className="flex-1 flex flex-col gap-1">
-              <h3 className="text-lg sm:text-[20px] font-semibold leading-[1.3] text-siyoh m-0">
-                {item.title}
+        <div className="mt-10 lg:mt-14 rounded-[18px] bg-white p-6 lg:p-0 grid grid-cols-1 divide-y divide-chiziq lg:grid-cols-3 lg:divide-y-0 lg:divide-x">
+          {lesson.cards.map((card) => (
+            <div
+              key={card.numeral}
+              className="flex flex-col gap-3 py-6 first:pt-0 last:pb-0 lg:min-h-[320px] lg:p-10 lg:first:pt-10 lg:last:pb-10"
+            >
+              <span
+                aria-hidden="true"
+                className="self-end font-arabic text-[44px] leading-none text-zumrad lg:text-[52px]"
+              >
+                {card.numeral}
+              </span>
+              <h3 className="m-0 text-[20px] font-semibold leading-[1.25] text-siyoh lg:text-[22px]">
+                {card.title}
               </h3>
-              <p className="text-[15px] sm:text-[16px] leading-[1.55] text-qalam m-0">
-                {item.description}
+              <p className="m-0 text-[16px] leading-[1.6] text-qalam lg:text-[17px]">
+                {card.description}
               </p>
             </div>
-            <span
-              dir="rtl"
-              className="font-arabic text-[40px] leading-[0.9] text-zumrad min-w-[32px] text-right shrink-0 select-none pt-0.5"
-            >
-              {item.numeral}
-            </span>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
 
-      <div className="pt-6">
-        <CtaButton variant="gold" className="w-full sm:w-auto">
-          {whatYouWillLearn.buttonText}
-        </CtaButton>
+        <div className="mt-8">
+          <CtaButton variant="gold" className="w-full md:w-auto">
+            {lesson.buttonText}
+          </CtaButton>
+        </div>
       </div>
     </section>
   );

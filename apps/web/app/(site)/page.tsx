@@ -3,6 +3,7 @@ import {
   FacebookPixel,
   FooterSection,
   HeroSection,
+  LandingHeader,
   LandingTracker,
   StepsToVideoSection,
   StickyBottomCta,
@@ -15,17 +16,16 @@ export default function Page() {
     <>
       <FacebookPixel />
       <LandingTracker />
-      <div className="flex min-h-screen flex-col bg-varaq text-siyoh">
-        <HeroSection />
-        <main className="w-full max-w-6xl mx-auto px-5">
-          <div className="w-full max-w-[560px]">
-            <WhatYouWillLearn />
-            <WhoIsThisFor />
-            <ExpertBioSection />
-            <StepsToVideoSection />
-            <FooterSection />
-          </div>
+      <div className="relative flex min-h-screen flex-col bg-varaq text-siyoh">
+        <LandingHeader />
+        <main className="flex flex-col">
+          <HeroSection />
+          <WhatYouWillLearn />
+          <WhoIsThisFor />
+          <ExpertBioSection />
+          <StepsToVideoSection />
         </main>
+        <FooterSection />
         <StickyBottomCta />
       </div>
     </>

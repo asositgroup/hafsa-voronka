@@ -180,7 +180,6 @@ describe.skipIf(!testDbUrl)("Admin Integration Tests", () => {
         type: "cta_click",
         visitorId: visitorA,
         createdAt: dateMay06BeforeMidnight,
-        meta: { utm_source: "fb_ad", utm_campaign: "promo_fb" },
       },
       {
         type: "landing_view",
@@ -371,6 +370,8 @@ describe.skipIf(!testDbUrl)("Admin Integration Tests", () => {
     expect(filteredStatsRes.status).toBe(200);
     const filteredStats = adminStatsResponseSchema.parse(await filteredStatsRes.json());
     expect(filteredStats.kpis.landingViews).toBe(1);
+    const filteredSteps = Object.fromEntries(filteredStats.funnel.map((s) => [s.step, s.count]));
+    expect(filteredSteps.cta_click).toBe(1);
     expect(filteredStats.kpis.botStarts).toBe(2);
     expect(filteredStats.kpis.registrations).toBe(2);
     expect(filteredStats.kpis.completions).toBe(1);

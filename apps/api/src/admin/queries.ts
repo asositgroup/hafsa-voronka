@@ -69,8 +69,16 @@ export async function getFunnelAndKpis(filters: QueryFilters): Promise<{
         AND e.type IN ('landing_view', 'cta_click', 'bot_start', 'registered', 'video_start', 'progress_25', 'progress_50', 'progress_75', 'video_complete', 'channel_click')
         AND (
           (e.type IN ('landing_view', 'cta_click')
-           AND (${filters.source ?? null}::text IS NULL OR e.meta->>'utm_source' = ${filters.source ?? null})
-           AND (${filters.campaign ?? null}::text IS NULL OR e.meta->>'utm_campaign' = ${filters.campaign ?? null}))
+           AND (
+             (${filters.source ?? null}::text IS NULL AND ${filters.campaign ?? null}::text IS NULL)
+             OR e.visitor_id IN (
+               SELECT lv.visitor_id
+               FROM events lv
+               WHERE lv.type = 'landing_view'
+                 AND (${filters.source ?? null}::text IS NULL OR lv.meta->>'utm_source' = ${filters.source ?? null})
+                 AND (${filters.campaign ?? null}::text IS NULL OR lv.meta->>'utm_campaign' = ${filters.campaign ?? null})
+             )
+           ))
           OR
           (e.type NOT IN ('landing_view', 'cta_click')
            AND (${filters.source ?? null}::text IS NULL OR u.utm_source = ${filters.source ?? null})

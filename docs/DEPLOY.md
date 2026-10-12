@@ -159,10 +159,10 @@ Encode source video using `scripts/encode-video.sh`:
 ./scripts/encode-video.sh /path/to/raw-video.mov ./dist/lesson-1 hls
 ```
 
-Upload the encoded directory:
+Upload the encoded directory. Use this script rather than a plain `rclone copy`: rclone guesses `.ts` as a Qt translation file type, and iOS can reject HLS segments with the wrong content type.
 
 ```bash
-rclone copy ./dist/lesson-1 r2:funnel-video/lesson-1 --progress
+scripts/upload-video.sh ./dist/lesson-1 r2:funnel-video/lesson-1
 ```
 
 ### Verify Cache Status

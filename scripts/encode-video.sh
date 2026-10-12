@@ -112,4 +112,4 @@ elif [ "$mode" = "hls" ]; then
 fi
 
 echo "VIDEO_DURATION_SEC=$duration_sec"
-echo "rclone copy \"$out_dir\" r2:funnel-video/lesson-1"
+echo "scripts/upload-video.sh \"$out_dir\" r2:funnel-video/lesson-1"

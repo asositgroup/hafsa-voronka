@@ -308,6 +308,7 @@ describe.skipIf(!testDbUrl)("Admin Integration Tests", () => {
     expect(stepCounts).toEqual({
       landing_view: 2,
       cta_click: 1,
+      lead_submitted: 0,
       bot_start: 3,
       registered: 3,
       video_start: 2,
@@ -321,7 +322,8 @@ describe.skipIf(!testDbUrl)("Admin Integration Tests", () => {
     const stepConv = Object.fromEntries(stats.funnel.map((s) => [s.step, s.conversionRate]));
     expect(stepConv.landing_view).toBe(100);
     expect(stepConv.cta_click).toBe(50);
-    expect(stepConv.bot_start).toBe(300);
+    expect(stepConv.lead_submitted).toBe(0);
+    expect(stepConv.bot_start).toBe(0);
     expect(stepConv.registered).toBe(100);
     expect(stepConv.video_start).toBe(66.7);
     expect(stepConv.progress_25).toBe(100);

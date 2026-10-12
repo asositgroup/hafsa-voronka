@@ -15,6 +15,20 @@
       "when": 1791785442414,
       "tag": "0001_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791805824205,
+      "tag": "0002_leads",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791806614949,
+      "tag": "0003_lead_assignment",
+      "breakpoints": true
     }
   ]
 }

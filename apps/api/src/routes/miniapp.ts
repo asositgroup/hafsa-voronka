@@ -5,11 +5,8 @@ import type { AppEnv } from "@/auth";
 import { db } from "@/db";
 import { watchProgress } from "@/db/schema";
 import { env } from "@/env";
-import { completeRegistration } from "@/funnel/registration";
 import { logEvent, upsertUser } from "@/funnel/users";
-import { capiClient } from "@/http/clientIp";
 import { remainingWatchSecs } from "@/watch/credit";
-import { validateRegistration } from "./registration";
 
 async function readJson(request: { json: () => Promise<unknown> }) {
   try {
@@ -60,22 +57,4 @@ miniappRoutes.post("/session", async (c) => {
   } satisfies SessionResponse);
 });
 
-miniappRoutes.post("/register", async (c) => {
-  const { user } = await upsertUser(c.get("telegramUser"), c.get("startParam"));
-  if (user.registeredAt !== null) {
-    return c.json({ ok: true as const });
-  }
-
-  const result = validateRegistration(await readJson(c.req), user);
-  if (!result.ok) {
-    return c.json({ field: result.field, message: result.message }, 422);
-  }
-
-  await completeRegistration(
-    user,
-    { name: result.name, phone: result.phone, phoneVerified: result.phoneVerified },
-    { actionSource: "website", client: capiClient(c) },
-  );
-
-  return c.json({ ok: true as const });
-});
+miniappRoutes.post("/register", (c) => c.json({ error: "register_in_bot" }, 403));

@@ -167,13 +167,13 @@ export const landingContent: LandingContent = {
     items: [
       {
         number: 1,
-        title: "Tugmani bosing",
-        description: "Telegramda bot ochiladi",
+        title: "Ism va raqamingizni qoldiring",
+        description: "Shundan so‘ng Telegramda bot ochiladi",
       },
       {
         number: 2,
-        title: "Raqamingizni yuboring",
-        description: "Buning uchun bitta tugma yetarli",
+        title: "Botda raqamingizni tasdiqlang",
+        description: "«Raqamni yuborish» tugmasini bosing",
       },
       {
         number: 3,

@@ -6,12 +6,10 @@ export const uz = {
       `Yana xush kelibsiz, ${name}! Darsni qayta ko'rishingiz yoki kanalga o'tishingiz mumkin.`,
     fallback: "Video darsni ko'rish uchun quyidagi tugmani bosing.",
     askContact: (name: string) =>
-      `Assalomu alaykum, ${name}! 👋\n\nBepul video darsni olish uchun telefon raqamingizni yuboring: pastdagi «📱 Raqamni yuborish» tugmasini bosing.\n\nYoki raqamingizni yozib yuboring, masalan: +998 90 123 45 67`,
+      `Assalomu alaykum, ${name}! 👋\n\nBepul video darsni olish uchun ro'yxatdan o'ting: pastdagi «📱 Raqamni yuborish» tugmasini bosing.`,
     askContactShort:
-      "Video darsni olish uchun avval telefon raqamingizni yuboring: pastdagi «📱 Raqamni yuborish» tugmasini bosing.",
+      "Video darsni olish uchun avval ro'yxatdan o'ting: pastdagi «📱 Raqamni yuborish» tugmasini bosing.",
     shareContactButton: "📱 Raqamni yuborish",
-    invalidPhone:
-      "Raqam noto'g'ri ko'rinishda. Pastdagi tugma orqali yuboring yoki shunday yozing: +998 90 123 45 67",
     registered: "Rahmat, ro'yxatdan o'tdingiz! ✅",
     watchPrompt: "Bepul video dars tayyor. Ko'rish uchun quyidagi tugmani bosing 👇",
     defaultName: "Foydalanuvchi",

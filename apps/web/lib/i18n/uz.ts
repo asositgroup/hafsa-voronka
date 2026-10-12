@@ -8,25 +8,13 @@ export const uz = {
     openInTelegramDesc: "Darsni ko‘rish uchun botimizni Telegramda oching.",
     openInTelegramButton: "Telegramda ochish",
   },
-  register: {
-    title: "Darsni ko‘rish uchun raqamingizni yuboring",
-    subtitle: "Bitta tugma bilan raqamingizni yuboring, keyin dars ochiladi.",
-    nameLabel: "Ismingiz",
-    namePlaceholder: "Ismingizni kiriting",
-    shareContactButton: "Raqamni yuborish",
-    waitingContact: "Raqam tekshirilmoqda...",
-    phoneVerifiedBadge: "Raqam tasdiqlandi",
-    phoneLabel: "Telefon raqamingiz",
-    phonePlaceholder: "90 123 45 67",
-    manualEntryHint: "Raqamni qo‘lda kiritish",
-    submitButton: "Davom etish",
-    submittingButton: "Yuklanmoqda...",
-    privacyNote: "Raqamingiz faqat dars va kanal haqida xabar berish uchun ishlatiladi.",
-    errors: {
-      nameRequired: "Ismingizni kiriting (2-60 ta belgi)",
-      phoneRequired: "Telefon raqamingizni to‘g‘ri kiriting (+998XXXXXXXXX)",
-      generic: "Xatolik yuz berdi. Qayta urinib ko‘ring.",
-    },
+  gate: {
+    title: "Avval botda ro‘yxatdan o‘ting",
+    description:
+      "Botga qayting va pastdagi «Raqamni yuborish» tugmasini bosing. Shundan so‘ng dars shu yerda ochiladi.",
+    backToBot: "Botga qaytish",
+    recheck: "Ro‘yxatdan o‘tdim, tekshirish",
+    stillLocked: "Hali ro‘yxatdan o‘tmagansiz. Botda raqamingizni yuboring.",
   },
   watch: {
     title: "Arab tilini o‘rganishdagi 5 muhim qadam",

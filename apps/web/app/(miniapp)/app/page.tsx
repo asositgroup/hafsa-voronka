@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { LoadingScreen, useMiniApp } from "@/components/miniapp/MiniAppProvider";
-import { RegistrationScreen } from "@/components/registration/RegistrationScreen";
+import { BotRegisterScreen } from "@/components/registration/BotRegisterScreen";
 
 export default function AppPage() {
   const router = useRouter();
@@ -14,5 +14,5 @@ export default function AppPage() {
   }, [router, session.registered]);
 
   if (session.registered) return <LoadingScreen />;
-  return <RegistrationScreen />;
+  return <BotRegisterScreen />;
 }

@@ -15,6 +15,7 @@ import { formatTashkentDate, listDaysInRange } from "./dates";
 const FUNNEL_STEP_NAMES: Record<string, string> = {
   landing_view: "Landing ko'rildi",
   cta_click: "CTA bosildi",
+  lead_submitted: "Forma yuborildi",
   bot_start: "Bot boshlandi",
   registered: "Ro'yxatdan o'tdi",
   video_start: "Video boshlandi",
@@ -28,6 +29,7 @@ const FUNNEL_STEP_NAMES: Record<string, string> = {
 const ORDERED_FUNNEL_STEPS = [
   "landing_view",
   "cta_click",
+  "lead_submitted",
   "bot_start",
   "registered",
   "video_start",
@@ -53,7 +55,7 @@ export async function getFunnelAndKpis(filters: QueryFilters): Promise<{
     SELECT
       type,
       CASE
-        WHEN type IN ('landing_view', 'cta_click') THEN count(DISTINCT visitor_id)
+        WHEN type IN ('landing_view', 'cta_click', 'lead_submitted') THEN count(DISTINCT visitor_id)
         ELSE count(DISTINCT user_id)
       END AS count
     FROM (
@@ -66,9 +68,9 @@ export async function getFunnelAndKpis(filters: QueryFilters): Promise<{
       WHERE
         (e.created_at AT TIME ZONE 'Asia/Tashkent')::date >= ${filters.from}::date
         AND (e.created_at AT TIME ZONE 'Asia/Tashkent')::date <= ${filters.to}::date
-        AND e.type IN ('landing_view', 'cta_click', 'bot_start', 'registered', 'video_start', 'progress_25', 'progress_50', 'progress_75', 'video_complete', 'channel_click')
+        AND e.type IN ('landing_view', 'cta_click', 'lead_submitted', 'bot_start', 'registered', 'video_start', 'progress_25', 'progress_50', 'progress_75', 'video_complete', 'channel_click')
         AND (
-          (e.type IN ('landing_view', 'cta_click')
+          (e.type IN ('landing_view', 'cta_click', 'lead_submitted')
            AND (
              (${filters.source ?? null}::text IS NULL AND ${filters.campaign ?? null}::text IS NULL)
              OR e.visitor_id IN (
@@ -80,7 +82,7 @@ export async function getFunnelAndKpis(filters: QueryFilters): Promise<{
              )
            ))
           OR
-          (e.type NOT IN ('landing_view', 'cta_click')
+          (e.type NOT IN ('landing_view', 'cta_click', 'lead_submitted')
            AND (${filters.source ?? null}::text IS NULL OR u.utm_source = ${filters.source ?? null})
            AND (${filters.campaign ?? null}::text IS NULL OR u.utm_campaign = ${filters.campaign ?? null}))
         )

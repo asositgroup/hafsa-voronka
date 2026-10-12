@@ -5,6 +5,7 @@ import {
   HeroSection,
   LandingHeader,
   LandingTracker,
+  LeadModalProvider,
   StepsToVideoSection,
   StickyBottomCta,
   WhatYouWillLearn,
@@ -16,6 +17,7 @@ export default function Page() {
     <>
       <FacebookPixel />
       <LandingTracker />
+      <LeadModalProvider>
       <div className="relative flex min-h-screen flex-col bg-varaq text-siyoh">
         <LandingHeader />
         <main className="flex flex-col">
@@ -28,6 +30,7 @@ export default function Page() {
         <FooterSection />
         <StickyBottomCta />
       </div>
+      </LeadModalProvider>
     </>
   );
 }

@@ -30,6 +30,11 @@ const schema = z
     FB_PIXEL_ID: z.string().optional(),
     FB_CAPI_TOKEN: z.string().optional(),
     FB_TEST_EVENT_CODE: z.string().optional(),
+    LEADS_CHAT_ID: z
+      .string()
+      .regex(/^(-?\d+|@[A-Za-z0-9_]{5,32})$/, "LEADS_CHAT_ID must be a numeric chat id or @channelname")
+      .optional(),
+    LEADS_THREAD_ID: z.coerce.number().int().positive().optional(),
     ADMIN_PASSWORD_HASH: z.string().optional(),
     SESSION_SECRET: z.string().min(32).optional(),
   })

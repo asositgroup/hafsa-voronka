@@ -49,6 +49,7 @@ describe("formatLeadRow", () => {
       "telegram",
       "autumn",
       "ad1",
+      "bot",
     ]);
   });
 

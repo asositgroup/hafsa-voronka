@@ -1,6 +1,7 @@
 export const eventTypes = [
   "landing_view",
   "cta_click",
+  "lead_submitted",
   "bot_start",
   "app_open",
   "registered",
@@ -26,3 +27,4 @@ export * from "./schemas";
 export * from "./video";
 export * from "./track";
 export * from "./admin";
+export * from "./lead";

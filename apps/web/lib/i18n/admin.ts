@@ -41,7 +41,7 @@ export const adminUz = {
     registrations: "Ro‘yxat",
     completions: "Kanal ochildi",
     channelClicks: "Kanalga o‘tdi",
-    conversionRate: "Landing → kanal",
+    conversionRate: ["Landing", "kanal"],
     landingNote: "ochilgan",
     botNote: "start bosgan",
     registrationNote: "raqam yuborgan",

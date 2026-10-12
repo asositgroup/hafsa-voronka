@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 import { JWT } from "google-auth-library";
 import { db, rawClient } from "@/db";
-import { sheetsQueue, type User } from "@/db/schema";
+import { type Lead, sheetsQueue, type User } from "@/db/schema";
 import { env } from "@/env";
 
 const SHEETS_LOCK_KEY = 849204812;
@@ -32,10 +32,14 @@ export function formatTashkentDate(date: Date): string {
   return `${map.year}-${map.month}-${map.day} ${map.hour}:${map.minute}`;
 }
 
+function sheetPhone(phone: string | null) {
+  if (!phone) return "";
+  return phone.startsWith("'") ? phone : `'${phone}`;
+}
+
 export function formatLeadRow(user: User, registeredAt?: Date): unknown[] {
   const dateStr = formatTashkentDate(registeredAt ?? user.registeredAt ?? new Date());
-  const phone = user.phone ?? "";
-  const prefixedPhone = phone ? (phone.startsWith("'") ? phone : `'${phone}`) : "";
+  const prefixedPhone = sheetPhone(user.phone);
   const username = user.username
     ? user.username.startsWith("@")
       ? user.username
@@ -52,6 +56,22 @@ export function formatLeadRow(user: User, registeredAt?: Date): unknown[] {
     user.utmSource ?? "",
     user.utmCampaign ?? "",
     user.utmContent ?? "",
+    "bot",
+  ];
+}
+
+export function formatWebLeadRow(lead: Lead): unknown[] {
+  return [
+    formatTashkentDate(lead.createdAt),
+    lead.name,
+    sheetPhone(lead.phone),
+    false,
+    "",
+    "",
+    lead.utmSource ?? "",
+    lead.utmCampaign ?? "",
+    lead.utmContent ?? "",
+    "sayt",
   ];
 }
 
@@ -79,7 +99,7 @@ export async function appendRowsToSheets(rows: unknown[][]): Promise<void> {
   }
 }
 
-export async function enqueueLead(userId: number, row: unknown[]) {
+export async function enqueueLead(userId: number | null, row: unknown[]) {
   const [entry] = await db()
     .insert(sheetsQueue)
     .values({ userId, row })

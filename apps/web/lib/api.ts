@@ -1,16 +1,16 @@
 import {
-  registerErrorSchema,
-  registerResponseSchema,
+  leadErrorSchema,
+  leadResponseSchema,
   sessionResponseSchema,
-  type RegisterRequest,
+  type LeadRequest,
   type SessionRequest,
   type SessionResponse,
 } from "@funnel/shared";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
-export type RegisterResult =
-  | { ok: true }
+export type LeadResult =
+  | { ok: true; eventId: string }
   | { ok: false; field?: "name" | "phone"; message?: string };
 
 export function miniAppPost(path: string, initData: string, body?: unknown) {
@@ -41,16 +41,20 @@ export async function fetchSession(
   return sessionResponseSchema.parse(await res.json());
 }
 
-export async function registerUser(initData: string, data: RegisterRequest): Promise<RegisterResult> {
-  const res = await miniAppPost("/app/register", initData, data);
+export async function submitLead(data: LeadRequest): Promise<LeadResult> {
+  const res = await fetch(`${API_URL}/leads`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(data),
+  });
 
   if (res.ok) {
-    registerResponseSchema.parse(await res.json());
-    return { ok: true };
+    const parsed = leadResponseSchema.parse(await res.json());
+    return { ok: true, eventId: parsed.event_id };
   }
 
   if (res.status === 422) {
-    const parsed = registerErrorSchema.safeParse(await res.json().catch(() => ({})));
+    const parsed = leadErrorSchema.safeParse(await res.json().catch(() => ({})));
     if (parsed.success) return { ok: false, ...parsed.data };
   }
 

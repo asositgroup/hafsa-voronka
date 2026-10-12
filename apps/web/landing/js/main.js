@@ -2,6 +2,7 @@ const API_URL = __API_URL__;
 const BOT_USERNAME = __BOT_USERNAME__;
 const STORAGE_KEY = "lead_form";
 const REDIRECT_DELAY_MS = 900;
+const TIMER_MS = 60 * 60 * 1000;
 const UZ_OPERATORS = ["90", "91", "93", "94", "95", "97", "98", "99", "33", "50", "55", "77", "88"];
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-";
 const GENERIC_ERROR = "Xatolik yuz berdi. Qayta urinib ko‘ring.";
@@ -77,6 +78,30 @@ function save(name, phone) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ name, phone }));
   } catch {}
 }
+
+function startTimer() {
+  const el = document.getElementById("timer");
+  const key = "video_deadline";
+  let deadline;
+  try {
+    deadline = Number(localStorage.getItem(key));
+    if (!deadline) {
+      deadline = Date.now() + TIMER_MS;
+      localStorage.setItem(key, String(deadline));
+    }
+  } catch {
+    deadline = Date.now() + TIMER_MS;
+  }
+  const pad = (n) => String(n).padStart(2, "0");
+  const tick = () => {
+    const left = Math.max(0, Math.round((deadline - Date.now()) / 1000));
+    el.textContent = `${pad(Math.floor(left / 3600))}:${pad(Math.floor((left % 3600) / 60))}:${pad(left % 60)}`;
+    if (left > 0) setTimeout(tick, 1000 - (Date.now() % 1000));
+  };
+  tick();
+}
+
+startTimer();
 
 const vid = visitorId();
 

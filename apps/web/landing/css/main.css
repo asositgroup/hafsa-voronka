@@ -344,12 +344,13 @@
   max-width: 380px;
   align-items: center;
   justify-content: center;
+  padding: 24px 0 72px;
   border-radius: 200px 200px 18px 18px;
   background: var(--zumrad);
 }
 
 .bio__word {
-  width: calc(100% - 32px);
+  width: 72%;
   height: 120px;
 }
 

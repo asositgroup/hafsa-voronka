@@ -52,8 +52,8 @@ adminRoutes.post("/login", async (c) => {
     return c.json({ error: "unauthorized" }, 401);
   }
 
-  await setAdminSessionCookie(c);
-  return c.json({ ok: true });
+  const token = await setAdminSessionCookie(c);
+  return c.json({ ok: true, token });
 });
 
 adminRoutes.post("/logout", (c) => {

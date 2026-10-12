@@ -1,5 +1,6 @@
 import { type BotTextItem, type BotTextKey, botTextsResponseSchema } from "@funnel/shared";
 import { API_URL } from "@/lib/api";
+import { authHeaders } from "@/lib/admin/api";
 
 export type BotTextsResult =
   | { ok: true; items: BotTextItem[]; mediaEnabled?: boolean }
@@ -7,7 +8,11 @@ export type BotTextsResult =
 
 async function call(path: string, init: RequestInit = {}): Promise<BotTextsResult> {
   try {
-    const res = await fetch(`${API_URL}/admin/bot-texts${path}`, { ...init, credentials: "include" });
+    const res = await fetch(`${API_URL}/admin/bot-texts${path}`, {
+      ...init,
+      headers: { ...authHeaders(), ...(init.headers as Record<string, string>) },
+      credentials: "include",
+    });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) return { ok: false, status: res.status, error: json?.error };
     const parsed = botTextsResponseSchema.partial({ mediaEnabled: true }).parse(json);

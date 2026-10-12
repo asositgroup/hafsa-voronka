@@ -29,7 +29,17 @@ export function createApp() {
   const app = new Hono();
   const handleUpdate = webhookCallback(bot(), "hono");
   const origins = webOrigins();
-  const originFor = (origin: string) => (origins.has(origin) ? origin : null);
+  const originFor = (origin: string) => {
+    if (!origin) return null;
+    if (origins.has(origin)) return origin;
+    try {
+      const url = new URL(origin);
+      if (url.hostname.endsWith(".vercel.app") || url.hostname === "localhost" || url.hostname === "127.0.0.1") {
+        return origin;
+      }
+    } catch {}
+    return null;
+  };
 
   app.get("/health", async (c) => {
     await db().execute(sql`select 1`);
@@ -65,7 +75,7 @@ export function createApp() {
     "/admin/*",
     cors({
       origin: originFor,
-      allowHeaders: ["Content-Type"],
+      allowHeaders: ["Content-Type", "Authorization", "x-admin-session"],
       allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
       credentials: true,
       maxAge: 86400,

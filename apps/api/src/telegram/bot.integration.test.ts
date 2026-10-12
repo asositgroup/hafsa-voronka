@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import type { Bot } from "grammy";
 import { closeDb, db } from "@/db";
@@ -7,6 +7,12 @@ import { runMigrations } from "@/db/migrate";
 import { setTestEnv } from "@/test/env";
 
 const testDbUrl = process.env.TEST_DATABASE_URL;
+const LEADS_CHAT_ID = -1_009_999_999_999;
+
+vi.mock("@/leads/notifier", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/leads/notifier")>()),
+  kickLeadNotifier: () => {},
+}));
 
 type ApiCall = { method: string; payload: Record<string, unknown> };
 
@@ -16,7 +22,7 @@ describe.skipIf(!testDbUrl)("Bot registration flow", () => {
   let updateId = 1;
 
   beforeAll(async () => {
-    setTestEnv({ DATABASE_URL: testDbUrl! });
+    setTestEnv({ DATABASE_URL: testDbUrl!, LEADS_CHAT_ID: String(LEADS_CHAT_ID) });
     await runMigrations(testDbUrl!);
     const { bot } = await import("./bot");
     testBot = bot();
@@ -207,5 +213,54 @@ describe.skipIf(!testDbUrl)("Bot registration flow", () => {
 
     const user = await userRow(telegramId);
     expect(await registeredEvents(user.id)).toHaveLength(1);
+  });
+
+  function pressButton(chatId: number, presser: number, data: string) {
+    return testBot.handleUpdate({
+      update_id: updateId++,
+      callback_query: {
+        id: String(updateId),
+        from: { id: presser, is_bot: false, first_name: "Sardor", username: "sardor" },
+        chat_instance: "1",
+        data,
+        message: {
+          message_id: 10,
+          date: Math.floor(Date.now() / 1000),
+          chat: { id: chatId, type: "supergroup", title: "Leads" },
+          text: "card",
+        },
+      },
+    } as never);
+  }
+
+  it("binds a lead to the first salesman who presses the button in the leads group", async () => {
+    const [lead] = await db()
+      .insert(leads)
+      .values({ source: "web", name: "Button", phone: "+998900000001" })
+      .returning();
+    const salesman = 9_000_000 + Math.floor(Math.random() * 100_000);
+
+    await pressButton(LEADS_CHAT_ID, salesman, `lead:claim:${lead.id}`);
+    await pressButton(LEADS_CHAT_ID, salesman + 1, `lead:claim:${lead.id}`);
+
+    const answers = calls.filter((c) => c.method === "answerCallbackQuery").map((c) => c.payload);
+    expect(answers[0]).toMatchObject({ text: "Lid sizga biriktirildi", show_alert: false });
+    expect(answers[1]).toMatchObject({ text: "Bu lid Sardor (@sardor)ga biriktirilgan", show_alert: true });
+
+    const [after] = await db().select().from(leads).where(eq(leads.id, lead.id));
+    expect(after.assigneeTelegramId).toBe(salesman);
+  });
+
+  it("ignores lead buttons pressed outside the configured leads group", async () => {
+    const [lead] = await db()
+      .insert(leads)
+      .values({ source: "web", name: "Elsewhere", phone: "+998900000002" })
+      .returning();
+
+    await pressButton(-1_000_000_000_001, 9_100_000, `lead:claim:${lead.id}`);
+
+    const [after] = await db().select().from(leads).where(eq(leads.id, lead.id));
+    expect(after.assigneeTelegramId).toBeNull();
+    expect(calls.map((c) => c.method)).toEqual(["answerCallbackQuery"]);
   });
 });

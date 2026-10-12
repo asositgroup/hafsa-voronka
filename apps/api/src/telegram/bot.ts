@@ -11,6 +11,8 @@ import {
   upsertUser,
 } from "@/funnel/users";
 import { uz } from "@/i18n/uz";
+import { applyLeadAction } from "@/leads/actions";
+import type { LeadAction } from "@/leads/card";
 import { findMatchingWebLead } from "@/leads/service";
 
 function watchKeyboard(completed: boolean) {
@@ -34,6 +36,12 @@ async function registerFromChat(ctx: Context, user: User, phone: string) {
   await ctx.reply(uz.bot.watchPrompt, { reply_markup: watchKeyboard(false) });
 }
 
+function isLeadsChat(chat: { id: number; username?: string } | undefined) {
+  const configured = env.LEADS_CHAT_ID;
+  if (!configured || !chat) return false;
+  return configured === String(chat.id) || (chat.username !== undefined && configured === `@${chat.username}`);
+}
+
 function createBot() {
   const root = new Bot(env.BOT_TOKEN);
 
@@ -42,6 +50,20 @@ function createBot() {
     await ctx.reply(`LEADS_CHAT_ID=${ctx.chat.id}${thread}`, {
       message_thread_id: ctx.msg.is_topic_message ? ctx.msg.message_thread_id : undefined,
     });
+  });
+
+  root.callbackQuery(/^lead:(claim|won|lost):(\d+)$/, async (ctx) => {
+    if (!isLeadsChat(ctx.chat)) {
+      await ctx.answerCallbackQuery();
+      return;
+    }
+    const actor = {
+      id: ctx.from.id,
+      name: nameFromTelegram(ctx.from) || ctx.from.username || String(ctx.from.id),
+      username: ctx.from.username,
+    };
+    const result = await applyLeadAction(Number(ctx.match[2]), ctx.match[1] as LeadAction, actor);
+    await ctx.answerCallbackQuery({ text: result.reply, show_alert: !result.ok });
   });
 
   const bot = root.chatType("private");

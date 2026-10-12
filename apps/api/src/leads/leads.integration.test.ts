@@ -105,7 +105,7 @@ describe.skipIf(!testDbUrl)("Landing leads", () => {
 
   it("updates the same lead when a visitor submits again", async () => {
     const vid = visitorId();
-    const ip = "10.9.9.9";
+    const ip = `10.9.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
     const secondPhone = randomPhone();
     const first = await (await post({ visitor_id: vid, name: "Ali", phone: randomPhone() }, ip)).json();
     const second = await (await post({ visitor_id: vid, name: "Ali Valiyev", phone: secondPhone }, ip)).json();
@@ -143,7 +143,7 @@ describe.skipIf(!testDbUrl)("Landing leads", () => {
     const log: string[] = [];
     let nextId = 100;
     const sender: LeadSender = {
-      async send(text, replyTo) {
+      async send(text, { replyTo } = {}) {
         log.push(`send${replyTo ? `>${replyTo}` : ""}:${text.split("\n")[0]}`);
         return nextId++;
       },
@@ -213,5 +213,50 @@ describe.skipIf(!testDbUrl)("Landing leads", () => {
     expect(badLead.notifiedVersion).toBe(0);
     expect(badLead.notifyAttempts).toBe(1);
     expect(badLead.notifyError).toBe("chat not found");
+  });
+
+  it("lets only the first salesman claim, and only them close the lead", async () => {
+    const { applyLeadAction, leadActionReplies } = await import("./actions");
+    const vid = visitorId();
+    await post({ visitor_id: vid, name: "Claim", phone: randomPhone() });
+    const [lead] = await leadsFor(vid);
+    const ali = { id: 501, name: "Ali", username: "ali_sales" };
+    const vali = { id: 502, name: "Vali" };
+
+    expect(await applyLeadAction(lead.id, "won", ali)).toEqual({ ok: false, reply: leadActionReplies.claimFirst });
+    expect(await applyLeadAction(lead.id, "claim", ali)).toEqual({ ok: true, reply: leadActionReplies.claimed });
+    expect(await applyLeadAction(lead.id, "claim", ali)).toEqual({ ok: false, reply: leadActionReplies.alreadyYours });
+    expect(await applyLeadAction(lead.id, "claim", vali)).toEqual({
+      ok: false,
+      reply: leadActionReplies.takenBy("Ali (@ali_sales)"),
+    });
+    expect(await applyLeadAction(lead.id, "lost", vali)).toEqual({
+      ok: false,
+      reply: leadActionReplies.takenBy("Ali (@ali_sales)"),
+    });
+    expect(await applyLeadAction(lead.id, "lost", ali)).toEqual({ ok: true, reply: leadActionReplies.lost });
+    expect(await applyLeadAction(lead.id, "won", ali)).toEqual({ ok: false, reply: leadActionReplies.closed });
+    expect(await applyLeadAction(999_999_999, "claim", ali)).toEqual({ ok: false, reply: leadActionReplies.notFound });
+
+    const [after] = await leadsFor(vid);
+    expect(after).toMatchObject({
+      assigneeTelegramId: 501,
+      assigneeName: "Ali",
+      assigneeUsername: "ali_sales",
+      outcome: "lost",
+      notifyVersion: 3,
+    });
+  });
+
+  it("claims exactly once when two salesmen press at the same time", async () => {
+    const { applyLeadAction } = await import("./actions");
+    const vid = visitorId();
+    await post({ visitor_id: vid, name: "Race", phone: randomPhone() });
+    const [lead] = await leadsFor(vid);
+
+    const results = await Promise.all(
+      [601, 602, 603].map((id) => applyLeadAction(lead.id, "claim", { id, name: `S${id}` })),
+    );
+    expect(results.filter((r) => r.ok)).toHaveLength(1);
   });
 });

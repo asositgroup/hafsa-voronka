@@ -108,6 +108,12 @@ export const leads = pgTable(
     notifyAttempts: integer("notify_attempts").default(0).notNull(),
     notifyError: text("notify_error"),
     completionNotified: boolean("completion_notified").default(false).notNull(),
+    assigneeTelegramId: bigint("assignee_telegram_id", { mode: "number" }),
+    assigneeName: text("assignee_name"),
+    assigneeUsername: text("assignee_username"),
+    assignedAt: timestamp("assigned_at", { withTimezone: true }),
+    outcome: text("outcome", { enum: ["won", "lost"] }),
+    outcomeAt: timestamp("outcome_at", { withTimezone: true }),
   },
   (t) => [
     index("leads_visitor_id_idx").on(t.visitorId),

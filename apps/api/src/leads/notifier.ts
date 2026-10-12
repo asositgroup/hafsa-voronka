@@ -1,10 +1,10 @@
 import { and, asc, eq, gt, lt, sql } from "drizzle-orm";
-import { GrammyError } from "grammy";
+import { GrammyError, type InlineKeyboard } from "grammy";
 import { db, rawClient } from "@/db";
 import { type Lead, leads, users } from "@/db/schema";
 import { env } from "@/env";
 import { bot } from "@/telegram/bot";
-import { type CardUser, renderCompletionReply, renderLeadCard } from "./card";
+import { type CardUser, renderCompletionReply, renderLeadCard, renderLeadKeyboard } from "./card";
 
 const NOTIFY_LOCK_KEY = 849204813;
 const RETRY_INTERVAL_MS = 60 * 1000;
@@ -13,26 +13,28 @@ const MAX_AGE_DAYS = 3;
 const BATCH_SIZE = 50;
 
 export type LeadSender = {
-  send(text: string, replyTo?: number): Promise<number>;
-  edit(messageId: number, text: string): Promise<void>;
+  send(text: string, options?: { replyTo?: number; keyboard?: InlineKeyboard }): Promise<number>;
+  edit(messageId: number, text: string, keyboard: InlineKeyboard): Promise<void>;
 };
 
 function telegramSender(chatId: string, threadId: number | undefined): LeadSender {
   return {
-    async send(text, replyTo) {
+    async send(text, { replyTo, keyboard } = {}) {
       const message = await bot().api.sendMessage(chatId, text, {
         message_thread_id: threadId,
         link_preview_options: { is_disabled: true },
+        reply_markup: keyboard,
         reply_parameters: replyTo
           ? { message_id: replyTo, allow_sending_without_reply: true }
           : undefined,
       });
       return message.message_id;
     },
-    async edit(messageId, text) {
+    async edit(messageId, text, keyboard) {
       try {
         await bot().api.editMessageText(chatId, messageId, text, {
           link_preview_options: { is_disabled: true },
+          reply_markup: keyboard,
         });
       } catch (error) {
         if (error instanceof GrammyError && error.description.includes("message is not modified")) {
@@ -50,16 +52,17 @@ export function leadSender(): LeadSender | undefined {
 
 export async function syncLeadCard(lead: Lead, user: CardUser | null, sender: LeadSender) {
   const text = renderLeadCard(lead, user);
+  const keyboard = renderLeadKeyboard(lead);
   let messageId = lead.notifyMessageId;
   if (messageId === null) {
-    messageId = await sender.send(text);
+    messageId = await sender.send(text, { keyboard });
     await db().update(leads).set({ notifyMessageId: messageId }).where(eq(leads.id, lead.id));
   } else {
-    await sender.edit(messageId, text);
+    await sender.edit(messageId, text, keyboard);
   }
 
   if (user?.completedAt && !lead.completionNotified) {
-    await sender.send(renderCompletionReply(lead), messageId);
+    await sender.send(renderCompletionReply(lead), { replyTo: messageId });
     await db().update(leads).set({ completionNotified: true }).where(eq(leads.id, lead.id));
   }
 }

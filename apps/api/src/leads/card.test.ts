@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Lead } from "@/db/schema";
-import { renderCompletionReply, renderLeadCard, type CardUser } from "./card";
+import { renderCompletionReply, renderLeadCard, renderLeadKeyboard, type CardUser } from "./card";
 
 const webLead: Lead = {
   id: 1,
@@ -23,6 +23,12 @@ const webLead: Lead = {
   notifyAttempts: 0,
   notifyError: null,
   completionNotified: false,
+  assigneeTelegramId: null,
+  assigneeName: null,
+  assigneeUsername: null,
+  assignedAt: null,
+  outcome: null,
+  outcomeAt: null,
 };
 
 const user: CardUser = {
@@ -86,5 +92,37 @@ describe("renderLeadCard", () => {
 
   it("renders the completion reply", () => {
     expect(renderCompletionReply(webLead)).toBe("🎬 Aziz Karimov videoni oxirigacha ko'rdi");
+  });
+
+  it("shows the assignee and the outcome", () => {
+    const card = renderLeadCard(
+      { ...webLead, assigneeTelegramId: 42, assigneeName: "Sardor", assigneeUsername: "sardor_s", outcome: "won" },
+      null,
+    );
+    expect(card.split("\n").slice(-2)).toEqual(["👨‍💼 Mas'ul: Sardor (@sardor_s)", "🏁 Natija: ✅ Muvaffaqiyatli"]);
+  });
+});
+
+describe("renderLeadKeyboard", () => {
+  const buttons = (lead: Lead) =>
+    renderLeadKeyboard(lead).inline_keyboard.map((row) =>
+      row.map((b) => `${b.text}|${"callback_data" in b ? b.callback_data : ""}`),
+    );
+
+  it("offers claim, won and lost on an open lead", () => {
+    expect(buttons(webLead)).toEqual([
+      ["🙋 Men olaman|lead:claim:1"],
+      ["✅ Muvaffaqiyatli|lead:won:1", "❌ Yo'qotildi|lead:lost:1"],
+    ]);
+  });
+
+  it("shows who claimed the lead on the first button", () => {
+    expect(buttons({ ...webLead, assigneeTelegramId: 42, assigneeName: "Sardor" })[0]).toEqual([
+      "👤 Sardor|lead:claim:1",
+    ]);
+  });
+
+  it("removes the buttons once an outcome is set", () => {
+    expect(buttons({ ...webLead, assigneeTelegramId: 42, outcome: "lost" })).toEqual([]);
   });
 });

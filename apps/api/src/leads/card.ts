@@ -1,3 +1,4 @@
+import { InlineKeyboard } from "grammy";
 import type { Lead, User } from "@/db/schema";
 import { formatTashkentDate } from "@/sheets";
 
@@ -56,7 +57,37 @@ export function renderLeadCard(lead: Lead, user: CardUser | null | undefined): s
   if (lead.source === "web" && !registered) lines.push("🔗 Telegram: hali botga kirmagan");
   if (registered?.completedAt) lines.push("🎬 Videoni ko'rib bo'ldi");
 
+  if (lead.assigneeTelegramId !== null) lines.push(`👨‍💼 Mas'ul: ${assigneeLabel(lead)}`);
+  if (lead.outcome) lines.push(`🏁 Natija: ${outcomeLabels[lead.outcome]}`);
+
   return lines.join("\n");
+}
+
+export type LeadAction = "claim" | "won" | "lost";
+
+export const outcomeLabels = {
+  won: "✅ Muvaffaqiyatli",
+  lost: "❌ Yo'qotildi",
+} as const;
+
+export function assigneeLabel(lead: Pick<Lead, "assigneeName" | "assigneeUsername">) {
+  const name = lead.assigneeName || "Sotuvchi";
+  return lead.assigneeUsername ? `${name} (@${lead.assigneeUsername})` : name;
+}
+
+export function leadActionData(action: LeadAction, leadId: number) {
+  return `lead:${action}:${leadId}`;
+}
+
+export function renderLeadKeyboard(lead: Lead): InlineKeyboard {
+  if (lead.outcome) return new InlineKeyboard([]);
+  const claimText =
+    lead.assigneeTelegramId === null ? "🙋 Men olaman" : `👤 ${lead.assigneeName || "Biriktirilgan"}`;
+  return new InlineKeyboard()
+    .text(claimText, leadActionData("claim", lead.id))
+    .row()
+    .text(outcomeLabels.won, leadActionData("won", lead.id))
+    .text(outcomeLabels.lost, leadActionData("lost", lead.id));
 }
 
 export function renderCompletionReply(lead: Lead): string {

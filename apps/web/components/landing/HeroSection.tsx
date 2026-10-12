@@ -46,13 +46,13 @@ export function HeroSection() {
           </div>
         </div>
 
-        <div className="order-3 mt-4 lg:mt-0 lg:justify-self-end lg:w-full lg:max-w-[480px] lg:mb-8">
+        <div className="order-3 mt-4 mb-6 lg:mt-0 lg:justify-self-end lg:w-full lg:max-w-[480px] lg:mb-8">
           <div className="relative lg:aspect-[0.82] lg:w-full lg:rounded-[240px_240px_24px_24px] lg:border lg:border-varaq/18 lg:bg-zumrad">
             <HarakatWord word="iqra" className="hidden lg:block absolute right-10 top-[18%] h-[150px]" />
 
             <CtaButton
               variant="visual"
-              ariaLabel={hero.posterLabel}
+              ariaLabel={`${hero.posterLabel}, ${hero.duration}`}
               className="aspect-video w-full overflow-hidden rounded-[18px] bg-siyoh-deep lg:absolute lg:inset-x-8 lg:-bottom-8 lg:w-auto lg:shadow-[0_24px_48px_rgba(0,0,0,.28)]"
             >
               <Image
@@ -68,12 +68,12 @@ export function HeroSection() {
                   <path d="M6 3.5v17a1 1 0 0 0 1.52.85l13.6-8.5a1 1 0 0 0 0-1.7L7.52 2.65A1 1 0 0 0 6 3.5Z" />
                 </svg>
               </span>
-              <span className="absolute bottom-3 right-3 rounded-[8px] bg-siyoh-deep px-2 py-1 text-[13px] leading-none tabular-nums text-varaq">
+              <span className="absolute bottom-3 right-3 rounded-[8px] bg-siyoh-deep px-2 py-1 text-[14px] leading-none tabular-nums text-varaq">
                 {hero.duration}
               </span>
             </CtaButton>
 
-            <div className="absolute -left-2 -top-6 z-10 flex h-24 w-24 flex-col items-center justify-center rounded-full bg-varaq px-2 text-center lg:-left-10 lg:top-[40%] lg:h-32 lg:w-32 lg:-translate-y-1/2 lg:px-3">
+            <div className="absolute -bottom-8 -left-2 z-10 flex h-24 w-24 flex-col items-center justify-center rounded-full bg-varaq px-2 text-center lg:bottom-auto lg:-left-10 lg:top-[40%] lg:h-32 lg:w-32 lg:-translate-y-1/2 lg:px-3">
               <span className="text-[36px] font-bold leading-none text-siyoh lg:text-[40px]">
                 {hero.badgeValue}
               </span>

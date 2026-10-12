@@ -11,6 +11,8 @@ type ProceedButtonProps = {
   initData: string;
 };
 
+const CLOSE_AFTER_OPEN_MS = 150;
+
 export function ProceedButton({
   visible,
   channelUrl,
@@ -21,6 +23,7 @@ export function ProceedButton({
     const tg = getTelegramWebApp();
     if (tg?.openTelegramLink) {
       tg.openTelegramLink(channelUrl);
+      setTimeout(() => tg.close(), CLOSE_AFTER_OPEN_MS);
     } else {
       window.open(channelUrl, "_blank");
     }

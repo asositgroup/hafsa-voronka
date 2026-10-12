@@ -13,10 +13,13 @@ export type CapiClient = {
   ip?: string;
 };
 
+export type CapiActionSource = "website" | "chat";
+
 export type CapiEvent = {
   name: CapiEventName;
   eventId: string;
   user: User;
+  actionSource?: CapiActionSource;
   client?: CapiClient;
 };
 
@@ -33,7 +36,7 @@ export type CapiEventItem = {
   event_name: CapiEventName;
   event_id: string;
   event_time: number;
-  action_source: "website";
+  action_source: CapiActionSource;
   event_source_url: string;
   user_data: CapiUserData;
 };
@@ -89,7 +92,7 @@ export function buildCapiPayload(event: CapiEvent, context: CapiContext = {}): C
     event_name: event.name,
     event_id: event.eventId,
     event_time: eventTime,
-    action_source: "website",
+    action_source: event.actionSource ?? "website",
     event_source_url: webUrl,
     user_data: userData,
   };

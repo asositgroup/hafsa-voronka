@@ -2,13 +2,12 @@ import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { sessionRequestSchema, type SessionResponse } from "@funnel/shared";
 import type { AppEnv } from "@/auth";
-import { sendCapiEvent } from "@/capi";
 import { db } from "@/db";
 import { watchProgress } from "@/db/schema";
 import { env } from "@/env";
-import { logEvent, markRegistered, upsertUser } from "@/funnel/users";
+import { completeRegistration } from "@/funnel/registration";
+import { logEvent, upsertUser } from "@/funnel/users";
 import { capiClient } from "@/http/clientIp";
-import { enqueueLead, formatLeadRow, sendLeadInline } from "@/sheets";
 import { validateRegistration } from "./registration";
 
 async function readJson(request: { json: () => Promise<unknown> }) {
@@ -66,29 +65,11 @@ miniappRoutes.post("/register", async (c) => {
     return c.json({ field: result.field, message: result.message }, 422);
   }
 
-  const registered = await markRegistered(user.id, {
-    name: result.name,
-    phone: result.phone,
-    phoneVerified: result.phoneVerified,
-  });
-  if (!registered) {
-    return c.json({ ok: true as const });
-  }
-
-  await logEvent("registered", { userId: user.id, visitorId: user.visitorId });
-
-  void sendCapiEvent({
-    name: "CompleteRegistration",
-    eventId: `reg_${user.id}`,
-    user: registered,
-    client: capiClient(c),
-  }).catch((error) => console.error("CAPI CompleteRegistration failed:", error));
-
-  if (env.SHEETS_ENABLED) {
-    void enqueueLead(user.id, formatLeadRow(registered))
-      .then(sendLeadInline)
-      .catch((error) => console.error("Sheets send error:", error));
-  }
+  await completeRegistration(
+    user,
+    { name: result.name, phone: result.phone, phoneVerified: result.phoneVerified },
+    { actionSource: "website", client: capiClient(c) },
+  );
 
   return c.json({ ok: true as const });
 });

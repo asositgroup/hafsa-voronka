@@ -19,6 +19,8 @@ export type WatchConfig = {
 
 export type Milestone = 25 | 50 | 75;
 
+export const MAX_BEAT_GAP_SECS = 30;
+
 export type BeatResult = {
   state: WatchState;
   milestones: Milestone[];
@@ -48,11 +50,13 @@ export function applyBeat(
   }
 
   let credit = 0;
-  if (state.playing && state.lastBeatAt !== null) {
+  if (state.playing && state.lastBeatAt !== null && beat.event !== "play") {
     const wall = (now.getTime() - state.lastBeatAt.getTime()) / 1000;
-    const jump = position - state.lastPosition;
-    const maxCredit = wall * 1.1 + 2;
-    credit = Math.max(0, Math.min(jump, maxCredit));
+    if (wall <= MAX_BEAT_GAP_SECS) {
+      const jump = position - state.lastPosition;
+      const maxCredit = wall * 1.1 + 2;
+      credit = Math.max(0, Math.min(jump, maxCredit));
+    }
   }
 
   const watchedSecs = state.watchedSecs + credit;

@@ -425,4 +425,34 @@ describe("applyBeat crediting rules", () => {
 
     expect(res.state.lastPosition).toBe(0);
   });
+
+  it("earns nothing when the app was killed mid-play and playback restarts later", () => {
+    let state = applyBeat(initialState(), { position: 10, event: "play" }, new Date(0), config).state;
+    expect(state.playing).toBe(true);
+
+    const res = applyBeat(state, { position: 95, event: "play" }, new Date(3_600_000), config);
+    expect(res.state.watchedSecs).toBe(0);
+    expect(res.state.maxPosition).toBe(10);
+    expect(res.completedNow).toBe(false);
+
+    state = res.state;
+    const next = applyBeat(state, { position: 100, event: "ended" }, new Date(3_605_000), config);
+    expect(next.state.watchedSecs).toBeCloseTo(5);
+    expect(next.completedNow).toBe(false);
+  });
+
+  it("earns nothing across a gap longer than the heartbeat window", () => {
+    const state = applyBeat(initialState(), { position: 0, event: "play" }, new Date(0), config).state;
+    const res = applyBeat(state, { position: 31, event: "tick" }, new Date(31_000), config);
+    expect(res.state.watchedSecs).toBe(0);
+    expect(res.state.maxPosition).toBe(0);
+  });
+
+  it("still credits a tick that arrives late but within the heartbeat window", () => {
+    const state = applyBeat(initialState(), { position: 0, event: "play" }, new Date(0), config).state;
+    const res = applyBeat(state, { position: 25, event: "tick" }, new Date(25_000), config);
+    expect(res.state.watchedSecs).toBe(25);
+    expect(res.state.maxPosition).toBe(25);
+  });
 });
+

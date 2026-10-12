@@ -149,11 +149,14 @@ describe.skipIf(!testDbUrl)("Video Integration Tests", () => {
       threshold: 0.95,
     });
 
-    const t1 = new Date(t0.getTime() + 96000);
-    await recordProgress(telegramId, { position: 96, event: "tick" }, t1, {
-      duration: 100,
-      threshold: 0.95,
-    });
+    let t1 = t0;
+    for (const position of [10, 20, 30, 40, 50, 60, 70, 80, 90, 96]) {
+      t1 = new Date(t0.getTime() + position * 1000);
+      await recordProgress(telegramId, { position, event: "tick" }, t1, {
+        duration: 100,
+        threshold: 0.95,
+      });
+    }
 
     const [user1] = await db().select().from(users).where(eq(users.id, user.id));
     expect(user1.completedAt).toEqual(t1);

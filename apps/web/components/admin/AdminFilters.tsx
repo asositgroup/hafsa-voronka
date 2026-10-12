@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { getLeadsCsvUrl } from "@/lib/admin/api";
 import { adminUz } from "@/lib/i18n/admin";
 
 type FiltersProps = {
@@ -32,6 +33,13 @@ export function AdminFilters({ from, to, source, campaign, onApply }: FiltersPro
   const [currentTo, setCurrentTo] = useState(to);
   const [currentSource, setCurrentSource] = useState(source);
   const [currentCampaign, setCurrentCampaign] = useState(campaign);
+
+  const csvUrl = getLeadsCsvUrl({
+    from: currentFrom,
+    to: currentTo,
+    source: currentSource,
+    campaign: currentCampaign,
+  });
 
   const applyPreset = (preset: "today" | "7d" | "30d") => {
     const today = getTashkentToday();
@@ -74,105 +82,108 @@ export function AdminFilters({ from, to, source, campaign, onApply }: FiltersPro
   };
 
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 sm:p-5">
-      <form onSubmit={handleApply} className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800/80 pb-3">
-          <div className="text-sm font-semibold text-zinc-200">
-            {adminUz.filters.title}
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5 text-xs">
-            <button
-              type="button"
-              onClick={() => applyPreset("today")}
-              className="rounded-md bg-zinc-800 px-2.5 py-1 text-zinc-300 hover:bg-zinc-700 transition"
-            >
-              {adminUz.filters.presets.today}
-            </button>
-            <button
-              type="button"
-              onClick={() => applyPreset("7d")}
-              className="rounded-md bg-zinc-800 px-2.5 py-1 text-zinc-300 hover:bg-zinc-700 transition"
-            >
-              {adminUz.filters.presets.last7Days}
-            </button>
-            <button
-              type="button"
-              onClick={() => applyPreset("30d")}
-              className="rounded-md bg-zinc-800 px-2.5 py-1 text-zinc-300 hover:bg-zinc-700 transition"
-            >
-              {adminUz.filters.presets.last30Days}
-            </button>
-          </div>
+    <div className="flex flex-col gap-4">
+      <div className="flex items-end justify-between gap-6 flex-wrap">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-[28px] font-bold text-siyoh m-0 leading-tight">
+            {adminUz.dashboard.title}
+          </h1>
+          <p className="text-sm text-qalam m-0">
+            {adminUz.dashboard.subtitle}
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-          <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1">
-              {adminUz.filters.fromLabel}
-            </label>
+        <form onSubmit={handleApply} className="flex gap-3 items-end flex-wrap">
+          <label className="flex flex-col gap-1 text-[13px] text-qalam">
+            {adminUz.filters.fromLabel}
             <input
               type="date"
               value={currentFrom}
               onChange={(e) => setCurrentFrom(e.target.value)}
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800/90 px-3 py-1.5 text-xs text-white focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="min-h-[40px] px-3 rounded-[10px] border border-chegara bg-white text-siyoh text-sm outline-none focus:border-siyoh focus:ring-1 focus:ring-siyoh"
             />
-          </div>
+          </label>
 
-          <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1">
-              {adminUz.filters.toLabel}
-            </label>
+          <label className="flex flex-col gap-1 text-[13px] text-qalam">
+            {adminUz.filters.toLabel}
             <input
               type="date"
               value={currentTo}
               onChange={(e) => setCurrentTo(e.target.value)}
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800/90 px-3 py-1.5 text-xs text-white focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="min-h-[40px] px-3 rounded-[10px] border border-chegara bg-white text-siyoh text-sm outline-none focus:border-siyoh focus:ring-1 focus:ring-siyoh"
             />
-          </div>
+          </label>
 
-          <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1">
-              {adminUz.filters.sourceLabel}
-            </label>
+          <label className="flex flex-col gap-1 text-[13px] text-qalam">
+            {adminUz.filters.sourceLabel}
             <input
               type="text"
               value={currentSource}
               placeholder={adminUz.filters.sourcePlaceholder}
               onChange={(e) => setCurrentSource(e.target.value)}
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800/90 px-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="min-h-[40px] w-[130px] px-3 rounded-[10px] border border-chegara bg-white text-siyoh text-sm outline-none focus:border-siyoh focus:ring-1 focus:ring-siyoh placeholder:text-qalam/50"
             />
-          </div>
+          </label>
 
-          <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1">
-              {adminUz.filters.campaignLabel}
-            </label>
+          <label className="flex flex-col gap-1 text-[13px] text-qalam">
+            {adminUz.filters.campaignLabel}
             <input
               type="text"
               value={currentCampaign}
               placeholder={adminUz.filters.campaignPlaceholder}
               onChange={(e) => setCurrentCampaign(e.target.value)}
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800/90 px-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="min-h-[40px] w-[130px] px-3 rounded-[10px] border border-chegara bg-white text-siyoh text-sm outline-none focus:border-siyoh focus:ring-1 focus:ring-siyoh placeholder:text-qalam/50"
             />
-          </div>
-        </div>
+          </label>
 
-        <div className="flex items-center justify-end gap-2 pt-1">
-          <button
-            type="button"
-            onClick={handleReset}
-            className="rounded-lg border border-zinc-700 bg-zinc-800 px-3.5 py-1.5 text-xs font-medium text-zinc-300 hover:bg-zinc-700 hover:text-white transition"
-          >
-            {adminUz.filters.resetButton}
-          </button>
           <button
             type="submit"
-            className="rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 transition shadow-sm"
+            className="min-h-[40px] px-4 rounded-[10px] bg-siyoh text-varaq text-sm font-semibold hover:opacity-95 transition"
           >
             {adminUz.filters.applyButton}
           </button>
-        </div>
-      </form>
+
+          <button
+            type="button"
+            onClick={handleReset}
+            className="min-h-[40px] px-3 rounded-[10px] border border-chegara bg-white text-siyoh text-sm hover:bg-varaq transition"
+          >
+            {adminUz.filters.resetButton}
+          </button>
+
+          <a
+            href={csvUrl}
+            download="leads.csv"
+            className="inline-flex items-center min-h-[40px] px-[18px] rounded-[10px] bg-oltin text-siyoh text-[15px] font-semibold hover:opacity-95 transition no-underline"
+          >
+            {adminUz.leads.exportCsv}
+          </a>
+        </form>
+      </div>
+
+      <div className="flex items-center gap-2 text-xs">
+        <button
+          type="button"
+          onClick={() => applyPreset("today")}
+          className="rounded-[6px] border border-chegara bg-white px-2.5 py-1 text-qalam hover:text-siyoh hover:bg-varaq transition"
+        >
+          {adminUz.filters.presets.today}
+        </button>
+        <button
+          type="button"
+          onClick={() => applyPreset("7d")}
+          className="rounded-[6px] border border-chegara bg-white px-2.5 py-1 text-qalam hover:text-siyoh hover:bg-varaq transition"
+        >
+          {adminUz.filters.presets.last7Days}
+        </button>
+        <button
+          type="button"
+          onClick={() => applyPreset("30d")}
+          className="rounded-[6px] border border-chegara bg-white px-2.5 py-1 text-qalam hover:text-siyoh hover:bg-varaq transition"
+        >
+          {adminUz.filters.presets.last30Days}
+        </button>
+      </div>
     </div>
   );
 }

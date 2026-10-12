@@ -8,64 +8,48 @@ function formatNumber(num: number): string {
 }
 
 export function KpiCards({ kpis }: { kpis: KpiStats }) {
-  const cards = [
+  const items = [
     {
       label: adminUz.kpis.landingViews,
       value: formatNumber(kpis.landingViews),
-      color: "text-blue-400",
-      bg: "bg-blue-500/10",
-      border: "border-blue-500/20",
+      note: adminUz.kpis.landingNote,
     },
     {
       label: adminUz.kpis.botStarts,
       value: formatNumber(kpis.botStarts),
-      color: "text-sky-400",
-      bg: "bg-sky-500/10",
-      border: "border-sky-500/20",
+      note: adminUz.kpis.botNote,
     },
     {
       label: adminUz.kpis.registrations,
       value: formatNumber(kpis.registrations),
-      color: "text-indigo-400",
-      bg: "bg-indigo-500/10",
-      border: "border-indigo-500/20",
+      note: adminUz.kpis.registrationNote,
     },
     {
       label: adminUz.kpis.completions,
       value: formatNumber(kpis.completions),
-      color: "text-emerald-400",
-      bg: "bg-emerald-500/10",
-      border: "border-emerald-500/20",
-    },
-    {
-      label: adminUz.kpis.channelClicks,
-      value: formatNumber(kpis.channelClicks),
-      color: "text-amber-400",
-      bg: "bg-amber-500/10",
-      border: "border-amber-500/20",
+      note: adminUz.kpis.completionNote,
     },
     {
       label: adminUz.kpis.conversionRate,
       value: `${kpis.conversionRate}%`,
-      color: "text-violet-400",
-      bg: "bg-violet-500/10",
-      border: "border-violet-500/20",
+      note: adminUz.kpis.conversionNote,
     },
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-      {cards.map((card, i) => (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 bg-white rounded-[16px] overflow-hidden">
+      {items.map((item, i) => (
         <div
           key={i}
-          className={`rounded-xl border ${card.border} ${card.bg} p-3.5 sm:p-4 backdrop-blur transition hover:scale-[1.01]`}
+          className={`px-5 py-4.5 flex flex-col gap-1 ${
+            i > 0 ? "border-t sm:border-t-0 sm:border-l border-chiziq" : ""
+          }`}
         >
-          <div className="text-xs font-medium text-zinc-400 mb-1.5 truncate">
-            {card.label}
-          </div>
-          <div className={`text-xl sm:text-2xl font-bold tracking-tight ${card.color}`}>
-            {card.value}
-          </div>
+          <span className="text-[14px] text-qalam">{item.label}</span>
+          <span className="text-[30px] font-bold tracking-tight text-siyoh tabular-nums leading-tight">
+            {item.value}
+          </span>
+          <span className="text-[13px] text-qalam">{item.note}</span>
         </div>
       ))}
     </div>

@@ -5,35 +5,35 @@ import { adminUz } from "@/lib/i18n/admin";
 
 export function DropoffBars({ dropoff }: { dropoff: DropoffStat[] }) {
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 sm:p-5">
-      <div className="mb-4">
-        <h2 className="text-base font-semibold text-zinc-100">
+    <div className="bg-white rounded-[16px] p-5 sm:p-6 flex flex-col gap-4">
+      <div>
+        <h2 className="text-[18px] font-semibold text-siyoh m-0">
           {adminUz.dropoff.title}
         </h2>
-        <p className="text-xs text-zinc-400 mt-0.5">
+        <p className="text-xs text-qalam mt-1 m-0">
           {adminUz.dropoff.subtitle}
         </p>
       </div>
 
-      <div className="space-y-2.5">
+      <div className="flex flex-col gap-3">
         {dropoff.map((item) => (
-          <div key={item.percent} className="space-y-1">
+          <div key={item.percent} className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-medium text-zinc-300">
+              <span className="font-medium text-siyoh">
                 {item.percent}% video
               </span>
               <div className="flex items-center gap-3">
-                <span className="text-zinc-400">
+                <span className="text-qalam">
                   {item.count} {adminUz.dropoff.countHeader.toLowerCase()}
                 </span>
-                <span className="font-semibold text-indigo-400 w-12 text-right">
+                <span className="font-semibold text-siyoh w-12 text-right tabular-nums">
                   {item.share}%
                 </span>
               </div>
             </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-800">
+            <div className="h-2 w-full overflow-hidden rounded-[4px] bg-varaq">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-emerald-400 transition-all duration-500"
+                className="h-full rounded-[4px] bg-siyoh transition-all duration-300"
                 style={{ width: `${Math.min(100, Math.max(0, item.share))}%` }}
               />
             </div>

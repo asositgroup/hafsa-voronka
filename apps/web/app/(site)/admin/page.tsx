@@ -145,14 +145,14 @@ function AdminDashboardContent() {
 
   if (authorized === null) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="text-sm text-zinc-500">{adminUz.common.loading}</div>
+      <div className="flex min-h-screen items-center justify-center p-4 bg-varaq text-siyoh">
+        <div className="text-sm text-qalam">{adminUz.common.loading}</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#09090B]">
+    <div className="min-h-screen flex flex-col bg-varaq text-siyoh">
       {stats && <AdminHeader health={stats.health} />}
 
       <main className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6 space-y-6 flex-1">
@@ -165,12 +165,12 @@ function AdminDashboardContent() {
         />
 
         {error && (
-          <div className="rounded-xl border border-rose-800/60 bg-rose-950/40 p-4 text-xs text-rose-300 flex items-center justify-between gap-4">
+          <div className="rounded-[10px] border border-anor bg-anor/10 p-4 text-xs text-anor flex items-center justify-between gap-4">
             <span>{error}</span>
             <button
               type="button"
               onClick={handleRetry}
-              className="rounded bg-rose-900/60 px-2.5 py-1 text-white hover:bg-rose-800 transition"
+              className="rounded-[6px] bg-anor text-white px-2.5 py-1 hover:opacity-90 transition"
             >
               {adminUz.common.retry}
             </button>
@@ -178,7 +178,7 @@ function AdminDashboardContent() {
         )}
 
         {loading && !stats && (
-          <div className="py-20 text-center text-sm text-zinc-500">
+          <div className="py-20 text-center text-sm text-qalam">
             {adminUz.common.loading}
           </div>
         )}
@@ -187,8 +187,18 @@ function AdminDashboardContent() {
           <>
             <KpiCards kpis={stats.kpis} />
 
-            <div className="grid grid-cols-1 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <FunnelChart funnel={stats.funnel} />
+              {leads && (
+                <LeadsTable
+                  data={leads}
+                  from={from}
+                  to={to}
+                  source={source}
+                  campaign={campaign}
+                  onPageChange={handlePageChange}
+                />
+              )}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -199,19 +209,6 @@ function AdminDashboardContent() {
             <div className="grid grid-cols-1 gap-6">
               <CampaignTable campaigns={stats.campaigns} />
             </div>
-
-            {leads && (
-              <div className="grid grid-cols-1 gap-6">
-                <LeadsTable
-                  data={leads}
-                  from={from}
-                  to={to}
-                  source={source}
-                  campaign={campaign}
-                  onPageChange={handlePageChange}
-                />
-              </div>
-            )}
           </>
         )}
       </main>
@@ -223,8 +220,8 @@ export default function AdminPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center p-4">
-          <div className="text-sm text-zinc-500">{adminUz.common.loading}</div>
+        <div className="flex min-h-screen items-center justify-center p-4 bg-varaq text-siyoh">
+          <div className="text-sm text-qalam">{adminUz.common.loading}</div>
         </div>
       }
     >

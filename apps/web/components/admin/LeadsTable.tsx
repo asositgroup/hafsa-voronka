@@ -43,13 +43,13 @@ export function LeadsTable({
   const csvUrl = getLeadsCsvUrl({ from, to, source, campaign });
 
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 sm:p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <div className="bg-white rounded-[16px] p-5 sm:p-6 flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-zinc-100">
+          <h2 className="text-[18px] font-semibold text-siyoh m-0">
             {adminUz.leads.title}
           </h2>
-          <p className="text-xs text-zinc-400 mt-0.5">
+          <p className="text-xs text-qalam mt-0.5 m-0">
             {data.total} {adminUz.leads.total} ({adminUz.leads.page} {data.page} / {data.totalPages})
           </p>
         </div>
@@ -57,106 +57,81 @@ export function LeadsTable({
         <a
           href={csvUrl}
           download="leads.csv"
-          className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-700/60 bg-emerald-950/40 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-900/50 hover:text-emerald-200 transition"
+          className="inline-flex items-center gap-1.5 rounded-[10px] bg-oltin px-3.5 py-1.5 text-xs font-semibold text-siyoh hover:opacity-95 transition no-underline"
         >
-          <svg
-            className="w-3.5 h-3.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-            />
-          </svg>
           <span>{adminUz.leads.exportCsv}</span>
         </a>
       </div>
 
-      <div className="overflow-x-auto -mx-4 sm:mx-0">
-        <div className="inline-block min-w-full align-middle px-4 sm:px-0">
-          <table className="min-w-full divide-y divide-zinc-800 text-left text-xs">
+      <div className="overflow-x-auto -mx-5 sm:mx-0">
+        <div className="inline-block min-w-full align-middle px-5 sm:px-0">
+          <table className="min-w-full text-left">
             <thead>
-              <tr className="text-zinc-400">
-                <th scope="col" className="py-2.5 pr-3 font-medium">
+              <tr className="text-[13px] text-qalam border-b border-chiziq">
+                <th scope="col" className="py-2.5 pr-3 font-normal">
                   {adminUz.leads.registeredAt}
                 </th>
-                <th scope="col" className="px-3 py-2.5 font-medium">
+                <th scope="col" className="px-3 py-2.5 font-normal">
                   {adminUz.leads.name}
                 </th>
-                <th scope="col" className="px-3 py-2.5 font-medium">
+                <th scope="col" className="px-3 py-2.5 font-normal">
                   {adminUz.leads.phone}
                 </th>
-                <th scope="col" className="px-3 py-2.5 font-medium">
+                <th scope="col" className="px-3 py-2.5 font-normal">
                   {adminUz.leads.username}
                 </th>
-                <th scope="col" className="px-3 py-2.5 font-medium">
+                <th scope="col" className="px-3 py-2.5 font-normal">
                   {adminUz.leads.source}
                 </th>
-                <th scope="col" className="px-3 py-2.5 font-medium">
+                <th scope="col" className="px-3 py-2.5 font-normal">
                   {adminUz.leads.campaign}
                 </th>
-                <th scope="col" className="px-3 py-2.5 font-medium">
+                <th scope="col" className="px-3 py-2.5 font-normal text-right">
                   {adminUz.leads.progress}
                 </th>
-                <th scope="col" className="px-3 py-2.5 font-medium text-center">
+                <th scope="col" className="px-3 py-2.5 font-normal text-center">
                   {adminUz.leads.completed}
                 </th>
-                <th scope="col" className="pl-3 py-2.5 font-medium text-center">
+                <th scope="col" className="pl-3 py-2.5 font-normal text-center">
                   {adminUz.leads.channelClicked}
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/60 text-zinc-200">
+            <tbody className="divide-y divide-chiziq text-[14px] text-siyoh">
               {data.leads.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-zinc-500">
+                  <td colSpan={9} className="py-8 text-center text-qalam">
                     {adminUz.leads.empty}
                   </td>
                 </tr>
               ) : (
                 data.leads.map((lead) => (
-                  <tr key={lead.id} className="hover:bg-zinc-800/30 transition">
-                    <td className="py-2.5 pr-3 text-zinc-400 whitespace-nowrap">
+                  <tr key={lead.id}>
+                    <td className="py-2.5 pr-3 text-qalam whitespace-nowrap tabular-nums text-xs">
                       {formatDate(lead.registeredAt)}
                     </td>
-                    <td className="px-3 py-2.5 font-medium text-white whitespace-nowrap">
+                    <td className="px-3 py-2.5 font-medium text-siyoh whitespace-nowrap">
                       {lead.name || "—"}
                     </td>
-                    <td className="px-3 py-2.5 text-zinc-300 font-mono whitespace-nowrap">
+                    <td className="px-3 py-2.5 text-siyoh tabular-nums whitespace-nowrap">
                       {lead.phone || "—"}
                     </td>
-                    <td className="px-3 py-2.5 text-zinc-400 whitespace-nowrap">
+                    <td className="px-3 py-2.5 text-qalam whitespace-nowrap text-xs">
                       {lead.username ? `@${lead.username.replace(/^@/, "")}` : "—"}
                     </td>
-                    <td className="px-3 py-2.5 text-zinc-400 whitespace-nowrap">
+                    <td className="px-3 py-2.5 text-qalam whitespace-nowrap">
                       {lead.source || "—"}
                     </td>
-                    <td className="px-3 py-2.5 text-zinc-400 whitespace-nowrap">
+                    <td className="px-3 py-2.5 text-qalam whitespace-nowrap">
                       {lead.campaign || "—"}
                     </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <div className="w-14 h-1.5 rounded-full bg-zinc-800 overflow-hidden">
-                          <div
-                            className="h-full bg-indigo-500 rounded-full"
-                            style={{ width: `${lead.progressPercent}%` }}
-                          />
-                        </div>
-                        <span className="text-[11px] font-medium text-zinc-300">
-                          {lead.progressPercent}%
-                        </span>
-                      </div>
+                    <td className="px-3 py-2.5 text-right font-semibold text-siyoh tabular-nums whitespace-nowrap">
+                      {lead.progressPercent}%
                     </td>
                     <td className="px-3 py-2.5 text-center whitespace-nowrap">
                       <span
-                        className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                          lead.completed
-                            ? "bg-emerald-950 text-emerald-400 border border-emerald-800/60"
-                            : "bg-zinc-800 text-zinc-500"
+                        className={`text-xs ${
+                          lead.completed ? "font-semibold text-zumrad" : "text-qalam"
                         }`}
                       >
                         {lead.completed ? adminUz.leads.yes : adminUz.leads.no}
@@ -164,10 +139,8 @@ export function LeadsTable({
                     </td>
                     <td className="pl-3 py-2.5 text-center whitespace-nowrap">
                       <span
-                        className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                          lead.channelClicked
-                            ? "bg-emerald-950 text-emerald-400 border border-emerald-800/60"
-                            : "bg-zinc-800 text-zinc-500"
+                        className={`text-xs ${
+                          lead.channelClicked ? "font-semibold text-zumrad" : "text-qalam"
                         }`}
                       >
                         {lead.channelClicked ? adminUz.leads.yes : adminUz.leads.no}
@@ -182,17 +155,17 @@ export function LeadsTable({
       </div>
 
       {data.totalPages > 1 && (
-        <div className="flex items-center justify-between border-t border-zinc-800/80 pt-4 mt-3 text-xs">
-          <div className="text-zinc-400">
-            {adminUz.leads.page} <span className="font-medium text-white">{data.page}</span>{" "}
-            {adminUz.leads.of} <span className="font-medium text-white">{data.totalPages}</span>
+        <div className="flex items-center justify-between border-t border-chiziq pt-3 text-xs">
+          <div className="text-qalam">
+            {adminUz.leads.page} <span className="font-medium text-siyoh tabular-nums">{data.page}</span>{" "}
+            {adminUz.leads.of} <span className="font-medium text-siyoh tabular-nums">{data.totalPages}</span>
           </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
               disabled={data.page <= 1}
               onClick={() => onPageChange(data.page - 1)}
-              className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-zinc-300 hover:bg-zinc-700 disabled:opacity-40 transition"
+              className="rounded-[8px] border border-chegara bg-white px-3 py-1.5 text-siyoh hover:bg-varaq disabled:opacity-40 transition"
             >
               {adminUz.leads.prev}
             </button>
@@ -200,7 +173,7 @@ export function LeadsTable({
               type="button"
               disabled={data.page >= data.totalPages}
               onClick={() => onPageChange(data.page + 1)}
-              className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-zinc-300 hover:bg-zinc-700 disabled:opacity-40 transition"
+              className="rounded-[8px] border border-chegara bg-white px-3 py-1.5 text-siyoh hover:bg-varaq disabled:opacity-40 transition"
             >
               {adminUz.leads.next}
             </button>

@@ -4,35 +4,34 @@ export function WhoIsThisFor() {
   const { whoIsThisFor } = landingContent;
 
   return (
-    <section className="w-full max-w-md mx-auto">
-      <h2 className="text-xl md:text-2xl font-bold tracking-tight text-zinc-100 text-center">
+    <section className="pt-10 flex flex-col gap-4">
+      <h2 className="text-2xl font-bold leading-[1.2] text-siyoh m-0">
         {whoIsThisFor.title}
       </h2>
 
-      <div className="mt-6 flex flex-col gap-3">
-        {whoIsThisFor.items.map((bullet, index) => (
-          <div
-            key={index}
-            className="flex items-start gap-3.5 rounded-xl border border-zinc-800 bg-zinc-900/40 p-4"
-          >
-            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-400/10 text-amber-400 mt-0.5">
-              <svg
-                className="h-3.5 w-3.5 stroke-amber-400 fill-none"
-                viewBox="0 0 24 24"
-                strokeWidth={3}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            </div>
-            <p className="text-sm md:text-base text-zinc-300 leading-relaxed">
-              {bullet}
-            </p>
-          </div>
+      <p className="text-[16px] leading-[1.55] text-siyoh m-0">
+        {whoIsThisFor.intro}
+      </p>
+
+      <p className="text-[16px] leading-[1.55] font-semibold text-siyoh m-0">
+        {whoIsThisFor.leadIn}
+      </p>
+
+      <ul className="m-0 p-0 list-none flex flex-col gap-3 text-[16px] sm:text-[17px] leading-[1.5] text-siyoh">
+        {whoIsThisFor.bullets.map((bullet, idx) => (
+          <li key={idx} className="flex gap-3 items-baseline">
+            <span
+              aria-hidden="true"
+              className="shrink-0 w-2 h-2 rotate-45 bg-oltin relative -top-0.5"
+            />
+            <span>{bullet}</span>
+          </li>
         ))}
-      </div>
+      </ul>
+
+      <p className="text-[16px] leading-[1.55] font-medium text-siyoh pt-1 m-0">
+        {whoIsThisFor.closing}
+      </p>
     </section>
   );
 }

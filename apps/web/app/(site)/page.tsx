@@ -4,9 +4,7 @@ import {
   FooterSection,
   HeroSection,
   LandingTracker,
-  ResultsSection,
   StepsToVideoSection,
-  StepStrip,
   StickyBottomCta,
   WhatYouWillLearn,
   WhoIsThisFor,
@@ -17,17 +15,17 @@ export default function Page() {
     <>
       <FacebookPixel />
       <LandingTracker />
-      <div className="flex min-h-screen flex-col bg-[#09090B] text-zinc-100">
-        <StepStrip />
-        <main className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-12 px-4 pb-28 pt-2 md:gap-16 md:pb-16">
-          <HeroSection />
-          <WhatYouWillLearn />
-          <WhoIsThisFor />
-          <ResultsSection />
-          <StepsToVideoSection />
-          <ExpertBioSection />
+      <div className="flex min-h-screen flex-col bg-varaq text-siyoh">
+        <HeroSection />
+        <main className="w-full max-w-6xl mx-auto px-5">
+          <div className="w-full max-w-[560px]">
+            <WhatYouWillLearn />
+            <WhoIsThisFor />
+            <ExpertBioSection />
+            <StepsToVideoSection />
+            <FooterSection />
+          </div>
         </main>
-        <FooterSection />
         <StickyBottomCta />
       </div>
     </>

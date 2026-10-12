@@ -1,39 +1,43 @@
+import { CtaButton } from "@/components/landing/CtaButton";
 import { landingContent } from "@/content/landing";
-import { landingI18n } from "@/lib/i18n/landing";
-import { CtaButton } from "./CtaButton";
 
 export function WhatYouWillLearn() {
   const { whatYouWillLearn } = landingContent;
 
   return (
-    <section className="w-full max-w-md mx-auto">
-      <h2 className="text-xl md:text-2xl font-bold tracking-tight text-zinc-100 text-center">
+    <section className="pt-10 flex flex-col">
+      <h2 className="text-2xl font-bold leading-[1.2] text-siyoh mb-3 m-0">
         {whatYouWillLearn.title}
       </h2>
 
-      <div className="mt-6 flex flex-col gap-3">
-        {whatYouWillLearn.items.map((item) => (
+      <div className="flex flex-col">
+        {whatYouWillLearn.items.map((item, index) => (
           <div
-            key={item.number}
-            className="flex items-start gap-4 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 transition-colors hover:border-zinc-700"
+            key={index}
+            className="flex items-start justify-between gap-4 py-4 border-t border-chiziq"
           >
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-400/10 border border-amber-400/30 text-amber-400 font-bold text-sm">
-              {item.number}
-            </span>
-            <div className="flex-1 text-sm md:text-base text-zinc-200 leading-relaxed font-medium">
-              {item.title}
+            <div className="flex-1 flex flex-col gap-1">
+              <h3 className="text-lg sm:text-[20px] font-semibold leading-[1.3] text-siyoh m-0">
+                {item.title}
+              </h3>
+              <p className="text-[15px] sm:text-[16px] leading-[1.55] text-qalam m-0">
+                {item.description}
+              </p>
             </div>
+            <span
+              dir="rtl"
+              className="font-arabic text-[40px] leading-[0.9] text-zumrad min-w-[32px] text-right shrink-0 select-none pt-0.5"
+            >
+              {item.numeral}
+            </span>
           </div>
         ))}
       </div>
 
-      <div className="mt-6 flex flex-col items-center">
-        <CtaButton>{whatYouWillLearn.ctaText}</CtaButton>
-        <p className="mt-2.5 text-xs text-zinc-400">
-          {landingI18n.price.label}{" "}
-          <strong className="text-zinc-200 font-bold">{landingI18n.price.value}</strong> ·{" "}
-          {whatYouWillLearn.priceNote}
-        </p>
+      <div className="pt-6">
+        <CtaButton variant="gold" className="w-full sm:w-auto">
+          {whatYouWillLearn.buttonText}
+        </CtaButton>
       </div>
     </section>
   );

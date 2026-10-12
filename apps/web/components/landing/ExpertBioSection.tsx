@@ -1,60 +1,50 @@
-import Image from "next/image";
+import { HarakatWord } from "@/components/brand/HarakatWord";
 import { landingContent } from "@/content/landing";
 
 export function ExpertBioSection() {
-  const { expert } = landingContent;
+  const { teacher } = landingContent;
 
   return (
-    <section className="w-full max-w-md mx-auto rounded-3xl border border-zinc-800 bg-zinc-900/40 p-6 text-center shadow-xl">
-      <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-2 border-amber-400/80 bg-gradient-to-br from-zinc-800 via-zinc-900 to-amber-950/50 shadow-lg shadow-amber-400/10">
-        {expert.image ? (
-          <Image
-            src={expert.image}
-            alt={expert.name}
-            width={96}
-            height={96}
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <span className="text-2xl font-extrabold tracking-wider text-amber-300">
-            {expert.name
-              .split(" ")
-              .map((n) => n[0])
-              .join("")}
-          </span>
-        )}
-      </div>
-
-      <h2 className="text-xl font-bold tracking-tight text-zinc-100">
-        {expert.name}
-      </h2>
-      <p className="mt-1 text-xs text-amber-400/90 font-medium">
-        {expert.title}
-      </p>
-
-      <div className="mt-5 space-y-2.5 text-left text-xs md:text-sm text-zinc-300 leading-relaxed border-t border-b border-zinc-800/80 py-4">
-        {expert.bio.map((paragraph, index) => (
-          <p key={index} className="flex items-start gap-2">
-            <span className="text-amber-400 shrink-0">•</span>
-            <span>{paragraph}</span>
-          </p>
-        ))}
-      </div>
-
-      <div className="mt-5 grid grid-cols-3 gap-2">
-        {expert.stats.map((stat, index) => (
-          <div
-            key={index}
-            className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-2.5 text-center"
-          >
-            <strong className="block text-sm md:text-base font-extrabold text-amber-400">
-              {stat.value}
-            </strong>
-            <span className="mt-0.5 block text-[11px] text-zinc-400 font-medium">
-              {stat.label}
-            </span>
+    <section className="pt-10">
+      <div className="rounded-[18px] bg-white p-6 sm:p-7 flex flex-col gap-5 text-siyoh">
+        <div className="flex gap-4 items-center">
+          <div className="w-[72px] h-[72px] rounded-[14px] bg-varaq flex items-center justify-center shrink-0">
+            <HarakatWord text={teacher.mark} className="text-[32px] text-siyoh" />
           </div>
-        ))}
+          <div className="flex flex-col gap-0.5">
+            <h2 className="text-xl font-bold text-siyoh m-0">{teacher.name}</h2>
+            <span className="text-[15px] text-qalam">{teacher.title}</span>
+          </div>
+        </div>
+
+        <p className="text-[16px] leading-[1.55] text-siyoh m-0">
+          {teacher.intro}
+        </p>
+
+        <div className="flex flex-col">
+          {teacher.studyPath.map((item, idx) => (
+            <div
+              key={idx}
+              className="flex items-center justify-between gap-4 py-3 border-t border-chiziq text-[15px] sm:text-[16px]"
+            >
+              <span className="text-siyoh">{item.uzbek}</span>
+              <span
+                dir="rtl"
+                className="font-arabic text-zumrad text-xl shrink-0 text-right select-none"
+              >
+                {item.arabic}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex flex-col gap-3">
+          {teacher.bioParagraphs.map((para, idx) => (
+            <p key={idx} className="text-[16px] leading-[1.55] text-siyoh m-0">
+              {para}
+            </p>
+          ))}
+        </div>
       </div>
     </section>
   );

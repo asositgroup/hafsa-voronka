@@ -1,88 +1,56 @@
-import Image from "next/image";
+import { HarakatWord } from "@/components/brand/HarakatWord";
+import { CtaButton } from "@/components/landing/CtaButton";
 import { landingContent } from "@/content/landing";
-import { landingI18n } from "@/lib/i18n/landing";
-import { CtaButton } from "./CtaButton";
 
 export function HeroSection() {
-  const { hero, features } = landingContent;
+  const { hero } = landingContent;
 
   return (
-    <section className="flex flex-col items-center text-center pt-8 md:pt-12">
-      <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-1.5 text-xs font-medium text-amber-300">
-        <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
-        {hero.badge}
-      </div>
+    <section className="bg-siyoh text-varaq px-5 pt-6 pb-10 sm:px-8 lg:px-12 xl:px-20 lg:py-16">
+      <div className="mx-auto max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-16 items-end">
+        <div className="flex flex-col gap-5">
+          <p className="text-kumush text-[15px] sm:text-lg font-semibold m-0">
+            {hero.tag}
+          </p>
 
-      <h1 className="mt-5 text-2xl md:text-4xl font-extrabold tracking-tight text-zinc-100 max-w-lg leading-tight">
-        {hero.title}
-      </h1>
-
-      <p className="mt-3 text-sm md:text-base text-zinc-400 max-w-md">
-        {hero.subtitle}
-      </p>
-
-      <div className="mt-6 w-full max-w-md overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/80 shadow-2xl">
-        <div className="relative aspect-video w-full overflow-hidden bg-gradient-to-tr from-zinc-950 via-zinc-900 to-amber-950/30 flex items-center justify-center">
-          {hero.coverImage ? (
-            <Image
-              src={hero.coverImage}
-              alt={hero.title}
-              fill
-              className="object-cover"
-              sizes="(max-width: 768px) 100vw, 448px"
-              priority
+          <div className="lg:hidden">
+            <HarakatWord
+              text={hero.arabicWord}
+              bareText={hero.arabicBare}
+              className="text-[132px] h-[150px] w-full"
             />
-          ) : (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-zinc-900 via-zinc-950 to-amber-950/20">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-400 text-zinc-950 shadow-xl shadow-amber-400/20 transition-transform hover:scale-105">
-                <svg
-                  className="h-8 w-8 translate-x-0.5 fill-current"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between border-t border-zinc-800/80 bg-zinc-950/80 p-3.5 text-left">
-          <div>
-            <div className="text-xs font-bold tracking-wide text-zinc-200">
-              {hero.featureTag}
-            </div>
-            <div className="text-[11px] text-zinc-400">
-              {hero.featureDesc}
-            </div>
           </div>
-          <div className="rounded-md border border-amber-500/40 bg-amber-400/10 px-2.5 py-1 text-[11px] font-bold text-amber-300">
-            {landingI18n.badges.free}
+
+          <h1 className="text-[34px] leading-[1.1] font-bold tracking-[-0.01em] m-0">
+            {hero.title}
+          </h1>
+
+          <p className="text-[17px] leading-[1.5] text-varaq/90 m-0">
+            {hero.lead}
+          </p>
+
+          <p className="text-[16px] leading-[1.55] text-varaq/80 m-0">
+            {hero.paragraph}
+          </p>
+
+          <div className="flex flex-col gap-2 pt-2">
+            <CtaButton variant="gold" className="w-full sm:w-auto self-start">
+              {hero.buttonText}
+            </CtaButton>
+            <p className="text-kumush text-sm m-0">
+              {hero.factText}
+            </p>
           </div>
         </div>
-      </div>
 
-      <div className="mt-6 w-full max-w-md flex flex-col items-center">
-        <CtaButton>{hero.ctaText}</CtaButton>
-        <p className="mt-3 text-xs text-zinc-400">
-          {landingI18n.price.label}{" "}
-          <strong className="text-zinc-200 font-bold">{landingI18n.price.value}</strong> ·{" "}
-          {hero.priceNote}
-        </p>
-      </div>
-
-      {features && features.length > 0 && (
-        <div className="mt-8 grid grid-cols-3 gap-2 w-full max-w-md">
-          {features.map((feat) => (
-            <div
-              key={feat.title}
-              className="flex items-center justify-center rounded-xl border border-zinc-800/80 bg-zinc-900/40 py-2.5 px-2 text-center text-xs font-medium text-zinc-300"
-            >
-              <span>{feat.title}</span>
-            </div>
-          ))}
+        <div className="hidden lg:flex justify-end pb-2">
+          <HarakatWord
+            text={hero.arabicWord}
+            bareText={hero.arabicBare}
+            className="text-[200px] h-[230px] w-full"
+          />
         </div>
-      )}
+      </div>
     </section>
   );
 }

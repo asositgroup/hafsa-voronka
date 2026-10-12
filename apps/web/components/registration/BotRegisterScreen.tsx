@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { LockIcon, SpinnerIcon } from "@/components/icons";
-import { TelegramIcon } from "@/components/landing/TelegramIcon";
+import { TelegramIcon } from "@/components/brand/TelegramIcon";
 import { useMiniApp } from "@/components/miniapp/MiniAppProvider";
 import { fetchSession } from "@/lib/api";
 import { uz } from "@/lib/i18n/uz";

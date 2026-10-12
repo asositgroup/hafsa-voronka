@@ -93,6 +93,9 @@ importers:
       '@types/telegram-web-app':
         specifier: ^10.1.0
         version: 10.1.0
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
       eslint:
         specifier: ^9
         version: 9.39.5(jiti@2.7.0)

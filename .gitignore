@@ -40,3 +40,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 !.env.example
+
+# generated landing (apps/web/landing -> apps/web/public)
+/apps/web/public/index.html
+/apps/web/public/css/
+/apps/web/public/js/
+/apps/web/public/img/

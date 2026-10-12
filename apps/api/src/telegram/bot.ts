@@ -1,7 +1,14 @@
 import { Bot, InlineKeyboard } from "grammy";
+import { normalizeContactPhone } from "@funnel/shared";
 import { env } from "@/env";
 import { uz } from "@/i18n/uz";
-import { findByTelegramId, logEvent, setBotBlocked, upsertFromStart } from "@/funnel/users";
+import {
+  findByTelegramId,
+  logEvent,
+  saveContactPhone,
+  setBotBlocked,
+  upsertFromStart,
+} from "@/funnel/users";
 
 function watchKeyboard(completed: boolean) {
   const keyboard = new InlineKeyboard().webApp(uz.bot.watchButton, `${env.WEB_URL}/app`);
@@ -24,6 +31,20 @@ function createBot() {
     await ctx.reply(completed ? uz.bot.welcomeBack(name) : uz.bot.welcome(name), {
       reply_markup: watchKeyboard(completed),
     });
+  });
+
+  bot.on("message:contact", async (ctx) => {
+    if (!ctx.from) return;
+    const contact = ctx.message.contact;
+    if (contact.user_id === ctx.from.id) {
+      const phone = normalizeContactPhone(contact.phone_number);
+      const user = await saveContactPhone(ctx.from, phone);
+      await ctx.reply(uz.bot.contactConfirmed, {
+        reply_markup: watchKeyboard(Boolean(user.completedAt)),
+      });
+      return;
+    }
+    await ctx.reply(uz.bot.contactMismatch);
   });
 
   bot.on("message", async (ctx) => {

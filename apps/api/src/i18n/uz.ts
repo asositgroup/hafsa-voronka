@@ -7,5 +7,11 @@ export const uz = {
     fallback: "Video darsni ko'rish uchun quyidagi tugmani bosing.",
     watchButton: "▶️ Videoni ko'rish",
     channelButton: "Kanalga o'tish →",
+    contactConfirmed: "Raqamingiz qabul qilindi! ✅ Mini ilovada davom etishingiz mumkin.",
+    contactMismatch: "Iltimos, faqat o'z telefon raqamingizni yuboring.",
+  },
+  validation: {
+    nameRequired: "Ismingizni kiriting (2-60 ta belgi)",
+    phoneRequired: "Telefon raqamingizni to'g'ri kiriting (+998XXXXXXXXX)",
   },
 };

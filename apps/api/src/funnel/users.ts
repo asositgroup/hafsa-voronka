@@ -4,14 +4,17 @@ import type { EventType } from "@funnel/shared";
 import { events, users } from "@/db/schema";
 import { resolveAttribution } from "./attribution";
 
-type TelegramProfile = {
+export type TelegramProfile = {
   id: number;
   username?: string;
   first_name?: string;
   language_code?: string;
 };
 
-export async function upsertFromStart(profile: TelegramProfile, startParam: string | undefined) {
+export async function upsertUser(
+  profile: TelegramProfile,
+  startParam: string | undefined,
+) {
   const profileFields = {
     username: profile.username ?? null,
     firstName: profile.first_name ?? null,
@@ -49,6 +52,69 @@ export async function upsertFromStart(profile: TelegramProfile, startParam: stri
     .onConflictDoUpdate({ target: users.telegramId, set: profileFields })
     .returning();
   return { user: created, isNew: true };
+}
+
+export const upsertFromStart = upsertUser;
+
+export async function saveContactPhone(profile: TelegramProfile, phone: string) {
+  const profileFields = {
+    username: profile.username ?? null,
+    firstName: profile.first_name ?? null,
+    languageCode: profile.language_code ?? null,
+  };
+
+  const [existing] = await db()
+    .select()
+    .from(users)
+    .where(eq(users.telegramId, profile.id))
+    .limit(1);
+
+  if (existing) {
+    const [updated] = await db()
+      .update(users)
+      .set({
+        ...profileFields,
+        phone,
+        phoneVerified: true,
+      })
+      .where(eq(users.id, existing.id))
+      .returning();
+    return updated;
+  }
+
+  const [created] = await db()
+    .insert(users)
+    .values({
+      telegramId: profile.id,
+      ...profileFields,
+      phone,
+      phoneVerified: true,
+    })
+    .onConflictDoUpdate({
+      target: users.telegramId,
+      set: { ...profileFields, phone, phoneVerified: true },
+    })
+    .returning();
+  return created;
+}
+
+export async function registerUserRecord(
+  userId: number,
+  name: string,
+  phone: string,
+  phoneVerified: boolean,
+) {
+  const [updated] = await db()
+    .update(users)
+    .set({
+      name,
+      phone,
+      phoneVerified,
+      registeredAt: new Date(),
+    })
+    .where(eq(users.id, userId))
+    .returning();
+  return updated;
 }
 
 export async function setBotBlocked(telegramId: number, blocked: boolean) {

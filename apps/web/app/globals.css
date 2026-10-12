@@ -1,1 +1,20 @@
 @import "tailwindcss";
+
+@theme {
+  --color-siyoh: #123B33;
+  --color-siyoh-deep: #0C2C26;
+  --color-zumrad: #1E5C4D;
+  --color-oltin: #E2B04A;
+  --color-varaq: #E8EEEA;
+  --color-kumush: #A7C2B8;
+  --color-qalam: #3E6359;
+  --color-chiziq: rgba(18, 59, 51, 0.16);
+  --color-anor: #C2493D;
+  --color-anor-tun: #F08A7E;
+  --color-chegara-tun: #6A978A;
+  --color-chegara: #7E9A90;
+  --color-white: #FFFFFF;
+
+  --font-sans: var(--font-sans), system-ui, -apple-system, sans-serif;
+  --font-arabic: var(--font-arabic), "Amiri", serif;
+}

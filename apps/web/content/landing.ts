@@ -1,178 +1,160 @@
-export type StepItem = {
-  step: number;
+export type LearnStep = {
+  numeral: string;
   title: string;
   description: string;
 };
 
-export type LearnPoint = {
+export type StudyPathItem = {
+  uzbek: string;
+  arabic: string;
+};
+
+export type HowToStep = {
   number: number;
-  title: string;
-  description?: string;
-};
-
-export type ResultCard = {
-  tag: string;
-  title: string;
-  description: string;
-};
-
-export type ExpertStat = {
-  value: string;
-  label: string;
+  text: string;
 };
 
 export type LandingContent = {
   hero: {
-    badge: string;
+    tag: string;
+    arabicWord: string;
+    arabicBare: string;
     title: string;
-    subtitle: string;
-    featureTag: string;
-    featureDesc: string;
-    coverImage: string | null;
-    ctaText: string;
-    priceNote: string;
+    lead: string;
+    paragraph: string;
+    buttonText: string;
+    factText: string;
   };
-  features: Array<{
-    title: string;
-  }>;
   whatYouWillLearn: {
     title: string;
-    items: LearnPoint[];
-    ctaText: string;
-    priceNote: string;
+    items: LearnStep[];
+    buttonText: string;
   };
   whoIsThisFor: {
+    intro: string;
     title: string;
-    items: string[];
+    leadIn: string;
+    bullets: string[];
+    closing: string;
   };
-  results: {
-    title: string;
-    subtitle: string;
-    items: ResultCard[];
-  };
-  stepsToVideo: {
-    title: string;
-    items: StepItem[];
-    ctaText: string;
-    priceNote: string;
-  };
-  expert: {
+  teacher: {
+    mark: string;
     name: string;
     title: string;
-    image: string | null;
-    bio: string[];
-    stats: ExpertStat[];
+    intro: string;
+    studyPath: StudyPathItem[];
+    bioParagraphs: string[];
+  };
+  howToGet: {
+    title: string;
+    steps: HowToStep[];
+    privacyText: string;
   };
   footer: {
     disclaimer: string;
     copyright: string;
   };
+  stickyBar: {
+    buttonText: string;
+  };
 };
 
 export const landingContent: LandingContent = {
   hero: {
-    badge: "Eksklyuziv Onlayn Dars",
-    title: "DAROMADNI OSHIRISHNING AMALIY USULLARI",
-    subtitle: "Mijozlar oqimini jalb qiling va sotuv hajmini 2x dan 5x gacha oshiring",
-    featureTag: "AMALIY BOSQICHLAR · REAL TAJRIBA",
-    featureDesc: "Mualliflik video master-klassi",
-    coverImage: null,
-    ctaText: "VIDEONI BEPUL KO'RISH →",
-    priceNote: "Narxi: 0 so'm · Cheklangan vaqt davomida ochiq",
+    tag: "Hafsa ustoza",
+    arabicWord: "اِقْرَأْ",
+    arabicBare: "اقرأ",
+    title: "Arab tilini o‘rganmoqchisiz, ammo nimadan boshlashni bilmayapsizmi?",
+    lead: "Hafsa ustozaning 12 yillik tajribasi asosida tayyorlangan bepul video darsda arab tilini o‘rganishdagi 5 ta muhim qadamni bilib oling.",
+    paragraph: "To‘g‘ri ustoz va kitob tanlashdan arab harflarini o‘rganishgacha — arab tilini o‘rganish jarayonini tezlashtiring va vaqtingizni tejang.",
+    buttonText: "Videoni Telegramda ko‘rish",
+    factText: "Bepul video dars, 17 daqiqa. Telegram ichida ko‘rasiz.",
   },
-  features: [
-    { title: "Yopiq Efir" },
-    { title: "Real Tajriba" },
-    { title: "Amaliy Tizim" },
-  ],
   whatYouWillLearn: {
-    title: "Videodarsda nimalarni bilib olasiz",
+    title: "Videodarsda nimalarni bilib olasiz?",
     items: [
       {
+        numeral: "١",
+        title: "Arab tilini o‘rganishni nimadan boshlash kerakligini bilib olasiz",
+        description: "To‘g‘ri ustoz va kitob tanlash, arab harflarini o‘rganish hamda ta’lim jarayonini to‘g‘ri yo‘lga qo‘yish haqida tushunchaga ega bo‘lasiz.",
+      },
+      {
+        numeral: "٢",
+        title: "O‘rganish jarayonini qiyinlashtiradigan xatolarni tushunasiz",
+        description: "Noto‘g‘ri metod tanlash va tartibsiz o‘rganish qanday qiyinchiliklarga olib kelishini, bu muammolardan qanday saqlanish mumkinligini bilib olasiz.",
+      },
+      {
+        numeral: "٣",
+        title: "O‘zingiz uchun to‘g‘ri o‘rganish yo‘lini belgilaysiz",
+        description: "Hafsa ustozaning tajribasi asosida arab tilini o‘rganishdagi dastlabki qadamlarni tushunib, o‘qishni qayerdan boshlash kerakligini aniqlashtirasiz.",
+      },
+    ],
+    buttonText: "Videoni Telegramda ko‘rish",
+  },
+  whoIsThisFor: {
+    intro: "Ushbu darslik arab tili va Qur’onni o‘qishni o‘rganishni istagan, ammo nimadan boshlashni bilmayotgan opa-singillarimiz uchun tayyorlangan.",
+    title: "Bu bepul dars kimlar uchun?",
+    leadIn: "Videodars ayniqsa quyidagilar uchun foydali bo‘ladi:",
+    bullets: [
+      "Arab tilini noldan o‘rganishni istayotganlar",
+      "Qur’onni tajvid bilan o‘qishni istayotganlar",
+      "Arab harflarini o‘rganmoqchi bo‘lgan, lekin qanday boshlashni bilmayotganlar",
+      "Arab tilini o‘rganish uchun qaysi ustoz va kitobni tanlashga ikkilanayotganlar",
+      "O‘rganishni boshlab, ammo to‘g‘ri yo‘nalish topa olmayotganlar",
+    ],
+    closing: "Agar siz ham arab tili va Qur’on o‘qishni o‘rganishni niyat qilgan bo‘lsangiz, ushbu bepul video darsni ko‘ring.",
+  },
+  teacher: {
+    mark: "حفصة",
+    name: "Hafsa ustoza",
+    title: "IQRA Akademiyasi asoschisi, 12 yildan ortiq tajriba",
+    intro: "Qur’on va arab tili ta’limi bilan 12 yildan ortiq shug‘ullanib kelaman. Arab tili va Qur’on ilmlarini chuqur o‘rganib, xalqaro darajadagi ustozlardan ta’lim olganman.",
+    studyPath: [
+      {
+        uzbek: "O‘zbekiston: arab tili bo‘yicha tahsil",
+        arabic: "أوزبكستان",
+      },
+      {
+        uzbek: "Madina, Islom universiteti: tahsil",
+        arabic: "المدينة المنورة",
+      },
+      {
+        uzbek: "Misr, arab tili markazi: 10 darajali dastur, yuqori baho bilan",
+        arabic: "مصر",
+      },
+      {
+        uzbek: "Istanbul, “Darussalam” madrasasi: malaka oshirish",
+        arabic: "إسطنبول",
+      },
+    ],
+    bioParagraphs: [
+      "Mujoza ustozlardan ta’lim olib, hozirda hofiza qizlarni ijozaga tayyorlab kelmoqdaman.",
+      "2014-yili IQRA Akademiyasiga asos soldim. Akademiyamizda darslarni Dubay, Misr va Makka shaharlarida tahsil olgan, yuqori darajadagi ijoza va diplomlarga ega ustozalar olib boradi.",
+    ],
+  },
+  howToGet: {
+    title: "Videoni qanday olasiz",
+    steps: [
+      {
         number: 1,
-        title: "Nega mijozlar narxni so'rab yo'qolib qoladi va ularni qanday ushlab qolish mumkin?",
+        text: "Tugmani bosing, Telegramda bot ochiladi",
       },
       {
         number: 2,
-        title: "Sotuv voronkasini to'g'ri qurish va konversiyani bir necha barobar oshirish usullari",
+        text: "Bitta tugma bilan raqamingizni yuboring",
       },
       {
         number: 3,
-        title: "Mahsulot yoki xizmat qadrini oshirib, yuqori chekda sotishning 3 ta asosiy siri",
+        text: "Darsni Telegram ichida ko‘ring",
       },
     ],
-    ctaText: "VIDEONI BEPUL KO'RISH →",
-    priceNote: "Narxi: 0 so'm",
-  },
-  whoIsThisFor: {
-    title: "Ushbu bepul darslik kimlar uchun:",
-    items: [
-      "Mahsulot yoki xizmatlarini yuqori chekda sotishni xohlagan tadbirkorlar",
-      "Onlayn va offlayn biznesda sotuvlarini 2x dan 10x gacha oshirmoqchi bo'lganlar",
-      "Sotuv tizimini noldan to'g'ri yo'lga qo'yishni rejalashtirgan mutaxassislar",
-    ],
-  },
-  results: {
-    title: "O'quvchilarim natijalari",
-    subtitle: "Quruq nazariya emas, real amaliyot va erishilgan haqiqiy natijalar:",
-    items: [
-      {
-        tag: "Onlayn Savdo",
-        title: "Sotuvlar hajmi 3 barobar o'sdi",
-        description: "Yangi sotuv voronkasi orqali 2 oy ichida oylik aylanma 20 mln so'mdan 65 mln so'mga ko'tarildi.",
-      },
-      {
-        tag: "Xizmat Ko'rsatish",
-        title: "Yuqori narxlarda barqaror mijozlar",
-        description: "Xizmatlar paketlashtirildi va birinchi oyda 5 ta yirik korporativ shartnoma imzolandi.",
-      },
-      {
-        tag: "Ishlab Chiqarish",
-        title: "Viloyatlararo yangi bozorlar",
-        description: "B2B mijozlar bilan ishlash strategiyasi yangilanib, 3 ta yangi hududga distribyutsiya yo'lga qo'yildi.",
-      },
-    ],
-  },
-  stepsToVideo: {
-    title: "Videoni ochish — 3 ta qadam",
-    items: [
-      {
-        step: 1,
-        title: "Saytdan botga o'ting",
-        description: "Quyidagi tugmani bosish orqali Telegram bot ochiladi",
-      },
-      {
-        step: 2,
-        title: "Botda ro'yxatdan o'ting",
-        description: "Ismingiz va raqamingizni tasdiqlang — 10 soniya",
-      },
-      {
-        step: 3,
-        title: "Videoni tomosha qiling",
-        description: "Bot dars havolasini darhol taqdim etadi",
-      },
-    ],
-    ctaText: "VIDEONI BEPUL KO'RISH →",
-    priceNote: "Narxi: 0 so'm",
-  },
-  expert: {
-    name: "Javohir Rustamov",
-    title: "Biznes-maslahatchi, marketing va sotuv tizimlari bo'yicha ekspert",
-    image: null,
-    bio: [
-      "12 yillik tajribaga ega amaliyotchi marketolog va biznes konsultant.",
-      "O'zbekistonda 100 dan ortiq yirik va o'rta biznes loyihalarida sotuv tizimini noldan yo'lga qo'ygan.",
-      "Kompaniyalar va tadbirkorlar uchun amaliy sotuv voronkalari yaratish bo'yicha yetakchi mutaxassis.",
-      "5000 dan ortiq shogirdlarga marketing va zamonaviy sotuv texnologiyalaridan dars bergan.",
-    ],
-    stats: [
-      { value: "12 YILLIK", label: "Tajriba" },
-      { value: "5000+", label: "O'quvchilar" },
-      { value: "100+", label: "Muvaffaqiyatli Keys" },
-    ],
+    privacyText: "Raqamingiz faqat dars va kanal haqida xabar berish uchun ishlatiladi.",
   },
   footer: {
-    disclaimer: "Natija shaxsiy mehnat va sarflangan vaqtga bog'liq. Kafolat berilmaydi.",
-    copyright: "© 2026 Barcha huquqlar himoyalangan.",
+    disclaimer: "Natijalar har bir o‘quvchining muntazam mehnatiga bog‘liq.",
+    copyright: "© 2026 IQRA Akademiyasi",
+  },
+  stickyBar: {
+    buttonText: "Videoni Telegramda ko‘rish",
   },
 };

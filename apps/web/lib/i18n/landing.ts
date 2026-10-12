@@ -10,16 +10,16 @@ export const landingI18n = {
   },
   price: {
     label: "Narxi:",
-    value: "0 so'm",
+    value: "0 so‘m",
   },
   cta: {
-    defaultText: "VIDEONI BEPUL KO'RISH →",
+    defaultText: "VIDEONI BEPUL KO‘RISH",
   },
   video: {
-    playAria: "Videoni bepul ko'rish",
+    playAria: "Videoni bepul ko‘rish",
   },
   footer: {
-    disclaimer: "Natija shaxsiy mehnat va sarflangan vaqtga bog'liq. Kafolat berilmaydi.",
-    copyright: "© 2026 Barcha huquqlar himoyalangan.",
+    disclaimer: "Natijalar har bir o‘quvchining muntazam mehnatiga bog‘liq.",
+    copyright: "© 2026 IQRA Akademiyasi",
   },
 };

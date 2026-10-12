@@ -52,14 +52,6 @@ a {
   overflow: hidden;
 }
 
-.l {
-  fill: var(--varaq);
-}
-
-.m {
-  fill: var(--oltin);
-}
-
 .wrap {
   width: 100%;
   max-width: 1180px;
@@ -344,7 +336,7 @@ a {
   overflow: hidden;
   aspect-ratio: 16 / 9;
   border-radius: 18px;
-  background: var(--siyoh-deep);
+  background: radial-gradient(ellipse at 50% 35%, #1f7d5c 0%, #16634a 45%, #0a3528 100%);
 }
 
 .poster img {

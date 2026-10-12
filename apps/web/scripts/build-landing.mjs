@@ -5,7 +5,7 @@ import { transform } from "esbuild";
 const root = new URL("..", import.meta.url).pathname;
 const src = join(root, "landing");
 const out = join(root, "public");
-const outputs = ["index.html", "css", "js", "img"];
+const outputs = ["index.html", "css", "js", "img", "svg"];
 
 function required(name) {
   const value = process.env[name];
@@ -38,7 +38,7 @@ async function minifyJs(file, define) {
 }
 
 await Promise.all(outputs.map((name) => rm(join(out, name), { recursive: true, force: true })));
-await Promise.all(["css", "js", "img"].map((dir) => mkdir(join(out, dir), { recursive: true })));
+await Promise.all(["css", "js", "img", "svg"].map((dir) => mkdir(join(out, dir), { recursive: true })));
 
 const criticalCss = await minifyCss("critical.css");
 let html = (await readFile(join(src, "index.html"), "utf8"))
@@ -60,8 +60,10 @@ await writeFile(
 if (pixelId) {
   await writeFile(join(out, "js", "pixel.js"), await minifyJs("pixel.js", { __FB_PIXEL_ID__: JSON.stringify(pixelId) }));
 }
-for (const file of await readdir(join(src, "img"))) {
-  await copyFile(join(src, "img", file), join(out, "img", file));
+for (const dir of ["img", "svg"]) {
+  for (const file of await readdir(join(src, dir))) {
+    await copyFile(join(src, dir, file), join(out, dir, file));
+  }
 }
 
 const imageLimit = 10 * 1024;

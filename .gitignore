@@ -46,4 +46,5 @@ next-env.d.ts
 /apps/web/public/css/
 /apps/web/public/js/
 /apps/web/public/img/
+/apps/web/public/svg/
 !deploy/.env.prod.example

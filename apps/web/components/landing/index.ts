@@ -1,6 +1,7 @@
 export * from "./CtaButton";
 export * from "./LandingTracker";
 export * from "./FacebookPixel";
+export * from "./LandingHeader";
 export * from "./HeroSection";
 export * from "./WhatYouWillLearn";
 export * from "./WhoIsThisFor";
@@ -8,3 +9,4 @@ export * from "./ExpertBioSection";
 export * from "./StepsToVideoSection";
 export * from "./FooterSection";
 export * from "./StickyBottomCta";
+export * from "./TelegramIcon";

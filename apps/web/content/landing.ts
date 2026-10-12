@@ -1,51 +1,71 @@
-export type LearnStep = {
+export type LessonCard = {
   numeral: string;
   title: string;
   description: string;
 };
 
 export type StudyPathItem = {
-  uzbek: string;
+  place: string;
+  detail: string;
   arabic: string;
 };
 
 export type HowToStep = {
   number: number;
-  text: string;
+  title: string;
+  description: string;
 };
 
 export type LandingContent = {
+  header: {
+    brand: string;
+    buttonText: string;
+  };
   hero: {
-    tag: string;
+    fact: string;
     title: string;
     lead: string;
     paragraph: string;
     buttonText: string;
-    factText: string;
+    telegramNote: string;
+    telegramSubnote: string;
+    posterLabel: string;
+    duration: string;
+    badgeValue: string;
+    badgeLabel: string;
   };
-  whatYouWillLearn: {
+  lesson: {
     title: string;
-    items: LearnStep[];
+    intro: string;
+    cards: LessonCard[];
     buttonText: string;
   };
-  whoIsThisFor: {
-    intro: string;
+  audience: {
     title: string;
+    intro: string;
     leadIn: string;
-    bullets: string[];
+    items: string[];
     closing: string;
+    buttonText: string;
   };
   teacher: {
+    archLabel: string;
+    archYear: string;
     name: string;
-    title: string;
-    intro: string;
+    credential: string;
+    lead: string;
     studyPath: StudyPathItem[];
-    bioParagraphs: string[];
+    ijaza: string;
+    foundedYear: string;
+    foundedText: string;
   };
-  howToGet: {
+  steps: {
     title: string;
-    steps: HowToStep[];
-    privacyText: string;
+    items: HowToStep[];
+    finalTitle: string;
+    finalSubline: string;
+    finalButtonText: string;
+    privacy: string;
   };
   footer: {
     disclaimer: string;
@@ -57,98 +77,120 @@ export type LandingContent = {
 };
 
 export const landingContent: LandingContent = {
-  hero: {
-    tag: "Hafsa ustoza",
-    title: "Arab tilini o‘rganmoqchisiz, ammo nimadan boshlashni bilmayapsizmi?",
-    lead: "Hafsa ustozaning 12 yillik tajribasi asosida tayyorlangan bepul video darsda arab tilini o‘rganishdagi 5 ta muhim qadamni bilib oling.",
-    paragraph: "To‘g‘ri ustoz va kitob tanlashdan arab harflarini o‘rganishgacha — arab tilini o‘rganish jarayonini tezlashtiring va vaqtingizni tejang.",
-    buttonText: "Videoni Telegramda ko‘rish",
-    factText: "Bepul video dars, 17 daqiqa. Telegram ichida ko‘rasiz.",
+  header: {
+    brand: "Hafsa ustoza",
+    buttonText: "Bepul olish",
   },
-  whatYouWillLearn: {
+  hero: {
+    fact: "17 daqiqalik bepul videodars",
+    title: "Arab tilini to‘g‘ri o‘rganishni nimadan boshlash kerak?",
+    lead: "Hafsa ustozaning 12 yillik tajribasi asosida arab tilini o‘rganishdagi 5 ta muhim qadamni bilib oling.",
+    paragraph: "To‘g‘ri ustoz va kitob tanlashdan arab harflarini o‘rganishgacha — jarayonni tezlashtiring va vaqtingizni tejang.",
+    buttonText: "Bepul darsni ko‘rish",
+    telegramNote: "Telegram ichida ochiladi",
+    telegramSubnote: "Bir necha soniyada",
+    posterLabel: "Videoni Telegramda ko‘rish",
+    duration: "17:29",
+    badgeValue: "12+",
+    badgeLabel: "yillik ta’lim tajribasi",
+  },
+  lesson: {
     title: "Videodarsda nimalarni bilib olasiz?",
-    items: [
+    intro: "Darsda arab tilini o‘rganishni boshlash uchun kerak bo‘ladigan uchta asosiy mavzu bor.",
+    cards: [
       {
         numeral: "١",
-        title: "Arab tilini o‘rganishni nimadan boshlash kerakligini bilib olasiz",
+        title: "Qayerdan boshlashni bilib olasiz",
         description: "To‘g‘ri ustoz va kitob tanlash, arab harflarini o‘rganish hamda ta’lim jarayonini to‘g‘ri yo‘lga qo‘yish haqida tushunchaga ega bo‘lasiz.",
       },
       {
         numeral: "٢",
-        title: "O‘rganish jarayonini qiyinlashtiradigan xatolarni tushunasiz",
-        description: "Noto‘g‘ri metod tanlash va tartibsiz o‘rganish qanday qiyinchiliklarga olib kelishini, bu muammolardan qanday saqlanish mumkinligini bilib olasiz.",
+        title: "Xatolarni oldindan tushunasiz",
+        description: "Noto‘g‘ri metod va tartibsiz o‘rganish qanday qiyinchiliklarga olib kelishini, bu muammolardan qanday saqlanishni bilib olasiz.",
       },
       {
         numeral: "٣",
-        title: "O‘zingiz uchun to‘g‘ri o‘rganish yo‘lini belgilaysiz",
-        description: "Hafsa ustozaning tajribasi asosida arab tilini o‘rganishdagi dastlabki qadamlarni tushunib, o‘qishni qayerdan boshlash kerakligini aniqlashtirasiz.",
+        title: "O‘z yo‘lingizni belgilaysiz",
+        description: "Hafsa ustozaning tajribasi asosida dastlabki qadamlarni tushunib, o‘qishni aynan qayerdan boshlash kerakligini aniqlashtirasiz.",
       },
     ],
-    buttonText: "Videoni Telegramda ko‘rish",
+    buttonText: "Bepul darsni ko‘rish",
   },
-  whoIsThisFor: {
-    intro: "Ushbu darslik arab tili va Qur’onni o‘qishni o‘rganishni istagan, ammo nimadan boshlashni bilmayotgan opa-singillarimiz uchun tayyorlangan.",
+  audience: {
     title: "Bu bepul dars kimlar uchun?",
-    leadIn: "Videodars ayniqsa quyidagilar uchun foydali bo‘ladi:",
-    bullets: [
+    intro: "Arab tili va Qur’onni o‘qishni o‘rganishni istagan, ammo nimadan boshlashni bilmayotgan opa-singillarimiz uchun tayyorlangan.",
+    leadIn: "Videodars ayniqsa quyidagilar uchun foydali:",
+    items: [
       "Arab tilini noldan o‘rganishni istayotganlar",
       "Qur’onni tajvid bilan o‘qishni istayotganlar",
-      "Arab harflarini o‘rganmoqchi bo‘lgan, lekin qanday boshlashni bilmayotganlar",
-      "Arab tilini o‘rganish uchun qaysi ustoz va kitobni tanlashga ikkilanayotganlar",
-      "O‘rganishni boshlab, ammo to‘g‘ri yo‘nalish topa olmayotganlar",
+      "Arab harflarini o‘rganmoqchi bo‘lganlar",
+      "Ustoz va kitob tanlashga ikkilanayotganlar",
+      "Boshlagan, ammo to‘g‘ri yo‘nalish topa olmayotganlar",
     ],
-    closing: "Agar siz ham arab tili va Qur’on o‘qishni o‘rganishni niyat qilgan bo‘lsangiz, ushbu bepul video darsni ko‘ring.",
+    closing: "Siz ham arab tili va Qur’on o‘qishni o‘rganishni niyat qilgan bo‘lsangiz, bu dars siz uchun.",
+    buttonText: "Bepul darsni ko‘rish",
   },
   teacher: {
+    archLabel: "IQRA Akademiyasi asoschisi",
+    archYear: "2014",
     name: "Hafsa ustoza",
-    title: "IQRA Akademiyasi asoschisi, 12 yildan ortiq tajriba",
-    intro: "Qur’on va arab tili ta’limi bilan 12 yildan ortiq shug‘ullanib kelaman. Arab tili va Qur’on ilmlarini chuqur o‘rganib, xalqaro darajadagi ustozlardan ta’lim olganman.",
+    credential: "12 yildan ortiq Qur’on va arab tili ta’limi tajribasi",
+    lead: "Qur’on va arab tili ta’limi bilan 12 yildan ortiq shug‘ullanib kelaman. Arab tili va Qur’on ilmlarini chuqur o‘rganib, xalqaro darajadagi ustozlardan ta’lim olganman.",
     studyPath: [
       {
-        uzbek: "O‘zbekiston: arab tili bo‘yicha tahsil",
+        place: "O‘zbekiston",
+        detail: "Arab tili bo‘yicha tahsil",
         arabic: "أوزبكستان",
       },
       {
-        uzbek: "Madina, Islom universiteti: tahsil",
+        place: "Madina",
+        detail: "Islom universitetida tahsil",
         arabic: "المدينة المنورة",
       },
       {
-        uzbek: "Misr, arab tili markazi: 10 darajali dastur, yuqori baho bilan",
+        place: "Misr",
+        detail: "Arab tili markazida 10 darajali dastur, yuqori baho bilan",
         arabic: "مصر",
       },
       {
-        uzbek: "Istanbul, “Darussalam” madrasasi: malaka oshirish",
+        place: "Istanbul",
+        detail: "“Darussalam” madrasasida malaka oshirish",
         arabic: "إسطنبول",
       },
     ],
-    bioParagraphs: [
-      "Mujoza ustozlardan ta’lim olib, hozirda hofiza qizlarni ijozaga tayyorlab kelmoqdaman.",
-      "2014-yili IQRA Akademiyasiga asos soldim. Akademiyamizda darslarni Dubay, Misr va Makka shaharlarida tahsil olgan, yuqori darajadagi ijoza va diplomlarga ega ustozalar olib boradi.",
-    ],
+    ijaza: "Mujoza ustozlardan ta’lim olib, hozirda hofiza qizlarni ijozaga tayyorlab kelmoqdaman.",
+    foundedYear: "2014",
+    foundedText: "IQRA Akademiyasiga asos soldim. Akademiyamizda darslarni Dubay, Misr va Makkada tahsil olgan, yuqori darajadagi ijoza va diplomlarga ega ustozalar olib boradi.",
   },
-  howToGet: {
-    title: "Videoni qanday olasiz",
-    steps: [
+  steps: {
+    title: "Videoni qanday olasiz?",
+    items: [
       {
         number: 1,
-        text: "Tugmani bosing, Telegramda bot ochiladi",
+        title: "Tugmani bosing",
+        description: "Telegramda bot ochiladi",
       },
       {
         number: 2,
-        text: "Bitta tugma bilan raqamingizni yuboring",
+        title: "Raqamingizni yuboring",
+        description: "Buning uchun bitta tugma yetarli",
       },
       {
         number: 3,
-        text: "Darsni Telegram ichida ko‘ring",
+        title: "Darsni ko‘ring",
+        description: "Telegram ichida, o‘zingizga qulay vaqtda",
       },
     ],
-    privacyText: "Raqamingiz faqat dars va kanal haqida xabar berish uchun ishlatiladi.",
+    finalTitle: "Birinchi qadamni bugun qo‘ying.",
+    finalSubline: "17 daqiqalik videodarsni bepul oling.",
+    finalButtonText: "Telegramda ko‘rish",
+    privacy: "Raqamingiz faqat dars va kanal haqida xabar berish uchun ishlatiladi.",
   },
   footer: {
     disclaimer: "Natijalar har bir o‘quvchining muntazam mehnatiga bog‘liq.",
     copyright: "© 2026 IQRA Akademiyasi",
   },
   stickyBar: {
-    buttonText: "Videoni Telegramda ko‘rish",
+    buttonText: "Bepul darsni ko‘rish",
   },
 };

@@ -212,10 +212,14 @@ Log in to the Coolify dashboard on the Oracle VM (`http://<ORACLE_VPS_PUBLIC_IP>
 
 To restore PostgreSQL from an R2 backup dump:
 
+Coolify stores Postgres backups as `pg_dump` custom-format archives, so restore them with `pg_restore`, not `psql`. Find the exact object path with `rclone ls r2:funnel-backups`.
+
 ```bash
-rclone copy r2:funnel-backups/latest.sql ./latest.sql
-docker exec -i <COOLIFY_POSTGRES_CONTAINER_ID> psql -U funnel -d funnel < ./latest.sql
+rclone copyto "r2:funnel-backups/<PATH_TO_BACKUP_FILE>" ./backup.dmp
+docker exec -i <COOLIFY_POSTGRES_CONTAINER_ID> pg_restore -U funnel -d funnel --clean --if-exists --no-owner < ./backup.dmp
 ```
+
+Run the drill once against a scratch database (`-d funnel_restore_test`, created first with `createdb`) before launch, so a real restore is never the first one.
 
 ### API Application Settings
 
@@ -291,6 +295,7 @@ Run the webhook setup script from the repo using production environment variable
 ```bash
 BOT_TOKEN="<PRODUCTION_BOT_TOKEN>" \
 API_URL="https://api.yourdomain.uz" \
+WEB_URL="https://yourdomain.uz" \
 WEBHOOK_SECRET="<PRODUCTION_WEBHOOK_SECRET>" \
 pnpm --filter @funnel/api set-webhook
 ```

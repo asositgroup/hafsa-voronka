@@ -27,12 +27,17 @@ export function initTelegramWebApp(tg: NonNullable<ReturnType<typeof getTelegram
   }
 
   if (typeof tg.setHeaderColor === "function") {
-    tg.setHeaderColor("#09090B");
+    tg.setHeaderColor("#123B33");
   }
 
   if (typeof tg.setBackgroundColor === "function") {
-    tg.setBackgroundColor("#09090B");
+    tg.setBackgroundColor("#123B33");
   }
+}
+
+export function setMainButtonTheme(tg?: ReturnType<typeof getTelegramWebApp>) {
+  const target = tg ?? getTelegramWebApp();
+  target?.MainButton?.setParams?.({ color: "#E2B04A", text_color: "#123B33" });
 }
 
 export function getTelegramUser() {

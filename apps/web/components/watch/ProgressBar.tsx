@@ -44,26 +44,26 @@ export function ProgressBar({
 
   const safeDuration = Math.max(duration, 1);
   const currentPct = Math.min(100, Math.max(0, (currentTime / safeDuration) * 100));
-  const watchedPct = Math.min(100, Math.max(0, (maxReached / safeDuration) * 100));
+  const maxReachedPct = Math.min(100, Math.max(0, (maxReached / safeDuration) * 100));
 
   return (
     <div
       ref={barRef}
       onPointerDown={handlePointerDown}
-      className="group relative flex h-7 w-full cursor-pointer touch-none items-center select-none"
+      className="group relative flex h-6 w-full cursor-pointer touch-none items-center select-none"
     >
-      <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-zinc-800 transition-all group-hover:h-2">
+      <div className="relative h-1 w-full rounded-[2px] bg-varaq/25">
         <div
-          className="absolute top-0 bottom-0 left-0 bg-zinc-600 transition-all"
-          style={{ width: `${watchedPct}%` }}
+          className="absolute top-0 bottom-0 left-0 rounded-[2px] bg-varaq/55"
+          style={{ width: `${maxReachedPct}%` }}
         />
         <div
-          className="absolute top-0 bottom-0 left-0 bg-blue-500"
+          className="absolute top-0 bottom-0 left-0 rounded-[2px] bg-oltin"
           style={{ width: `${currentPct}%` }}
         />
       </div>
       <div
-        className="pointer-events-none absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 -translate-x-1/2 rounded-full bg-white shadow-md transition-transform group-hover:scale-125"
+        className="pointer-events-none absolute top-1/2 h-3 w-3 -mt-1.5 -ml-1.5 rounded-full bg-oltin"
         style={{ left: `${currentPct}%` }}
       />
     </div>

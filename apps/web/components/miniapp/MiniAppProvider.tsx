@@ -18,7 +18,7 @@ type LoadState =
   | { type: "error"; initData: string }
   | { type: "ready"; initData: string; session: SessionResponse };
 
-const MiniAppContext = createContext<MiniAppContextValue | null>(null);
+export const MiniAppContext = createContext<MiniAppContextValue | null>(null);
 
 export function useMiniApp() {
   const value = useContext(MiniAppContext);
@@ -72,51 +72,57 @@ export function MiniAppProvider({ children }: { children: React.ReactNode }) {
 
 export function LoadingScreen() {
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center p-6 text-center">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-white" />
-      <p className="mt-4 text-sm text-zinc-400">{uz.app.loading}</p>
+    <div className="flex min-h-dvh flex-col items-center justify-center p-6 text-center bg-siyoh text-varaq">
+      <div className="w-6 h-6 rotate-45 border-2 border-oltin animate-spin motion-reduce:animate-none" />
+      <p className="mt-6 text-sm text-kumush">{uz.app.loading}</p>
     </div>
   );
 }
 
-function OpenInTelegramScreen() {
+export function OpenInTelegramScreen() {
   const botUsername = process.env.NEXT_PUBLIC_BOT_USERNAME || "";
   const botUrl = botUsername ? `https://t.me/${botUsername}` : "https://t.me";
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center p-6 text-center">
-      <div className="max-w-sm space-y-4">
-        <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 text-3xl">
-          ✈️
+    <div className="flex min-h-dvh flex-col items-center justify-center p-6 text-center bg-siyoh text-varaq">
+      <div className="w-full max-w-sm flex flex-col gap-4">
+        <h1 className="text-xl font-bold text-varaq m-0">
+          {uz.app.openInTelegramTitle}
+        </h1>
+        <p className="text-sm text-kumush m-0">
+          {uz.app.openInTelegramDesc}
+        </p>
+        <div className="pt-2">
+          <a
+            href={botUrl}
+            className="flex items-center justify-center w-full min-h-[54px] rounded-[14px] bg-oltin text-siyoh text-[17px] font-semibold transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oltin"
+          >
+            {uz.app.openInTelegramButton}
+          </a>
         </div>
-        <h1 className="text-xl font-bold text-white">{uz.app.openInTelegramTitle}</h1>
-        <p className="text-sm text-zinc-400">{uz.app.openInTelegramDesc}</p>
-        <a
-          href={botUrl}
-          className="inline-block w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-500"
-        >
-          {uz.app.openInTelegramButton}
-        </a>
       </div>
     </div>
   );
 }
 
-function ErrorScreen({ onRetry }: { onRetry: () => void }) {
+export function ErrorScreen({ onRetry }: { onRetry: () => void }) {
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center p-6 text-center">
-      <div className="max-w-sm space-y-4">
-        <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-rose-950/50 text-2xl text-rose-400">
-          ⚠️
+    <div className="flex min-h-dvh flex-col items-center justify-center p-6 text-center bg-siyoh text-varaq">
+      <div className="w-full max-w-sm flex flex-col gap-4">
+        <h1 className="text-xl font-bold text-varaq m-0">
+          {uz.app.errorTitle}
+        </h1>
+        <p className="text-sm text-kumush m-0">
+          {uz.app.errorMessage}
+        </p>
+        <div className="pt-2">
+          <button
+            type="button"
+            onClick={onRetry}
+            className="flex items-center justify-center w-full min-h-[54px] rounded-[14px] border border-chegara-tun bg-transparent text-varaq text-[17px] font-semibold transition hover:bg-siyoh-deep active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oltin"
+          >
+            {uz.app.retryButton}
+          </button>
         </div>
-        <h1 className="text-xl font-bold text-white">{uz.app.errorTitle}</h1>
-        <p className="text-sm text-zinc-400">{uz.app.errorMessage}</p>
-        <button
-          type="button"
-          onClick={onRetry}
-          className="w-full rounded-xl bg-zinc-800 px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-700"
-        >
-          {uz.app.retryButton}
-        </button>
       </div>
     </div>
   );

@@ -3,7 +3,7 @@
 import { useCallback, useEffect } from "react";
 import { miniAppBeacon } from "@/lib/api";
 import { watchUz } from "@/lib/i18n/watch";
-import { getTelegramWebApp } from "@/lib/telegram";
+import { getTelegramWebApp, setMainButtonTheme } from "@/lib/telegram";
 
 type ProceedButtonProps = {
   visible: boolean;
@@ -34,6 +34,7 @@ export function ProceedButton({
     const tg = getTelegramWebApp();
     if (!tg?.MainButton) return undefined;
 
+    setMainButtonTheme(tg);
     tg.MainButton.setText(watchUz.proceedButton);
     tg.MainButton.show();
     tg.MainButton.enable();
@@ -48,11 +49,11 @@ export function ProceedButton({
   if (!visible) return null;
 
   return (
-    <div className="w-full transition-all duration-500">
+    <div className="w-full">
       <button
         type="button"
         onClick={handleClick}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-6 py-4 text-base font-semibold text-white shadow-lg shadow-blue-600/30 transition-all hover:bg-blue-500 active:scale-[0.98]"
+        className="flex w-full items-center justify-center min-h-[54px] rounded-[14px] bg-oltin text-siyoh font-semibold text-[17px] transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oltin"
       >
         <span>{watchUz.proceedButton}</span>
       </button>

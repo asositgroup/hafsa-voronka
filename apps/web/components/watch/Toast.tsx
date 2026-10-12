@@ -9,9 +9,8 @@ export function Toast({ message, visible }: ToastProps) {
   if (!visible) return null;
 
   return (
-    <div className="pointer-events-none absolute top-4 left-1/2 z-30 -translate-x-1/2 px-4 transition-all duration-200">
-      <div className="flex items-center gap-2 rounded-full border border-zinc-700/60 bg-zinc-950/90 px-4 py-2 text-xs sm:text-sm font-medium text-zinc-100 shadow-xl backdrop-blur-md">
-        <span>🔒</span>
+    <div className="pointer-events-none absolute inset-x-0 top-4 z-30 flex justify-center px-4 transition-all duration-200">
+      <div className="flex items-center rounded-full border border-zumrad bg-siyoh-deep px-4 py-2 text-xs sm:text-sm font-medium text-varaq">
         <span>{message}</span>
       </div>
     </div>

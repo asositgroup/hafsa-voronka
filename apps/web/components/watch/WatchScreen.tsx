@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { MAX_PLAYBACK_RATE, PLAYBACK_RATES, type ProgressEvent, type ProgressResponse } from "@funnel/shared";
+import { PLAYBACK_RATES, type ProgressEvent, type ProgressResponse } from "@funnel/shared";
 import { miniAppBeacon, miniAppPost } from "@/lib/api";
 import { watchUz } from "@/lib/i18n/watch";
-import { getTelegramWebApp, hapticSuccess } from "@/lib/telegram";
+import { getTelegramWebApp, hapticSuccess, setMainButtonTheme } from "@/lib/telegram";
 import { attachVideoSource } from "@/lib/video/hls";
 import { formatTime } from "@/lib/video/format";
 import { useMiniApp } from "@/components/miniapp/MiniAppProvider";
+import { HarakatWord } from "@/components/brand/HarakatWord";
 import { ProgressBar } from "./ProgressBar";
 import { ProceedButton } from "./ProceedButton";
 import { Toast } from "./Toast";
@@ -18,11 +19,9 @@ export function WatchScreen() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
-  const [hasStarted, setHasStarted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(session.config.duration || 0);
   const [maxReached, setMaxReached] = useState(session.progress.maxPosition || 0);
-  const [isMuted, setIsMuted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [toastVisible, setToastVisible] = useState(false);
@@ -45,7 +44,7 @@ export function WatchScreen() {
   }, [session.completed]);
 
   const isSeekLocked = session.config.seekLock && !session.completed;
-  const isProceedVisible = !session.config.gateProceed || session.completed;
+  const isUnlocked = !session.config.gateProceed || session.completed;
 
   const triggerToast = useCallback(() => {
     setToastVisible(true);
@@ -85,7 +84,9 @@ export function WatchScreen() {
           if (data.completed && !isCompletedRef.current) {
             hapticSuccess();
             setSession({ ...session, completed: true });
-            getTelegramWebApp()?.disableClosingConfirmation?.();
+            const tg = getTelegramWebApp();
+            tg?.disableClosingConfirmation?.();
+            setMainButtonTheme(tg);
           }
         }
       } catch {
@@ -193,29 +194,24 @@ export function WatchScreen() {
     }
   };
 
-  const cycleSpeed = () => {
+  const setSpeed = (rate: (typeof PLAYBACK_RATES)[number]) => {
     const video = videoRef.current;
     if (!video) return;
-    const index = PLAYBACK_RATES.indexOf(playbackRateRef.current as (typeof PLAYBACK_RATES)[number]);
-    const next = PLAYBACK_RATES[(index + 1) % PLAYBACK_RATES.length];
-    playbackRateRef.current = next;
-    video.playbackRate = next;
-    setPlaybackRate(next);
-    resetControlsTimeout();
+    playbackRateRef.current = rate;
+    video.playbackRate = rate;
+    setPlaybackRate(rate);
   };
 
   const unlockRemainingSecs = Math.max(
     0,
     unlockAnchor.remainingSecs - Math.max(0, currentTime - unlockAnchor.position),
   );
-  const showUnlockCountdown = !isProceedVisible && unlockRemainingSecs > 0;
 
   const handlePlay = () => {
     const video = videoRef.current;
     if (!video) return;
 
     setIsPlaying(true);
-    setHasStarted(true);
     resetControlsTimeout();
 
     if (!hasSentStartRef.current) {
@@ -275,13 +271,6 @@ export function WatchScreen() {
     }
   };
 
-  const toggleMute = () => {
-    const video = videoRef.current;
-    if (!video) return;
-    video.muted = !video.muted;
-    setIsMuted(video.muted);
-  };
-
   const toggleFullscreen = () => {
     const tg = getTelegramWebApp();
     if (!isFullscreen) {
@@ -300,17 +289,26 @@ export function WatchScreen() {
     setCurrentTime(targetTime);
   };
 
+  const targetGateSecs = duration > 0 ? duration * 0.7 : 1;
+  const gateProgressPercent = isUnlocked
+    ? Math.min(100, Math.max(70, duration > 0 ? (currentTime / duration) * 100 : 70))
+    : Math.min(70, Math.max(0, (maxReached / targetGateSecs) * 70));
+
+  const formattedRemainingTime = formatTime(
+    Math.ceil(unlockRemainingSecs / playbackRate),
+  );
+
   return (
-    <div className="flex min-h-dvh flex-col items-center bg-[#09090B] px-4 py-6 text-white selection:bg-blue-500">
-      <div className="flex w-full max-w-md flex-col space-y-6">
+    <div className="flex min-h-dvh flex-col bg-siyoh text-varaq">
+      <div className="mx-auto flex w-full max-w-[420px] flex-1 flex-col pb-[max(28px,env(safe-area-inset-bottom))]">
         <div
           ref={containerRef}
           onMouseMove={resetControlsTimeout}
           onTouchStart={resetControlsTimeout}
           className={
             isFullscreen
-              ? "fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#09090B]"
-              : "relative aspect-video w-full overflow-hidden rounded-2xl bg-black shadow-2xl ring-1 ring-zinc-800"
+              ? "fixed inset-0 z-50 flex flex-col items-center justify-center bg-black"
+              : "relative aspect-video w-full bg-black"
           }
         >
           <Toast message={watchUz.seekLockedToast} visible={toastVisible} />
@@ -330,28 +328,14 @@ export function WatchScreen() {
             onPause={handlePause}
             onEnded={handleEnded}
             onClick={togglePlay}
-            className="h-full w-full object-contain cursor-pointer"
+            className="h-full w-full object-cover cursor-pointer"
           />
 
-          {!hasStarted && (
-            <div
-              onClick={togglePlay}
-              className="absolute inset-0 z-20 flex cursor-pointer items-center justify-center bg-black/40 backdrop-blur-[2px] transition-opacity"
-            >
-              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-blue-600/90 text-white shadow-2xl shadow-blue-500/50 backdrop-blur-md transition-transform hover:scale-110 active:scale-95">
-                <svg
-                  className="ml-1 h-9 w-9 fill-current"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              </div>
-            </div>
-          )}
-
           <div
-            className={`absolute inset-x-0 bottom-0 z-20 flex flex-col gap-2 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-3.5 transition-opacity duration-300 ${
-              controlsVisible || !isPlaying ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+            className={`absolute inset-x-0 bottom-0 z-20 flex flex-col gap-1.5 px-3 pt-7 pb-2 bg-gradient-to-t from-black/78 to-transparent transition-opacity duration-300 ${
+              controlsVisible || !isPlaying
+                ? "opacity-100 pointer-events-auto"
+                : "opacity-0 pointer-events-none"
             }`}
           >
             <ProgressBar
@@ -363,103 +347,171 @@ export function WatchScreen() {
               onSeekBlocked={triggerToast}
             />
 
-            <div className="flex items-center justify-between text-xs sm:text-sm font-medium text-zinc-200">
-              <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between text-varaq">
+              <div className="flex items-center gap-1">
                 <button
                   type="button"
                   onClick={togglePlay}
                   aria-label={isPlaying ? watchUz.pause : watchUz.play}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-white/10 active:scale-95 transition-all text-white"
+                  className="flex h-11 w-11 items-center justify-center text-white"
                 >
                   {isPlaying ? (
-                    <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24">
-                      <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                    <svg
+                      aria-hidden="true"
+                      width="22"
+                      height="22"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                    >
+                      <rect x="6" y="5" width="4" height="14" rx="1" />
+                      <rect x="14" y="5" width="4" height="14" rx="1" />
                     </svg>
                   ) : (
-                    <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24">
+                    <svg
+                      aria-hidden="true"
+                      width="22"
+                      height="22"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                    >
                       <path d="M8 5v14l11-7z" />
                     </svg>
                   )}
                 </button>
 
-                <button
-                  type="button"
-                  onClick={toggleMute}
-                  aria-label={isMuted ? watchUz.unmute : watchUz.mute}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-white/10 active:scale-95 transition-all text-white"
-                >
-                  {isMuted ? (
-                    <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24">
-                      <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27l4.73 4.73H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09l2.09 2.09V4z" />
-                    </svg>
-                  ) : (
-                    <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24">
-                      <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
-                    </svg>
-                  )}
-                </button>
-
-                <span className="font-mono text-zinc-300">
+                <span className="text-[13px] text-varaq tabular-nums">
                   {formatTime(currentTime)} / {formatTime(duration)}
                 </span>
               </div>
 
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={cycleSpeed}
-                  aria-label={watchUz.speed}
-                  className="flex h-8 min-w-11 items-center justify-center rounded-lg px-2 font-mono text-white hover:bg-white/10 active:scale-95 transition-all"
+              <button
+                type="button"
+                onClick={toggleFullscreen}
+                aria-label={
+                  isFullscreen ? watchUz.exitFullscreen : watchUz.fullscreen
+                }
+                className="flex h-11 w-11 items-center justify-center text-white"
+              >
+                <svg
+                  aria-hidden="true"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
                 >
-                  {playbackRate}x
-                </button>
-                <button
-                  type="button"
-                  onClick={toggleFullscreen}
-                  aria-label={isFullscreen ? watchUz.exitFullscreen : watchUz.fullscreen}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-white/10 active:scale-95 transition-all text-white"
-                >
-                  {isFullscreen ? (
-                    <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24">
-                      <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z" />
-                    </svg>
-                  ) : (
-                    <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24">
-                      <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />
-                    </svg>
-                  )}
-                </button>
-              </div>
+                  <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+                </svg>
+              </button>
             </div>
           </div>
         </div>
 
-        <div className="space-y-1.5 px-1">
-          <h1 className="text-xl font-bold tracking-tight text-white">
+        <div className="flex flex-col gap-1.5 px-5 pt-5.5">
+          <h1 className="text-[22px] leading-[1.25] font-bold text-varaq m-0">
             {watchUz.lessonTitle}
           </h1>
-          <p className="text-sm text-zinc-400">
-            {watchUz.lessonSubtitle}
-          </p>
+          <p className="text-[15px] text-kumush m-0">{watchUz.lessonSubtitle}</p>
         </div>
 
-        {showUnlockCountdown && (
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 px-4 py-3 text-center">
-            <p className="text-sm font-medium text-zinc-200">
-              {watchUz.unlockIn(formatTime(Math.ceil(unlockRemainingSecs / playbackRate)))}
-            </p>
-            {playbackRate < MAX_PLAYBACK_RATE && (
-              <p className="mt-1 text-xs text-zinc-500">{watchUz.unlockHint}</p>
-            )}
+        {!isUnlocked && (
+          <div className="flex flex-col gap-2.5 px-5 pt-6">
+            <span className="text-[15px] font-semibold text-varaq">
+              {watchUz.speed}
+            </span>
+            <div
+              role="group"
+              aria-label={watchUz.speed}
+              className="grid grid-cols-4 gap-1 p-1 rounded-[14px] bg-siyoh-deep"
+            >
+              {PLAYBACK_RATES.map((rate) => {
+                const isSelected = playbackRate === rate;
+                return (
+                  <button
+                    key={rate}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => setSpeed(rate)}
+                    className={`min-h-[44px] rounded-[10px] text-[15px] font-semibold flex items-center justify-center transition active:scale-[0.98] ${
+                      isSelected
+                        ? "bg-zumrad text-varaq"
+                        : "bg-transparent text-kumush hover:text-varaq"
+                    }`}
+                  >
+                    {rate}x
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
-        <div className="pt-2">
-          <ProceedButton
-            visible={isProceedVisible}
-            channelUrl={session.config.channelUrl}
-            initData={initData}
-          />
+        <div className="flex flex-col gap-3.5 px-5 pt-7">
+          {!isUnlocked && (
+            <div className="flex items-baseline justify-between">
+              <span className="text-[15px] font-semibold text-varaq">
+                {watchUz.channelUntil}
+              </span>
+              <span className="text-[15px] text-kumush tabular-nums">
+                {watchUz.remaining(formattedRemainingTime)}
+              </span>
+            </div>
+          )}
+
+          <div className="relative h-2 rounded-[4px] bg-siyoh-deep">
+            <div
+              className="absolute left-0 top-0 bottom-0 rounded-[4px] bg-oltin transition-all duration-300"
+              style={{ width: `${gateProgressPercent}%` }}
+            />
+            <div
+              className={`absolute left-[70%] top-1/2 w-3.5 h-3.5 -ml-[7px] -mt-[7px] rotate-45 transition-colors duration-300 ${
+                isUnlocked
+                  ? "bg-oltin ring-[3px] ring-siyoh"
+                  : "bg-varaq"
+              }`}
+            />
+          </div>
+
+          {!isUnlocked ? (
+            <p className="text-[14px] leading-[1.5] text-kumush m-0">
+              {watchUz.gateNote}
+            </p>
+          ) : (
+            <div className="flex flex-col gap-3.5 pt-2 transition-all duration-[320ms] ease-out motion-reduce:transition-none opacity-100">
+              <div className="pt-2">
+                <HarakatWord
+                  text={watchUz.praiseWord}
+                  bareText={watchUz.praiseBare}
+                  className="text-[84px] h-[96px] w-full"
+                />
+              </div>
+              <p className="text-[17px] leading-[1.5] text-varaq m-0">
+                {watchUz.unlockedText}
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-auto px-5 pt-6">
+          {!isUnlocked ? (
+            <button
+              type="button"
+              disabled
+              className="w-full min-h-[54px] rounded-[14px] border-[1.5px] border-dashed border-chegara-tun bg-transparent text-kumush text-[17px] font-semibold flex items-center justify-center select-none"
+            >
+              {watchUz.lockedButton(formattedRemainingTime)}
+            </button>
+          ) : (
+            <div className="transition-all duration-[320ms] ease-out motion-reduce:transition-none opacity-100">
+              <ProceedButton
+                visible={true}
+                channelUrl={session.config.channelUrl}
+                initData={initData}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>

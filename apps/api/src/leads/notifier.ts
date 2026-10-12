@@ -17,27 +17,53 @@ export type LeadSender = {
   edit(messageId: number, text: string, keyboard: InlineKeyboard): Promise<void>;
 };
 
-function telegramSender(chatId: string, threadId: number | undefined): LeadSender {
+function telegramSender(initialChatId: string, threadId: number | undefined): LeadSender {
+  let targetChatId = initialChatId;
   return {
     async send(text, { replyTo, keyboard } = {}) {
-      const message = await bot().api.sendMessage(chatId, text, {
-        message_thread_id: threadId,
-        link_preview_options: { is_disabled: true },
-        reply_markup: keyboard,
-        reply_parameters: replyTo
-          ? { message_id: replyTo, allow_sending_without_reply: true }
-          : undefined,
-      });
-      return message.message_id;
+      try {
+        const message = await bot().api.sendMessage(targetChatId, text, {
+          message_thread_id: threadId,
+          link_preview_options: { is_disabled: true },
+          reply_markup: keyboard,
+          reply_parameters: replyTo
+            ? { message_id: replyTo, allow_sending_without_reply: true }
+            : undefined,
+        });
+        return message.message_id;
+      } catch (error) {
+        if (error instanceof GrammyError && error.parameters?.migrate_to_chat_id) {
+          targetChatId = String(error.parameters.migrate_to_chat_id);
+          console.warn(`[telegramSender] Chat migrated to supergroup ${targetChatId}, retrying...`);
+          const message = await bot().api.sendMessage(targetChatId, text, {
+            message_thread_id: threadId,
+            link_preview_options: { is_disabled: true },
+            reply_markup: keyboard,
+            reply_parameters: replyTo
+              ? { message_id: replyTo, allow_sending_without_reply: true }
+              : undefined,
+          });
+          return message.message_id;
+        }
+        throw error;
+      }
     },
     async edit(messageId, text, keyboard) {
       try {
-        await bot().api.editMessageText(chatId, messageId, text, {
+        await bot().api.editMessageText(targetChatId, messageId, text, {
           link_preview_options: { is_disabled: true },
           reply_markup: keyboard,
         });
       } catch (error) {
         if (error instanceof GrammyError && error.description.includes("message is not modified")) {
+          return;
+        }
+        if (error instanceof GrammyError && error.parameters?.migrate_to_chat_id) {
+          targetChatId = String(error.parameters.migrate_to_chat_id);
+          await bot().api.editMessageText(targetChatId, messageId, text, {
+            link_preview_options: { is_disabled: true },
+            reply_markup: keyboard,
+          });
           return;
         }
         throw error;

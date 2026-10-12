@@ -1,0 +1,22 @@
+export const eventTypes = [
+  "landing_view",
+  "cta_click",
+  "bot_start",
+  "app_open",
+  "registered",
+  "video_start",
+  "progress_25",
+  "progress_50",
+  "progress_75",
+  "video_complete",
+  "channel_click",
+] as const;
+
+export type EventType = (typeof eventTypes)[number];
+
+export type Utm = {
+  utm_source?: string;
+  utm_campaign?: string;
+  utm_content?: string;
+  fbclid?: string;
+};

@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback } from "react";
 import { miniAppBeacon } from "@/lib/api";
 import { watchUz } from "@/lib/i18n/watch";
-import { getTelegramWebApp, setMainButtonTheme } from "@/lib/telegram";
+import { getTelegramWebApp } from "@/lib/telegram";
 
 type ProceedButtonProps = {
   visible: boolean;
@@ -28,23 +28,6 @@ export function ProceedButton({
       window.open(channelUrl, "_blank");
     }
   }, [channelUrl, initData]);
-
-  useEffect(() => {
-    if (!visible) return undefined;
-    const tg = getTelegramWebApp();
-    if (!tg?.MainButton) return undefined;
-
-    setMainButtonTheme(tg);
-    tg.MainButton.setText(watchUz.proceedButton);
-    tg.MainButton.show();
-    tg.MainButton.enable();
-    tg.MainButton.onClick(handleClick);
-
-    return () => {
-      tg.MainButton.offClick(handleClick);
-      tg.MainButton.hide();
-    };
-  }, [visible, handleClick]);
 
   if (!visible) return null;
 

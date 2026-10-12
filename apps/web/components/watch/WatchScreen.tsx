@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { PLAYBACK_RATES, type ProgressEvent, type ProgressResponse } from "@funnel/shared";
 import { miniAppBeacon, miniAppPost } from "@/lib/api";
 import { watchUz } from "@/lib/i18n/watch";
-import { getTelegramWebApp, hapticSuccess, setMainButtonTheme } from "@/lib/telegram";
+import { getTelegramWebApp, hapticSuccess } from "@/lib/telegram";
 import { attachVideoSource } from "@/lib/video/hls";
 import { formatTime } from "@/lib/video/format";
 import { useMiniApp } from "@/components/miniapp/MiniAppProvider";
@@ -86,7 +86,6 @@ export function WatchScreen() {
             setSession({ ...session, completed: true });
             const tg = getTelegramWebApp();
             tg?.disableClosingConfirmation?.();
-            setMainButtonTheme(tg);
           }
         }
       } catch {

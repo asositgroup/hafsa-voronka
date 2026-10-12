@@ -506,11 +506,11 @@ To restore the PostgreSQL database from a scheduled dump:
 
 1. Pull the backup file from Cloudflare R2:
    ```bash
-   rclone copy r2:funnel-backups/latest.sql ./latest.sql
+   rclone copyto "r2:funnel-backups/<PATH_TO_BACKUP_FILE>" ./backup.dmp
    ```
 2. Restore the database inside the PostgreSQL container:
    ```bash
-   docker exec -i <COOLIFY_POSTGRES_CONTAINER_ID> psql -U funnel -d funnel < ./latest.sql
+   docker exec -i <COOLIFY_POSTGRES_CONTAINER_ID> pg_restore -U funnel -d funnel --clean --if-exists --no-owner < ./backup.dmp
    ```
 3. Restart the API container in Coolify to clear in-memory caches and run any pending startup checks.
 

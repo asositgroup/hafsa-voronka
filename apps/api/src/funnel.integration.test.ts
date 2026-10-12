@@ -4,7 +4,6 @@ import { sessionResponseSchema } from "@funnel/shared";
 import { closeDb, db } from "./db";
 import { events, users } from "./db/schema";
 import { runMigrations } from "./db/migrate";
-import { saveContactPhone } from "./funnel/users";
 import { signInitData } from "./telegram/initData";
 
 const testDbUrl = process.env.TEST_DATABASE_URL;
@@ -98,104 +97,21 @@ describe.skipIf(!testDbUrl)("Funnel Integration Tests", () => {
     expect(appOpenEvents.some((e) => e.type === "app_open")).toBe(true);
   });
 
-  it("completes registration happy path and is idempotent", async () => {
+  it("refuses Mini App registration so users register in the bot", async () => {
     const app = createApp();
     const testUserId = Math.floor(Math.random() * 1000000) + 20000;
     const authHeader = makeAuthHeader(testUserId);
 
-    await app.request("/app/session", {
-      method: "POST",
-      headers: { authorization: authHeader },
-    });
-
     const regRes = await app.request("/app/register", {
       method: "POST",
-      headers: {
-        authorization: authHeader,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        name: "Ali Valiyev",
-        phone: "+998 90 123 45 67",
-      }),
+      headers: { authorization: authHeader, "content-type": "application/json" },
+      body: JSON.stringify({ name: "Ali Valiyev", phone: "+998 90 123 45 67" }),
     });
 
-    expect(regRes.status).toBe(200);
-    const regJson = await regRes.json();
-    expect(regJson).toEqual({ ok: true });
-
-    const [user] = await db()
-      .select()
-      .from(users)
-      .where(eq(users.telegramId, testUserId))
-      .limit(1);
-
-    expect(user.name).toBe("Ali Valiyev");
-    expect(user.phone).toBe("+998901234567");
-    expect(user.phoneVerified).toBe(false);
-    expect(user.registeredAt).not.toBeNull();
-
-    const userEvents = await db()
-      .select()
-      .from(events)
-      .where(eq(events.userId, user.id));
-
-    const regEvents = userEvents.filter((e) => e.type === "registered");
-    expect(regEvents.length).toBe(1);
-
-    const repeatRes = await app.request("/app/register", {
-      method: "POST",
-      headers: {
-        authorization: authHeader,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        name: "Different Name",
-        phone: "+998 90 999 99 99",
-      }),
-    });
-
-    expect(repeatRes.status).toBe(200);
-    expect(await repeatRes.json()).toEqual({ ok: true });
-
-    const [userAfterRepeat] = await db()
-      .select()
-      .from(users)
-      .where(eq(users.telegramId, testUserId))
-      .limit(1);
-
-    expect(userAfterRepeat.name).toBe("Ali Valiyev");
-    expect(userAfterRepeat.phone).toBe("+998901234567");
-
-    const eventsAfterRepeat = await db()
-      .select()
-      .from(events)
-      .where(eq(events.userId, user.id));
-
-    const regEventsAfter = eventsAfterRepeat.filter((e) => e.type === "registered");
-    expect(regEventsAfter.length).toBe(1);
-  });
-
-  it("records a single registration when submitted twice concurrently", async () => {
-    const app = createApp();
-    const testUserId = Math.floor(Math.random() * 1000000) + 3000000;
-    const authHeader = makeAuthHeader(testUserId);
-    await app.request("/app/session", { method: "POST", headers: { authorization: authHeader } });
-
-    const submit = () =>
-      app.request("/app/register", {
-        method: "POST",
-        headers: { authorization: authHeader, "content-type": "application/json" },
-        body: JSON.stringify({ name: "Ali", phone: "901234567" }),
-      });
-    const responses = await Promise.all([submit(), submit()]);
-    expect(responses.map((r) => r.status)).toEqual([200, 200]);
-
+    expect(regRes.status).toBe(403);
+    expect(await regRes.json()).toEqual({ error: "register_in_bot" });
     const [user] = await db().select().from(users).where(eq(users.telegramId, testUserId)).limit(1);
-    const regEvents = (await db().select().from(events).where(eq(events.userId, user.id))).filter(
-      (e) => e.type === "registered",
-    );
-    expect(regEvents.length).toBe(1);
+    expect(user?.registeredAt ?? null).toBeNull();
   });
 
   it("does not log app_open for polling session calls", async () => {
@@ -218,42 +134,5 @@ describe.skipIf(!testDbUrl)("Funnel Integration Tests", () => {
       (e) => e.type === "app_open",
     );
     expect(opens.length).toBe(1);
-  });
-
-  it("preserves verified phone when registering with a different phone", async () => {
-    const app = createApp();
-    const testUserId = Math.floor(Math.random() * 1000000) + 30000;
-    const authHeader = makeAuthHeader(testUserId);
-
-    await saveContactPhone(
-      { id: testUserId, first_name: "VerifiedUser" },
-      "+998935554433",
-    );
-
-    const regRes = await app.request("/app/register", {
-      method: "POST",
-      headers: {
-        authorization: authHeader,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        name: "Verified Lead",
-        phone: "+998 90 111 22 33",
-      }),
-    });
-
-    expect(regRes.status).toBe(200);
-    expect(await regRes.json()).toEqual({ ok: true });
-
-    const [user] = await db()
-      .select()
-      .from(users)
-      .where(eq(users.telegramId, testUserId))
-      .limit(1);
-
-    expect(user.name).toBe("Verified Lead");
-    expect(user.phone).toBe("+998935554433");
-    expect(user.phoneVerified).toBe(true);
-    expect(user.registeredAt).not.toBeNull();
   });
 });

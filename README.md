@@ -84,6 +84,8 @@ GATE_PROCEED=true
 COMPLETE_THRESHOLD=0.95
 CORS_ORIGINS=http://localhost:3000
 SHEETS_ENABLED=false
+LEADS_CHAT_ID=
+LEADS_THREAD_ID=
 ```
 
 Create `apps/web/.env.local`:
@@ -133,6 +135,20 @@ Register your test bot webhook:
 ```bash
 pnpm --filter @funnel/api set-webhook
 ```
+
+---
+
+## Lead Capture Flow
+
+1. **Landing form.** Every CTA on the landing page opens a modal asking for name and phone. The form posts to `POST /leads` (rate limited per IP and visitor, with a honeypot field), which stores the lead in the `leads` table, logs a `lead_submitted` event, sends a Meta `Lead` event (deduplicated with the browser pixel via `event_id`), and appends a `sayt` row to Google Sheets when enabled. The visitor is then redirected to `t.me/<bot>?start=v_<visitorId>`.
+2. **Bot registration.** `/start` asks the user to tap the «📱 Raqamni yuborish» button. Only a shared contact registers the user; typed numbers are refused. The name typed on the landing page is used when a web lead matches (by visitor id, then by phone). The Mini App shows a "register in the bot first" screen until registration is done, and `POST /app/register` returns `403`.
+3. **Group alerts.** When `LEADS_CHAT_ID` is set, the bot posts one card per lead to that group and edits it as the lead progresses (web lead, then registered with Telegram handle and ID, then finished video). Finishing the video also posts a short reply under the card. Delivery runs in the background with retries (up to 10 attempts, leads from the last 3 days).
+
+### Setting up the leads group
+
+1. Add the bot to the group (or supergroup with topics).
+2. Send `/chatid` in the group (or in the topic you want). The bot replies with `LEADS_CHAT_ID` (and `LEADS_THREAD_ID` for topics).
+3. Put those values in `apps/api/.env` and restart the API.
 
 ---
 

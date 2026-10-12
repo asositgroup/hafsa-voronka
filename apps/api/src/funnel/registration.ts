@@ -1,6 +1,7 @@
 import { type CapiActionSource, type CapiClient, sendCapiEvent } from "@/capi";
 import type { User } from "@/db/schema";
 import { env } from "@/env";
+import { attachLeadToUser } from "@/leads/service";
 import { enqueueLead, formatLeadRow, sendLeadInline } from "@/sheets";
 import { logEvent, markRegistered } from "./users";
 
@@ -17,6 +18,9 @@ export async function completeRegistration(
   if (!registered) return undefined;
 
   await logEvent("registered", { userId: user.id, visitorId: user.visitorId });
+  await attachLeadToUser(registered).catch((error) =>
+    console.error("Lead attach failed:", error),
+  );
 
   void sendCapiEvent({
     name: "CompleteRegistration",

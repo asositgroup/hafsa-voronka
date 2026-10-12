@@ -85,6 +85,39 @@ export const sheetsQueue = pgTable("sheets_queue", {
 
 export type User = typeof users.$inferSelect;
 
+export const leads = pgTable(
+  "leads",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    source: text("source", { enum: ["web", "bot"] }).notNull(),
+    userId: bigint("user_id", { mode: "number" }).references(() => users.id),
+    visitorId: text("visitor_id"),
+    name: text("name").notNull(),
+    phone: text("phone").notNull(),
+    utmSource: text("utm_source"),
+    utmCampaign: text("utm_campaign"),
+    utmContent: text("utm_content"),
+    fbclid: text("fbclid"),
+    pageUrl: text("page_url"),
+    userAgent: text("user_agent"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    linkedAt: timestamp("linked_at", { withTimezone: true }),
+    notifyVersion: integer("notify_version").default(1).notNull(),
+    notifiedVersion: integer("notified_version").default(0).notNull(),
+    notifyMessageId: integer("notify_message_id"),
+    notifyAttempts: integer("notify_attempts").default(0).notNull(),
+    notifyError: text("notify_error"),
+    completionNotified: boolean("completion_notified").default(false).notNull(),
+  },
+  (t) => [
+    index("leads_visitor_id_idx").on(t.visitorId),
+    index("leads_phone_idx").on(t.phone),
+    index("leads_user_id_idx").on(t.userId),
+  ],
+);
+
+export type Lead = typeof leads.$inferSelect;
+
 export const rateLimits = pgTable("rate_limits", {
   key: text("key").primaryKey(),
   count: integer("count").notNull(),

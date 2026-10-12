@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore, type ReactNode } from "react";
+import { botLink, useLeadModal } from "@/components/landing/LeadModal";
 import { getOrCreateVisitorId } from "@/lib/tracking/visitor";
 import { trackCtaClick } from "@/lib/tracking/client";
 
@@ -42,17 +43,17 @@ export function CtaButton({
   surface,
   ariaLabel,
 }: CtaButtonProps) {
-  const botUsername = process.env.NEXT_PUBLIC_BOT_USERNAME || "";
+  const openLeadModal = useLeadModal();
   const vid = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-
-  const href = vid
-    ? `https://t.me/${botUsername}?start=v_${vid}`
-    : `https://t.me/${botUsername}`;
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     trackCtaClick();
-    const visitorId = getOrCreateVisitorId();
-    e.currentTarget.href = `https://t.me/${botUsername}?start=v_${visitorId}`;
+    if (openLeadModal) {
+      e.preventDefault();
+      openLeadModal();
+      return;
+    }
+    e.currentTarget.href = botLink(getOrCreateVisitorId());
   };
 
   const baseClasses =
@@ -62,7 +63,8 @@ export function CtaButton({
 
   return (
     <a
-      href={href}
+      href={botLink(vid)}
+      aria-haspopup={openLeadModal ? "dialog" : undefined}
       onClick={handleClick}
       aria-label={ariaLabel}
       className={`${baseClasses} ${variantClasses[variant]} focus-visible:outline-2 focus-visible:outline-offset-2 ${surfaceClasses[surface ?? defaultSurface[variant]]} ${className}`}

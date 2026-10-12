@@ -7,6 +7,7 @@ import { users, watchProgress } from "@/db/schema";
 import { env } from "@/env";
 import { findByTelegramId, logEvent } from "@/funnel/users";
 import { uz } from "@/i18n/uz";
+import { markLeadCompleted } from "@/leads/service";
 import { bot } from "@/telegram/bot";
 import {
   applyBeat,
@@ -104,6 +105,10 @@ export async function recordProgress(
       userId: user.id,
       visitorId: user.visitorId,
     });
+
+    await markLeadCompleted(user.id).catch((error) =>
+      console.error("Lead completion update failed:", error),
+    );
 
     void sendCapiEvent({
       name: "VideoComplete",

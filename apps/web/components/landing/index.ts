@@ -10,3 +10,4 @@ export * from "./StepsToVideoSection";
 export * from "./FooterSection";
 export * from "./StickyBottomCta";
 export * from "./TelegramIcon";
+export * from "./LeadModal";

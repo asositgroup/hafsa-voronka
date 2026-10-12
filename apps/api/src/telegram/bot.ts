@@ -1,5 +1,5 @@
 import { Bot, type Context, InlineKeyboard, Keyboard } from "grammy";
-import { normalizeContactPhone, normalizeUzPhone } from "@funnel/shared";
+import { normalizeContactPhone } from "@funnel/shared";
 import type { User } from "@/db/schema";
 import { env } from "@/env";
 import { completeRegistration, nameFromTelegram } from "@/funnel/registration";
@@ -11,6 +11,7 @@ import {
   upsertUser,
 } from "@/funnel/users";
 import { uz } from "@/i18n/uz";
+import { findMatchingWebLead } from "@/leads/service";
 
 function watchKeyboard(completed: boolean) {
   const keyboard = new InlineKeyboard().webApp(uz.bot.watchButton, `${env.WEB_URL}/app`);
@@ -21,15 +22,29 @@ function contactKeyboard() {
   return new Keyboard().requestContact(uz.bot.shareContactButton).resized().oneTime();
 }
 
-async function registerFromChat(ctx: Context, user: User, phone: string, phoneVerified: boolean) {
-  const name = (ctx.from && nameFromTelegram(ctx.from)) || ctx.from?.username || uz.bot.defaultName;
-  await completeRegistration(user, { name, phone, phoneVerified }, { actionSource: "chat" });
+async function registerFromChat(ctx: Context, user: User, phone: string) {
+  const webLead = await findMatchingWebLead(user.visitorId, phone);
+  const name =
+    webLead?.name ||
+    (ctx.from && nameFromTelegram(ctx.from)) ||
+    ctx.from?.username ||
+    uz.bot.defaultName;
+  await completeRegistration(user, { name, phone, phoneVerified: true }, { actionSource: "chat" });
   await ctx.reply(uz.bot.registered, { reply_markup: { remove_keyboard: true } });
   await ctx.reply(uz.bot.watchPrompt, { reply_markup: watchKeyboard(false) });
 }
 
 function createBot() {
-  const bot = new Bot(env.BOT_TOKEN);
+  const root = new Bot(env.BOT_TOKEN);
+
+  root.chatType(["group", "supergroup"]).command("chatid", async (ctx) => {
+    const thread = ctx.msg.is_topic_message ? `\nLEADS_THREAD_ID=${ctx.msg.message_thread_id}` : "";
+    await ctx.reply(`LEADS_CHAT_ID=${ctx.chat.id}${thread}`, {
+      message_thread_id: ctx.msg.is_topic_message ? ctx.msg.message_thread_id : undefined,
+    });
+  });
+
+  const bot = root.chatType("private");
 
   bot.command("start", async (ctx) => {
     if (!ctx.from) return;
@@ -62,23 +77,10 @@ function createBot() {
     const phone = normalizeContactPhone(contact.phone_number);
     const user = await saveContactPhone(ctx.from, phone);
     if (user.registeredAt === null) {
-      await registerFromChat(ctx, user, phone, true);
+      await registerFromChat(ctx, user, phone);
       return;
     }
     await ctx.reply(uz.bot.contactConfirmed, { reply_markup: { remove_keyboard: true } });
-  });
-
-  bot.on("message:text", async (ctx, next) => {
-    const existing = await findByTelegramId(ctx.from.id);
-    if (existing?.registeredAt) return next();
-
-    const user = existing ?? (await upsertUser(ctx.from, undefined)).user;
-    const phone = normalizeUzPhone(ctx.message.text);
-    if (!phone) {
-      await ctx.reply(uz.bot.invalidPhone, { reply_markup: contactKeyboard() });
-      return;
-    }
-    await registerFromChat(ctx, user, phone, false);
   });
 
   bot.on("message", async (ctx) => {
@@ -98,11 +100,11 @@ function createBot() {
     if (status === "member") await setBotBlocked(ctx.myChatMember.from.id, false);
   });
 
-  bot.catch((err) => {
+  root.catch((err) => {
     console.error("bot error", err.error);
   });
 
-  return bot;
+  return root;
 }
 
 let instance: Bot | undefined;

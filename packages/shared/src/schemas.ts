@@ -30,23 +30,3 @@ export type SessionResponse = z.infer<typeof sessionResponseSchema>;
 
 export const NAME_MIN_LENGTH = 2;
 export const NAME_MAX_LENGTH = 60;
-
-export const registerRequestSchema = z.object({
-  name: z.string().trim().min(NAME_MIN_LENGTH).max(NAME_MAX_LENGTH),
-  phone: z.string().optional(),
-});
-
-export type RegisterRequest = z.infer<typeof registerRequestSchema>;
-
-export const registerResponseSchema = z.object({
-  ok: z.literal(true),
-});
-
-export type RegisterResponse = z.infer<typeof registerResponseSchema>;
-
-export const registerErrorSchema = z.object({
-  field: z.enum(["name", "phone"]),
-  message: z.string(),
-});
-
-export type RegisterError = z.infer<typeof registerErrorSchema>;

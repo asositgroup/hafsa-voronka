@@ -35,15 +35,6 @@ export function initTelegramWebApp(tg: NonNullable<ReturnType<typeof getTelegram
   }
 }
 
-export function setMainButtonTheme(tg?: ReturnType<typeof getTelegramWebApp>) {
-  const target = tg ?? getTelegramWebApp();
-  target?.MainButton?.setParams?.({ color: "#E2B04A", text_color: "#123B33" });
-}
-
-export function getTelegramUser() {
-  return getTelegramWebApp()?.initDataUnsafe?.user;
-}
-
 export function hapticSuccess() {
   getTelegramWebApp()?.HapticFeedback?.notificationOccurred("success");
 }

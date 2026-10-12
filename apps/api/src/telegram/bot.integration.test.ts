@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import type { Bot } from "grammy";
 import { closeDb, db } from "@/db";
-import { events, users } from "@/db/schema";
+import { events, leads, users } from "@/db/schema";
 import { runMigrations } from "@/db/migrate";
 import { setTestEnv } from "@/test/env";
 
@@ -121,18 +121,80 @@ describe.skipIf(!testDbUrl)("Bot registration flow", () => {
     expect(user.phone).toBeNull();
   });
 
-  it("registers with an unverified phone typed as text, and re-asks on invalid text", async () => {
+  it("does not register from a typed phone number and re-asks for the contact button", async () => {
     const telegramId = 7_300_000 + Math.floor(Math.random() * 100_000);
     await start(telegramId);
-
-    await message(telegramId, { text: "salom" });
-    expect((await userRow(telegramId)).registeredAt).toBeNull();
+    calls.length = 0;
 
     await message(telegramId, { text: "+998 (93) 111-22-33" });
+
     const user = await userRow(telegramId);
-    expect(user.registeredAt).not.toBeNull();
-    expect(user.phone).toBe("+998931112233");
-    expect(user.phoneVerified).toBe(false);
+    expect(user.registeredAt).toBeNull();
+    expect(user.phone).toBeNull();
+    const markup = calls.find((c) => c.method === "sendMessage")?.payload.reply_markup as {
+      keyboard?: { request_contact?: boolean }[][];
+    };
+    expect(markup.keyboard?.[0]?.[0]?.request_contact).toBe(true);
+  });
+
+  it("uses the landing form name and links the web lead to the Telegram user", async () => {
+    const telegramId = 7_500_000 + Math.floor(Math.random() * 100_000);
+    const visitorId = `W${String(telegramId).padStart(9, "0")}`;
+    const [lead] = await db()
+      .insert(leads)
+      .values({ source: "web", visitorId, name: "Aziz Karimov", phone: "+998901112233" })
+      .returning();
+
+    await message(telegramId, {
+      text: `/start v_${visitorId}`,
+      entities: [{ type: "bot_command", offset: 0, length: 6 }],
+    });
+    await message(telegramId, {
+      contact: { phone_number: "998935554433", first_name: "Ali", user_id: telegramId },
+    });
+
+    const user = await userRow(telegramId);
+    expect(user.name).toBe("Aziz Karimov");
+    expect(user.phone).toBe("+998935554433");
+    const [linked] = await db().select().from(leads).where(eq(leads.id, lead.id));
+    expect(linked.userId).toBe(user.id);
+    expect(linked.notifyVersion).toBe(2);
+  });
+
+  it("creates a bot lead when there is no matching web lead", async () => {
+    const telegramId = 7_600_000 + Math.floor(Math.random() * 100_000);
+    await start(telegramId);
+    await message(telegramId, {
+      contact: { phone_number: "998977776655", first_name: "Ali", user_id: telegramId },
+    });
+
+    const user = await userRow(telegramId);
+    const rows = await db().select().from(leads).where(eq(leads.userId, user.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ source: "bot", name: "Ali Valiyev", phone: "+998977776655" });
+  });
+
+  it("ignores group chatter and answers /chatid in groups", async () => {
+    const groupId = -1_000_000_000_000 - Math.floor(Math.random() * 100_000);
+    const groupUpdate = (text: string, entities?: unknown[]) =>
+      testBot.handleUpdate({
+        update_id: updateId++,
+        message: {
+          message_id: updateId,
+          date: Math.floor(Date.now() / 1000),
+          chat: { id: groupId, type: "supergroup", title: "Leads" },
+          from: from(42),
+          text,
+          entities,
+        },
+      } as never);
+
+    await groupUpdate("salom");
+    expect(calls).toHaveLength(0);
+
+    await groupUpdate("/chatid", [{ type: "bot_command", offset: 0, length: 7 }]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].payload).toMatchObject({ chat_id: groupId, text: `LEADS_CHAT_ID=${groupId}` });
   });
 
   it("does not register twice when the contact is shared again", async () => {

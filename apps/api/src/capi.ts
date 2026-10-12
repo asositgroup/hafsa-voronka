@@ -6,7 +6,7 @@ import { env } from "@/env";
 
 export const GRAPH_API_VERSION = "v26.0";
 
-export type CapiEventName = "CompleteRegistration" | "VideoComplete";
+export type CapiEventName = "Lead" | "CompleteRegistration" | "VideoComplete";
 
 export type CapiClient = {
   userAgent?: string;
@@ -15,10 +15,16 @@ export type CapiClient = {
 
 export type CapiActionSource = "website" | "chat";
 
+export type CapiUser = Pick<User, "phone" | "fbclid" | "createdAt" | "visitorId"> & {
+  telegramId?: number | null;
+};
+
 export type CapiEvent = {
   name: CapiEventName;
   eventId: string;
-  user: User;
+  user: CapiUser;
+  externalId?: string;
+  sourceUrl?: string;
   actionSource?: CapiActionSource;
   client?: CapiClient;
 };
@@ -60,7 +66,7 @@ function hashString(value: string): string {
 export function buildCapiPayload(event: CapiEvent, context: CapiContext = {}): CapiPayload {
   const digits = event.user.phone ? event.user.phone.replace(/\D/g, "") : "";
   const ph = digits ? hashString(digits) : undefined;
-  const external_id = hashString(String(event.user.telegramId));
+  const external_id = hashString(event.externalId ?? String(event.user.telegramId));
   const country = hashString("uz");
 
   const userData: CapiUserData = {
@@ -84,7 +90,7 @@ export function buildCapiPayload(event: CapiEvent, context: CapiContext = {}): C
     userData.fbc = `fb.1.${ms}.${event.user.fbclid}`;
   }
 
-  const webUrl = context.webUrl ?? (process.env.WEB_URL ? env.WEB_URL : "https://example.com");
+  const webUrl = event.sourceUrl ?? context.webUrl ?? (process.env.WEB_URL ? env.WEB_URL : "https://example.com");
   const eventTime = context.eventTime ?? Math.floor(Date.now() / 1000);
   const testEventCode = context.testEventCode ?? (process.env.FB_TEST_EVENT_CODE ? env.FB_TEST_EVENT_CODE : undefined);
 

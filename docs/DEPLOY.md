@@ -547,6 +547,7 @@ Comprehensive reference for all environment variables used by the API and Web ap
 | `FB_TEST_EVENT_CODE` | API (`apps/api`) | Optional | `TEST12345` | Meta test code for server-side event verification |
 | `ADMIN_PASSWORD_HASH` | API (`apps/api`) | Optional | `$2a$10$...` | Hash generated via `pnpm --filter @funnel/api hash-password` |
 | `SESSION_SECRET` | API (`apps/api`) | Optional | `openssl rand -base64 48` string | Secret key for signing admin session cookies (min 32 chars) |
+| `MEDIA_CHAT_ID` | API (`apps/api`) | Optional | `-1001234567890` | Chat where the bot uploads photos and videos for editable bot messages. Defaults to `LEADS_CHAT_ID` (and its `LEADS_THREAD_ID` topic); the upload message is deleted right after Telegram returns the file ID |
 | `NEXT_PUBLIC_API_URL` | Web (`apps/web`) | Required | `https://api.yourdomain.uz` | Public API URL accessible from browser/Mini App |
 | `NEXT_PUBLIC_BOT_USERNAME` | Web (`apps/web`) | Required | `your_bot` | Telegram bot username (without @) for deep linking |
 | `NEXT_PUBLIC_APP_URL` | Web (`apps/web`) | Required | `https://hafsa.azeemov.uz` | Public site URL; makes the link-preview (OG) image URL absolute |

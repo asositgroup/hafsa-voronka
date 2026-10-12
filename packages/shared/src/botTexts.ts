@@ -1,0 +1,106 @@
+import { z } from "zod";
+
+export const BOT_TEXT_LIMITS = {
+  message: 4096,
+  caption: 1024,
+  button: 64,
+} as const;
+
+export const BOT_MEDIA_LIMITS = {
+  photo: 10 * 1024 * 1024,
+  video: 50 * 1024 * 1024,
+} as const;
+
+export const BOT_MEDIA_MIME_TYPES = {
+  photo: ["image/jpeg", "image/png", "image/webp"],
+  video: ["video/mp4"],
+} as const;
+
+export const botMessageKeys = [
+  "askContact",
+  "askContactShort",
+  "welcome",
+  "welcomeBack",
+  "registered",
+  "watchPrompt",
+  "completion",
+  "fallback",
+] as const;
+
+export const botButtonKeys = ["shareContactButton", "watchButton", "channelButton"] as const;
+
+export const botTextKeys = [...botMessageKeys, ...botButtonKeys] as const;
+
+export type BotMessageKey = (typeof botMessageKeys)[number];
+export type BotButtonKey = (typeof botButtonKeys)[number];
+export type BotTextKey = BotMessageKey | BotButtonKey;
+
+export type BotTextKind = "message" | "button";
+
+export type BotMediaType = keyof typeof BOT_MEDIA_LIMITS;
+
+export const botTextDefinitions: Record<BotTextKey, { kind: BotTextKind; placeholders: readonly string[] }> = {
+  askContact: { kind: "message", placeholders: ["name"] },
+  askContactShort: { kind: "message", placeholders: [] },
+  welcome: { kind: "message", placeholders: ["name"] },
+  welcomeBack: { kind: "message", placeholders: ["name"] },
+  registered: { kind: "message", placeholders: [] },
+  watchPrompt: { kind: "message", placeholders: [] },
+  completion: { kind: "message", placeholders: [] },
+  fallback: { kind: "message", placeholders: [] },
+  shareContactButton: { kind: "button", placeholders: [] },
+  watchButton: { kind: "button", placeholders: [] },
+  channelButton: { kind: "button", placeholders: [] },
+};
+
+export type BotTextError = "empty" | "too_long" | "unknown_placeholder" | "multiline_button";
+
+export function botTextLimit(key: BotTextKey, hasMedia: boolean): number {
+  if (botTextDefinitions[key].kind === "button") return BOT_TEXT_LIMITS.button;
+  return hasMedia ? BOT_TEXT_LIMITS.caption : BOT_TEXT_LIMITS.message;
+}
+
+export function validateBotText(key: BotTextKey, text: string, hasMedia: boolean): BotTextError | null {
+  const { kind, placeholders } = botTextDefinitions[key];
+  if (!text.trim()) return "empty";
+  if (kind === "button" && /\n/.test(text)) return "multiline_button";
+  const used = [...text.matchAll(/\{(\w+)\}/g)].map((match) => match[1]);
+  if (used.some((name) => !placeholders.includes(name))) return "unknown_placeholder";
+  const rendered = text.replace(/\{\w+\}/g, "");
+  if (rendered.length > botTextLimit(key, hasMedia)) return "too_long";
+  return null;
+}
+
+export function botMediaTypeFor(mimeType: string): BotMediaType | null {
+  for (const type of Object.keys(BOT_MEDIA_MIME_TYPES) as BotMediaType[]) {
+    if ((BOT_MEDIA_MIME_TYPES[type] as readonly string[]).includes(mimeType)) return type;
+  }
+  return null;
+}
+
+export const botTextKeySchema = z.enum(botTextKeys);
+
+export const botTextItemSchema = z.object({
+  key: botTextKeySchema,
+  kind: z.enum(["message", "button"]),
+  placeholders: z.array(z.string()),
+  defaultText: z.string(),
+  text: z.string().nullable(),
+  media: z.object({ type: z.enum(["photo", "video"]) }).nullable(),
+  updatedAt: z.string().nullable(),
+});
+
+export type BotTextItem = z.infer<typeof botTextItemSchema>;
+
+export const botTextsResponseSchema = z.object({
+  items: z.array(botTextItemSchema),
+  mediaEnabled: z.boolean(),
+});
+
+export type BotTextsResponse = z.infer<typeof botTextsResponseSchema>;
+
+export const botTextUpdateSchema = z.object({
+  text: z.string().max(BOT_TEXT_LIMITS.message * 2),
+});
+
+export type BotTextUpdate = z.infer<typeof botTextUpdateSchema>;

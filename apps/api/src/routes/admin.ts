@@ -25,10 +25,13 @@ import {
 } from "@/admin/queries";
 import { clientIp } from "@/http/clientIp";
 import { consumeRateLimit } from "@/http/rateLimit";
+import { adminBotTextRoutes } from "@/routes/adminBotTexts";
 
 export const adminRoutes = new Hono();
 
 adminRoutes.use("*", requireAdminConfig);
+
+adminRoutes.route("/bot-texts", adminBotTextRoutes);
 
 adminRoutes.post("/login", async (c) => {
   const ip = clientIp(c);

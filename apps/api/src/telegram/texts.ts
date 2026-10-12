@@ -1,0 +1,145 @@
+import { eq } from "drizzle-orm";
+import { type Api, InputFile } from "grammy";
+import type { ForceReply, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove } from "grammy/types";
+import {
+  type BotMediaType,
+  type BotMessageKey,
+  type BotTextItem,
+  type BotTextKey,
+  botTextDefinitions,
+  botTextKeys,
+} from "@funnel/shared";
+import { db } from "@/db";
+import { type BotTextRow, botTexts } from "@/db/schema";
+import { env } from "@/env";
+
+export const defaultBotTexts: Record<BotTextKey, string> = {
+  askContact:
+    "Assalomu alaykum, {name}! 👋\n\nBepul video darsni olish uchun ro'yxatdan o'ting: pastdagi «📱 Raqamni yuborish» tugmasini bosing.",
+  askContactShort:
+    "Video darsni olish uchun avval ro'yxatdan o'ting: pastdagi «📱 Raqamni yuborish» tugmasini bosing.",
+  welcome: "Assalomu alaykum, {name}! 👋\n\nBepul video darsni ko'rish uchun quyidagi tugmani bosing.",
+  welcomeBack: "Yana xush kelibsiz, {name}! Darsni qayta ko'rishingiz yoki kanalga o'tishingiz mumkin.",
+  registered: "Rahmat, ro'yxatdan o'tdingiz! ✅",
+  watchPrompt: "Bepul video dars tayyor. Ko'rish uchun quyidagi tugmani bosing 👇",
+  completion:
+    "Tabriklaymiz! Siz darsni muvaffaqiyatli yakunladingiz. 🎉\n\nKanalimizga a'zo bo'lish uchun quyidagi tugmani bosing:",
+  fallback: "Video darsni ko'rish uchun quyidagi tugmani bosing.",
+  shareContactButton: "📱 Raqamni yuborish",
+  watchButton: "▶️ Videoni ko'rish",
+  channelButton: "Kanalga o'tish →",
+};
+
+type ReplyMarkup = InlineKeyboardMarkup | ReplyKeyboardMarkup | ReplyKeyboardRemove | ForceReply;
+
+let cache: Map<string, BotTextRow> | undefined;
+
+async function overrides() {
+  cache ??= new Map((await db().select().from(botTexts)).map((row) => [row.key, row]));
+  return cache;
+}
+
+export function invalidateBotTexts() {
+  cache = undefined;
+}
+
+function render(template: string, vars: Record<string, string>) {
+  return template.replace(/\{(\w+)\}/g, (match, name: string) => vars[name] ?? match);
+}
+
+export async function botText(key: BotTextKey, vars: Record<string, string> = {}) {
+  const row = (await overrides()).get(key);
+  return render(row?.text ?? defaultBotTexts[key], vars);
+}
+
+export async function sendBotText(
+  api: Api,
+  chatId: number,
+  key: BotMessageKey,
+  vars: Record<string, string> = {},
+  replyMarkup?: ReplyMarkup,
+) {
+  const row = (await overrides()).get(key);
+  const text = render(row?.text ?? defaultBotTexts[key], vars);
+  const options = { reply_markup: replyMarkup };
+
+  if (row?.mediaFileId && row.mediaType === "photo") {
+    return api.sendPhoto(chatId, row.mediaFileId, { ...options, caption: text });
+  }
+  if (row?.mediaFileId && row.mediaType === "video") {
+    return api.sendVideo(chatId, row.mediaFileId, { ...options, caption: text, supports_streaming: true });
+  }
+  return api.sendMessage(chatId, text, options);
+}
+
+export async function listBotTexts(): Promise<BotTextItem[]> {
+  const rows = await overrides();
+  return botTextKeys.map((key) => {
+    const row = rows.get(key);
+    return {
+      key,
+      kind: botTextDefinitions[key].kind,
+      placeholders: [...botTextDefinitions[key].placeholders],
+      defaultText: defaultBotTexts[key],
+      text: row?.text ?? null,
+      media: row?.mediaFileId && row.mediaType ? { type: row.mediaType as BotMediaType } : null,
+      updatedAt: row?.updatedAt.toISOString() ?? null,
+    };
+  });
+}
+
+export async function findBotText(key: BotTextKey) {
+  return (await overrides()).get(key);
+}
+
+async function upsert(key: BotTextKey, values: Partial<Pick<BotTextRow, "text" | "mediaType" | "mediaFileId">>) {
+  await db()
+    .insert(botTexts)
+    .values({ key, ...values, updatedAt: new Date() })
+    .onConflictDoUpdate({ target: botTexts.key, set: { ...values, updatedAt: new Date() } });
+  invalidateBotTexts();
+}
+
+export async function saveBotText(key: BotTextKey, text: string) {
+  await upsert(key, { text: text === defaultBotTexts[key] ? null : text });
+}
+
+export async function resetBotText(key: BotTextKey) {
+  await db().delete(botTexts).where(eq(botTexts.key, key));
+  invalidateBotTexts();
+}
+
+export async function clearBotMedia(key: BotTextKey) {
+  await upsert(key, { mediaType: null, mediaFileId: null });
+}
+
+export function botMediaChat() {
+  if (env.MEDIA_CHAT_ID) return { chatId: env.MEDIA_CHAT_ID, threadId: undefined };
+  if (env.LEADS_CHAT_ID) return { chatId: env.LEADS_CHAT_ID, threadId: env.LEADS_THREAD_ID };
+  return null;
+}
+
+export async function uploadBotMedia(api: Api, key: BotTextKey, type: BotMediaType, file: File) {
+  const target = botMediaChat()!;
+  const input = new InputFile(new Uint8Array(await file.arrayBuffer()), file.name || `${key}.${type === "photo" ? "jpg" : "mp4"}`);
+  const options = { message_thread_id: target.threadId, disable_notification: true };
+  let fileId: string;
+  let messageId: number;
+  if (type === "photo") {
+    const message = await api.sendPhoto(target.chatId, input, options);
+    fileId = message.photo[message.photo.length - 1].file_id;
+    messageId = message.message_id;
+  } else {
+    const message = await api.sendVideo(target.chatId, input, { ...options, supports_streaming: true });
+    fileId = message.video.file_id;
+    messageId = message.message_id;
+  }
+  await api.deleteMessage(target.chatId, messageId).catch((error) => console.error("Media upload cleanup failed:", error));
+  await upsert(key, { mediaType: type, mediaFileId: fileId });
+}
+
+export async function downloadBotMedia(api: Api, fileId: string) {
+  const file = await api.getFile(fileId);
+  if (!file.file_path) return null;
+  return fetch(`https://api.telegram.org/file/bot${env.BOT_TOKEN}/${file.file_path}`);
+}

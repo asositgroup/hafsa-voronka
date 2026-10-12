@@ -129,3 +129,13 @@ export const rateLimits = pgTable("rate_limits", {
   count: integer("count").notNull(),
   windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
 });
+
+export const botTexts = pgTable("bot_texts", {
+  key: text("key").primaryKey(),
+  text: text("text"),
+  mediaType: text("media_type"),
+  mediaFileId: text("media_file_id"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type BotTextRow = typeof botTexts.$inferSelect;

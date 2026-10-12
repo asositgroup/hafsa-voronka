@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { LogoutButton } from "@/components/admin/LogoutButton";
 import { DownloadIcon } from "@/components/icons";
 import { getLeadsCsvUrl } from "@/lib/admin/api";
 import { adminUz } from "@/lib/i18n/admin";
@@ -123,7 +122,6 @@ export function AdminFilters({ from, to, source, campaign, onApply }: FiltersPro
             <DownloadIcon className="h-4 w-4" />
             {adminUz.leads.exportCsv}
           </a>
-          <LogoutButton />
         </div>
       </div>
 

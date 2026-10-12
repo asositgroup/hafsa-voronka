@@ -28,3 +28,4 @@ export * from "./video";
 export * from "./track";
 export * from "./admin";
 export * from "./lead";
+export * from "./botTexts";

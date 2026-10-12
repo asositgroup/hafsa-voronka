@@ -9,7 +9,9 @@ import { DailyChart } from "@/components/admin/DailyChart";
 import { DropoffBars } from "@/components/admin/DropoffBars";
 import { FunnelChart } from "@/components/admin/FunnelChart";
 import { KpiCards } from "@/components/admin/KpiCards";
-import { adminMe, fetchAdminStats } from "@/lib/admin/api";
+import { AdminNav } from "@/components/admin/AdminNav";
+import { fetchAdminStats } from "@/lib/admin/api";
+import { useAdminSession } from "@/lib/admin/useAdminSession";
 import { adminUz } from "@/lib/i18n/admin";
 
 function getTashkentToday(): string {
@@ -40,25 +42,10 @@ function AdminDashboardContent() {
   const source = searchParams.get("source") || "";
   const campaign = searchParams.get("campaign") || "";
 
-  const [authorized, setAuthorized] = useState<boolean | null>(null);
+  const authorized = useAdminSession();
   const [stats, setStats] = useState<AdminStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    void adminMe().then((isLoggedIn) => {
-      if (!active) return;
-      if (!isLoggedIn) {
-        router.replace("/admin/login");
-      } else {
-        setAuthorized(true);
-      }
-    });
-    return () => {
-      active = false;
-    };
-  }, [router]);
 
   useEffect(() => {
     if (!authorized) return;
@@ -123,7 +110,7 @@ function AdminDashboardContent() {
       });
   };
 
-  if (authorized === null) {
+  if (!authorized) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4 bg-varaq text-siyoh">
         <div className="text-sm text-qalam">{adminUz.common.loading}</div>
@@ -134,6 +121,7 @@ function AdminDashboardContent() {
   return (
     <div className="min-h-screen flex flex-col bg-varaq text-siyoh">
       <main className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6 space-y-6 flex-1">
+        <AdminNav />
         <AdminFilters
           from={from}
           to={to}

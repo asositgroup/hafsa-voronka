@@ -35,6 +35,10 @@ const schema = z
       .regex(/^(-?\d+|@[A-Za-z0-9_]{5,32})$/, "LEADS_CHAT_ID must be a numeric chat id or @channelname")
       .optional(),
     LEADS_THREAD_ID: z.coerce.number().int().positive().optional(),
+    MEDIA_CHAT_ID: z
+      .string()
+      .regex(/^(-?\d+|@[A-Za-z0-9_]{5,32})$/, "MEDIA_CHAT_ID must be a numeric chat id or @channelname")
+      .optional(),
     ADMIN_PASSWORD_HASH: z.string().optional(),
     SESSION_SECRET: z.string().min(32).optional(),
   })

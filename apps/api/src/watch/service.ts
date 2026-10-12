@@ -6,9 +6,9 @@ import { db } from "@/db";
 import { users, watchProgress } from "@/db/schema";
 import { env } from "@/env";
 import { findByTelegramId, logEvent } from "@/funnel/users";
-import { uz } from "@/i18n/uz";
 import { markLeadCompleted } from "@/leads/service";
 import { bot } from "@/telegram/bot";
+import { botText, sendBotText } from "@/telegram/texts";
 import {
   applyBeat,
   remainingWatchSecs,
@@ -119,10 +119,8 @@ export async function recordProgress(
 
     if (!user.botBlocked) {
       try {
-        const keyboard = new InlineKeyboard().url(uz.bot.channelButton, env.CHANNEL_URL);
-        await bot().api.sendMessage(user.telegramId, uz.bot.completion, {
-          reply_markup: keyboard,
-        });
+        const keyboard = new InlineKeyboard().url(await botText("channelButton"), env.CHANNEL_URL);
+        await sendBotText(bot().api, user.telegramId, "completion", {}, keyboard);
       } catch (error) {
         console.error("Failed to send bot completion message:", error);
       }

@@ -29,6 +29,13 @@
       "when": 1791806614949,
       "tag": "0003_lead_assignment",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791829262975,
+      "tag": "0004_bot_texts",
+      "breakpoints": true
     }
   ]
 }

@@ -552,3 +552,59 @@ Comprehensive reference for all environment variables used by the API and Web ap
 | `NEXT_PUBLIC_BOT_USERNAME` | Web (`apps/web`) | Required | `your_bot` | Telegram bot username (without @) for deep linking |
 | `NEXT_PUBLIC_APP_URL` | Web (`apps/web`) | Required | `https://hafsa.azeemov.uz` | Public site URL; makes the link-preview (OG) image URL absolute |
 | `TEST_DATABASE_URL` | Test Runner | Optional (CI / Tests) | `postgres://funnel:funnel@localhost:5432/funnel_test` | Isolated database URL for running integration tests |
+
+---
+
+## 14. Bare VPS Deployment (without Coolify)
+
+Runs the API, Postgres and Caddy (automatic HTTPS) with Docker Compose on any Linux VPS (e.g. Hetzner CAX11). The web app stays on Vercel; only `NEXT_PUBLIC_API_URL` must point at the VPS domain. Files live in `deploy/`.
+
+### One-time server setup
+
+1. Ubuntu 24.04, Docker Engine with the Compose plugin, `git`, `curl`, `rclone`.
+2. Firewall: allow only 22, 80, 443 (`ufw allow OpenSSH && ufw allow 80 && ufw allow 443/tcp && ufw allow 443/udp && ufw enable`).
+3. DNS: `A` record for the API domain → VPS IP, **DNS only** (grey cloud), so Caddy can issue the certificate.
+4. Clone and configure:
+   ```bash
+   git clone https://github.com/estoyse/video-funnel.git /opt/video-funnel
+   cd /opt/video-funnel
+   cp deploy/.env.prod.example deploy/.env.prod
+   chmod 600 deploy/.env.prod
+   ```
+   Fill `deploy/.env.prod`. Keep `ADMIN_PASSWORD_HASH` and `GOOGLE_SA_KEY` in **single quotes**: Docker Compose expands `$` in env files, and the hash contains `$`. `DATABASE_URL` is built from the `POSTGRES_*` values, do not set it.
+5. First start: `./deploy/deploy.sh`. Migrations run when the API starts; the script waits for `https://<API_DOMAIN>/health`.
+6. Point the bot at the server (once, and after any domain change), using the running container's env:
+   ```bash
+   docker compose --env-file deploy/.env.prod -f deploy/docker-compose.prod.yml exec api node -e "fetch('https://api.telegram.org/bot'+process.env.BOT_TOKEN+'/setWebhook',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({url:process.env.API_URL+'/bot',secret_token:process.env.WEBHOOK_SECRET,allowed_updates:['message','my_chat_member','callback_query']})}).then(r=>r.json()).then(console.log)"
+   ```
+   Or run `scripts/set-webhook.ts` from a machine with the repo and the same env.
+
+### Deploying updates
+
+- By hand on the server: `./deploy/deploy.sh` (pulls `main`, rebuilds the API image, restarts it, checks health, prunes old images).
+- From GitHub: Actions → **Deploy API to VPS** → Run workflow. Needs repository secrets `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_APP_DIR` (e.g. `/opt/video-funnel`). It is manual on purpose so it never competes with Coolify.
+- Expect ~5–10 s of API downtime per deploy; Telegram retries webhook deliveries, so no updates are lost.
+
+### Backups
+
+Daily `pg_dump` (custom format) to R2, keeping 30 days:
+
+```bash
+crontab -e
+0 3 * * * /opt/video-funnel/deploy/backup.sh r2:funnel-backups/hafsa >> /var/log/hafsa-backup.log 2>&1
+```
+
+Restore with `pg_restore` as in the Disaster Recovery section, using `docker compose ... exec -T postgres pg_restore -U funnel -d funnel --clean --if-exists --no-owner < backup.dump`.
+
+### Day-to-day
+
+- Logs: `docker compose --env-file deploy/.env.prod -f deploy/docker-compose.prod.yml logs -f api`
+- Restart API: same prefix with `restart api`.
+- OS security updates: `apt install unattended-upgrades`.
+
+### Moving from Coolify
+
+1. `pg_dump -Fc` the Coolify database and `pg_restore` it into the new Postgres before switching.
+2. Switch the API DNS record to the VPS, wait for Caddy to get the certificate (`curl https://<API_DOMAIN>/health`).
+3. Re-run the webhook step so Telegram calls the new server.
+4. Stop the Coolify API so two servers never process the same updates.

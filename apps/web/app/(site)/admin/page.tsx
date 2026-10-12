@@ -189,22 +189,17 @@ function AdminDashboardContent() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <FunnelChart funnel={stats.funnel} />
-              {leads && (
-                <LeadsTable
-                  data={leads}
-                  from={from}
-                  to={to}
-                  source={source}
-                  campaign={campaign}
-                  onPageChange={handlePageChange}
-                />
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <DailyChart daily={stats.daily} />
               <DropoffBars dropoff={stats.dropoff} />
             </div>
+
+            <DailyChart daily={stats.daily} />
+
+            {leads && (
+              <LeadsTable
+                data={leads}
+                onPageChange={handlePageChange}
+              />
+            )}
 
             <div className="grid grid-cols-1 gap-6">
               <CampaignTable campaigns={stats.campaigns} />

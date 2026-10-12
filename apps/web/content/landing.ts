@@ -17,8 +17,6 @@ export type HowToStep = {
 export type LandingContent = {
   hero: {
     tag: string;
-    arabicWord: string;
-    arabicBare: string;
     title: string;
     lead: string;
     paragraph: string;
@@ -38,7 +36,6 @@ export type LandingContent = {
     closing: string;
   };
   teacher: {
-    mark: string;
     name: string;
     title: string;
     intro: string;
@@ -62,8 +59,6 @@ export type LandingContent = {
 export const landingContent: LandingContent = {
   hero: {
     tag: "Hafsa ustoza",
-    arabicWord: "اِقْرَأْ",
-    arabicBare: "اقرأ",
     title: "Arab tilini o‘rganmoqchisiz, ammo nimadan boshlashni bilmayapsizmi?",
     lead: "Hafsa ustozaning 12 yillik tajribasi asosida tayyorlangan bepul video darsda arab tilini o‘rganishdagi 5 ta muhim qadamni bilib oling.",
     paragraph: "To‘g‘ri ustoz va kitob tanlashdan arab harflarini o‘rganishgacha — arab tilini o‘rganish jarayonini tezlashtiring va vaqtingizni tejang.",
@@ -105,7 +100,6 @@ export const landingContent: LandingContent = {
     closing: "Agar siz ham arab tili va Qur’on o‘qishni o‘rganishni niyat qilgan bo‘lsangiz, ushbu bepul video darsni ko‘ring.",
   },
   teacher: {
-    mark: "حفصة",
     name: "Hafsa ustoza",
     title: "IQRA Akademiyasi asoschisi, 12 yildan ortiq tajriba",
     intro: "Qur’on va arab tili ta’limi bilan 12 yildan ortiq shug‘ullanib kelaman. Arab tili va Qur’on ilmlarini chuqur o‘rganib, xalqaro darajadagi ustozlardan ta’lim olganman.",

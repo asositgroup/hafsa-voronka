@@ -1,53 +1,21 @@
-import type { CSSProperties } from "react";
+import { harakatWords, type HarakatWordKey } from "./harakatPaths";
 
 type HarakatWordProps = {
-  text: string;
-  bareText?: string;
+  word: HarakatWordKey;
   className?: string;
-  style?: CSSProperties;
+  lettersClassName?: string;
 };
 
 export function HarakatWord({
-  text,
-  bareText,
+  word,
   className = "",
-  style,
+  lettersClassName = "fill-varaq",
 }: HarakatWordProps) {
-  if (!bareText) {
-    return (
-      <span
-        dir="rtl"
-        aria-label={text}
-        className={`font-arabic text-siyoh select-none whitespace-nowrap ${className}`}
-        style={style}
-      >
-        {text}
-      </span>
-    );
-  }
-
+  const { text, viewBox, letters, marks } = harakatWords[word];
   return (
-    <div
-      dir="rtl"
-      aria-label={text}
-      role="img"
-      className={`relative font-arabic leading-none select-none whitespace-nowrap ${className}`}
-      style={style}
-    >
-      <span
-        aria-hidden="true"
-        className="absolute inset-0 text-right text-oltin pointer-events-none whitespace-nowrap"
-      >
-        {text}
-      </span>
-      <span
-        aria-hidden="true"
-        className="absolute inset-0 text-right text-varaq pointer-events-none whitespace-nowrap"
-        style={{ WebkitTextStroke: "0.5px var(--color-varaq)" }}
-      >
-        {bareText}
-      </span>
-      <span className="sr-only">{text}</span>
-    </div>
+    <svg viewBox={viewBox} role="img" aria-label={text} lang="ar" className={`block w-auto ${className}`}>
+      <path d={letters} className={lettersClassName} />
+      {marks && <path d={marks} className="fill-oltin" />}
+    </svg>
   );
 }

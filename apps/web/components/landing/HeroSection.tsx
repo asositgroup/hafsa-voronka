@@ -1,5 +1,6 @@
 import { HarakatWord } from "@/components/brand/HarakatWord";
 import { CtaButton } from "@/components/landing/CtaButton";
+import { HERO_CTA_ID } from "@/components/landing/ids";
 import { landingContent } from "@/content/landing";
 
 export function HeroSection() {
@@ -13,12 +14,8 @@ export function HeroSection() {
             {hero.tag}
           </p>
 
-          <div className="lg:hidden">
-            <HarakatWord
-              text={hero.arabicWord}
-              bareText={hero.arabicBare}
-              className="text-[132px] h-[150px] w-full"
-            />
+          <div className="flex justify-end lg:hidden">
+            <HarakatWord word="iqra" className="h-[150px]" />
           </div>
 
           <h1 className="text-[34px] leading-[1.1] font-bold tracking-[-0.01em] m-0">
@@ -33,7 +30,7 @@ export function HeroSection() {
             {hero.paragraph}
           </p>
 
-          <div className="flex flex-col gap-2 pt-2">
+          <div id={HERO_CTA_ID} className="flex flex-col gap-2 pt-2">
             <CtaButton variant="gold" className="w-full sm:w-auto self-start">
               {hero.buttonText}
             </CtaButton>
@@ -44,11 +41,7 @@ export function HeroSection() {
         </div>
 
         <div className="hidden lg:flex justify-end pb-2">
-          <HarakatWord
-            text={hero.arabicWord}
-            bareText={hero.arabicBare}
-            className="text-[200px] h-[230px] w-full"
-          />
+          <HarakatWord word="iqra" className="h-[230px]" />
         </div>
       </div>
     </section>

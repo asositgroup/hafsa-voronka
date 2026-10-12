@@ -254,6 +254,7 @@ The Next.js 16 web app is deployed on Vercel.
 3. Environment Variables:
    - `NEXT_PUBLIC_API_URL`: `https://api.yourdomain.uz`
    - `NEXT_PUBLIC_BOT_USERNAME`: `your_bot`
+   - `NEXT_PUBLIC_APP_URL`: `https://yourdomain.uz`
 4. Domains:
    - Add `yourdomain.uz` and `www.yourdomain.uz`.
    - Ensure Cloudflare DNS points `yourdomain.uz` CNAME to `cname.vercel-dns.com`.
@@ -548,4 +549,5 @@ Comprehensive reference for all environment variables used by the API and Web ap
 | `SESSION_SECRET` | API (`apps/api`) | Optional | `openssl rand -base64 48` string | Secret key for signing admin session cookies (min 32 chars) |
 | `NEXT_PUBLIC_API_URL` | Web (`apps/web`) | Required | `https://api.yourdomain.uz` | Public API URL accessible from browser/Mini App |
 | `NEXT_PUBLIC_BOT_USERNAME` | Web (`apps/web`) | Required | `your_bot` | Telegram bot username (without @) for deep linking |
+| `NEXT_PUBLIC_APP_URL` | Web (`apps/web`) | Required | `https://hafsa.azeemov.uz` | Public site URL; makes the link-preview (OG) image URL absolute |
 | `TEST_DATABASE_URL` | Test Runner | Optional (CI / Tests) | `postgres://funnel:funnel@localhost:5432/funnel_test` | Isolated database URL for running integration tests |

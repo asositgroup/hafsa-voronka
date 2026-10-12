@@ -9,7 +9,7 @@ export function ExpertBioSection() {
       <div className="rounded-[18px] bg-white p-6 sm:p-7 flex flex-col gap-5 text-siyoh">
         <div className="flex gap-4 items-center">
           <div className="w-[72px] h-[72px] rounded-[14px] bg-varaq flex items-center justify-center shrink-0">
-            <HarakatWord text={teacher.mark} className="text-[32px] text-siyoh" />
+            <HarakatWord word="hafsa" lettersClassName="fill-siyoh" className="h-[30px]" />
           </div>
           <div className="flex flex-col gap-0.5">
             <h2 className="text-xl font-bold text-siyoh m-0">{teacher.name}</h2>

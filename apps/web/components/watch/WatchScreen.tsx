@@ -480,12 +480,8 @@ export function WatchScreen() {
             </p>
           ) : (
             <div className="flex flex-col gap-3.5 pt-2 transition-all duration-[320ms] ease-out motion-reduce:transition-none opacity-100">
-              <div className="pt-2">
-                <HarakatWord
-                  text={watchUz.praiseWord}
-                  bareText={watchUz.praiseBare}
-                  className="text-[84px] h-[96px] w-full"
-                />
+              <div className="flex justify-end pt-2">
+                <HarakatWord word="ahsantum" className="h-[96px]" />
               </div>
               <p className="text-[17px] leading-[1.5] text-varaq m-0">
                 {watchUz.unlockedText}

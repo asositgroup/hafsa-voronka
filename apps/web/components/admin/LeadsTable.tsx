@@ -1,15 +1,10 @@
 "use client";
 
 import type { AdminLeadsResponse } from "@funnel/shared";
-import { getLeadsCsvUrl } from "@/lib/admin/api";
 import { adminUz } from "@/lib/i18n/admin";
 
 type LeadsTableProps = {
   data: AdminLeadsResponse;
-  from: string;
-  to: string;
-  source: string;
-  campaign: string;
   onPageChange: (newPage: number) => void;
 };
 
@@ -34,14 +29,8 @@ function formatDate(iso: string): string {
 
 export function LeadsTable({
   data,
-  from,
-  to,
-  source,
-  campaign,
   onPageChange,
 }: LeadsTableProps) {
-  const csvUrl = getLeadsCsvUrl({ from, to, source, campaign });
-
   return (
     <div className="bg-white rounded-[16px] p-5 sm:p-6 flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -54,13 +43,6 @@ export function LeadsTable({
           </p>
         </div>
 
-        <a
-          href={csvUrl}
-          download="leads.csv"
-          className="inline-flex items-center gap-1.5 rounded-[10px] bg-oltin px-3.5 py-1.5 text-xs font-semibold text-siyoh hover:opacity-95 transition no-underline"
-        >
-          <span>{adminUz.leads.exportCsv}</span>
-        </a>
       </div>
 
       <div className="overflow-x-auto -mx-5 sm:mx-0">

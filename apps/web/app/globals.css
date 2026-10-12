@@ -15,6 +15,6 @@
   --color-chegara: #7E9A90;
   --color-white: #FFFFFF;
 
-  --font-sans: var(--font-sans), system-ui, -apple-system, sans-serif;
-  --font-arabic: var(--font-arabic), "Amiri", serif;
+  --font-sans: var(--font-golos), system-ui, -apple-system, sans-serif;
+  --font-arabic: var(--font-scheherazade), serif;
 }

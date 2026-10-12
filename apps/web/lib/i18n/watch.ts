@@ -14,7 +14,5 @@ export const watchUz = {
   remaining: (time: string) => `${time} qoldi`,
   gateNote: "Darsning 70% qismini ko‘rganingizda kanal tugmasi ochiladi.",
   lockedButton: (time: string) => `Kanal ${time} dan keyin ochiladi`,
-  praiseWord: "أَحْسَنْتُمْ",
-  praiseBare: "أحسنتم",
   unlockedText: "Darsning 70% qismini ko‘rdingiz. Kanal ochildi, darsni oxirigacha ham ko‘rishingiz mumkin.",
 };

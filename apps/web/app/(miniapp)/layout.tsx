@@ -1,19 +1,18 @@
 import type { Metadata, Viewport } from "next";
-import { Amiri, Golos_Text } from "next/font/google";
+import { Golos_Text, Scheherazade_New } from "next/font/google";
 import Script from "next/script";
 import "../globals.css";
 
 const golos = Golos_Text({
-  subsets: ["latin", "latin-ext", "cyrillic"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-sans",
+  subsets: ["latin"],
+  variable: "--font-golos",
   display: "swap",
 });
 
-const amiri = Amiri({
-  subsets: ["arabic", "latin"],
-  weight: ["400", "700"],
-  variable: "--font-arabic",
+const scheherazade = Scheherazade_New({
+  subsets: ["arabic"],
+  weight: "400",
+  variable: "--font-scheherazade",
   display: "swap",
 });
 
@@ -33,7 +32,7 @@ export default function MiniAppRootLayout({ children }: LayoutProps<"/app">) {
   return (
     <html
       lang="uz"
-      className={`${golos.variable} ${amiri.variable} h-full antialiased font-sans`}
+      className={`${golos.variable} ${scheherazade.variable} h-full antialiased font-sans`}
     >
       <body className="flex min-h-dvh flex-col bg-siyoh text-varaq font-sans">
         <Script

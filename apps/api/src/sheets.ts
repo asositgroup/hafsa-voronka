@@ -79,16 +79,14 @@ export async function appendRowsToSheets(rows: unknown[][]): Promise<void> {
   if (rows.length === 0) return;
   const client = getAuthClient();
   const headers = await client.getRequestHeaders();
+  headers.set("Content-Type", "application/json");
   const range = encodeURIComponent("Leads!A:K");
   const sheetId = encodeURIComponent(env.SHEET_ID!);
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}:append?valueInputOption=USER_ENTERED`;
 
   const response = await fetch(url, {
     method: "POST",
-    headers: {
-      ...headers,
-      "Content-Type": "application/json",
-    },
+    headers,
     body: JSON.stringify({ values: rows }),
     signal: AbortSignal.timeout(3000),
   });

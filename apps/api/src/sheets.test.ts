@@ -1,6 +1,15 @@
-import { describe, expect, it } from "vitest";
-import { formatLeadRow, formatTashkentDate } from "./sheets";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { appendRowsToSheets, formatLeadRow, formatTashkentDate } from "./sheets";
 import type { User } from "./db/schema";
+import { setTestEnv } from "./test/env";
+
+vi.mock("google-auth-library", () => ({
+  JWT: class {
+    async getRequestHeaders() {
+      return new Headers({ authorization: "Bearer test-token" });
+    }
+  },
+}));
 
 describe("formatTashkentDate", () => {
   it("formats date in Asia/Tashkent timezone", () => {
@@ -81,5 +90,23 @@ describe("formatLeadRow", () => {
       username: "@prefixed",
     });
     expect(row[4]).toBe("@prefixed");
+  });
+});
+
+describe("appendRowsToSheets", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("sends the service account authorization header", async () => {
+    setTestEnv({ SHEET_ID: "sheet-123" });
+    const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await appendRowsToSheets([["row"]]);
+
+    const headers = new Headers(fetchMock.mock.calls[0][1].headers);
+    expect(headers.get("authorization")).toBe("Bearer test-token");
+    expect(headers.get("content-type")).toBe("application/json");
   });
 });

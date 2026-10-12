@@ -20,3 +20,6 @@ export type Utm = {
   utm_content?: string;
   fbclid?: string;
 };
+
+export * from "./phone";
+export * from "./schemas";

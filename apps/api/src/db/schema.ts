@@ -12,7 +12,9 @@ import {
 } from "drizzle-orm/pg-core";
 import { eventTypes, type Utm } from "@funnel/shared";
 
-export const users = pgTable("users", {
+export const users = pgTable(
+  "users",
+  {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   telegramId: bigint("telegram_id", { mode: "number" }).unique().notNull(),
   username: text("username"),
@@ -32,7 +34,9 @@ export const users = pgTable("users", {
   channelClickAt: timestamp("channel_click_at", { withTimezone: true }),
   botBlocked: boolean("bot_blocked").default(false).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+  },
+  (t) => [index("users_registered_at_idx").on(t.registeredAt)],
+);
 
 export const events = pgTable(
   "events",
@@ -47,6 +51,7 @@ export const events = pgTable(
   (t) => [
     index("events_type_created_at_idx").on(t.type, t.createdAt),
     index("events_visitor_id_idx").on(t.visitorId),
+    index("events_user_id_type_idx").on(t.userId, t.type),
   ],
 );
 
@@ -79,3 +84,9 @@ export const sheetsQueue = pgTable("sheets_queue", {
 });
 
 export type User = typeof users.$inferSelect;
+
+export const rateLimits = pgTable("rate_limits", {
+  key: text("key").primaryKey(),
+  count: integer("count").notNull(),
+  windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+});

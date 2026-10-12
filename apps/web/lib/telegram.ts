@@ -3,10 +3,22 @@ export function getTelegramWebApp() {
   return window.Telegram?.WebApp;
 }
 
-export function initTelegramWebApp() {
-  const tg = getTelegramWebApp();
-  if (!tg) return null;
+export function waitForTelegramWebApp(timeoutMs = 3000) {
+  return new Promise<ReturnType<typeof getTelegramWebApp>>((resolve) => {
+    const startedAt = Date.now();
+    const check = () => {
+      const webApp = getTelegramWebApp();
+      if (webApp || Date.now() - startedAt >= timeoutMs) {
+        resolve(webApp);
+        return;
+      }
+      setTimeout(check, 50);
+    };
+    check();
+  });
+}
 
+export function initTelegramWebApp(tg: NonNullable<ReturnType<typeof getTelegramWebApp>>) {
   tg.ready();
   tg.expand();
 
@@ -21,12 +33,6 @@ export function initTelegramWebApp() {
   if (typeof tg.setBackgroundColor === "function") {
     tg.setBackgroundColor("#09090B");
   }
-
-  return tg;
-}
-
-export function getInitData(): string {
-  return getTelegramWebApp()?.initData ?? "";
 }
 
 export function getTelegramUser() {

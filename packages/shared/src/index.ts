@@ -23,3 +23,6 @@ export type Utm = {
 
 export * from "./phone";
 export * from "./schemas";
+export * from "./video";
+export * from "./track";
+export * from "./admin";

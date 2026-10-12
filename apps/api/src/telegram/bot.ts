@@ -7,7 +7,7 @@ import {
   logEvent,
   saveContactPhone,
   setBotBlocked,
-  upsertFromStart,
+  upsertUser,
 } from "@/funnel/users";
 
 function watchKeyboard(completed: boolean) {
@@ -20,7 +20,7 @@ function createBot() {
 
   bot.command("start", async (ctx) => {
     if (!ctx.from) return;
-    const { user, isNew } = await upsertFromStart(ctx.from, ctx.match || undefined);
+    const { user, isNew } = await upsertUser(ctx.from, ctx.match || undefined);
     await logEvent("bot_start", {
       userId: user.id,
       visitorId: user.visitorId,

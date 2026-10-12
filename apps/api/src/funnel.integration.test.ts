@@ -176,6 +176,50 @@ describe.skipIf(!testDbUrl)("Funnel Integration Tests", () => {
     expect(regEventsAfter.length).toBe(1);
   });
 
+  it("records a single registration when submitted twice concurrently", async () => {
+    const app = createApp();
+    const testUserId = Math.floor(Math.random() * 1000000) + 3000000;
+    const authHeader = makeAuthHeader(testUserId);
+    await app.request("/app/session", { method: "POST", headers: { authorization: authHeader } });
+
+    const submit = () =>
+      app.request("/app/register", {
+        method: "POST",
+        headers: { authorization: authHeader, "content-type": "application/json" },
+        body: JSON.stringify({ name: "Ali", phone: "901234567" }),
+      });
+    const responses = await Promise.all([submit(), submit()]);
+    expect(responses.map((r) => r.status)).toEqual([200, 200]);
+
+    const [user] = await db().select().from(users).where(eq(users.telegramId, testUserId)).limit(1);
+    const regEvents = (await db().select().from(events).where(eq(events.userId, user.id))).filter(
+      (e) => e.type === "registered",
+    );
+    expect(regEvents.length).toBe(1);
+  });
+
+  it("does not log app_open for polling session calls", async () => {
+    const app = createApp();
+    const testUserId = Math.floor(Math.random() * 1000000) + 4000000;
+    const authHeader = makeAuthHeader(testUserId);
+    const session = (body?: unknown) =>
+      app.request("/app/session", {
+        method: "POST",
+        headers: { authorization: authHeader, "content-type": "application/json" },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+
+    await session();
+    await session({ reason: "poll" });
+    await session({ reason: "poll" });
+
+    const [user] = await db().select().from(users).where(eq(users.telegramId, testUserId)).limit(1);
+    const opens = (await db().select().from(events).where(eq(events.userId, user.id))).filter(
+      (e) => e.type === "app_open",
+    );
+    expect(opens.length).toBe(1);
+  });
+
   it("preserves verified phone when registering with a different phone", async () => {
     const app = createApp();
     const testUserId = Math.floor(Math.random() * 1000000) + 30000;

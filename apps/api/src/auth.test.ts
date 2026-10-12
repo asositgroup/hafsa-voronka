@@ -29,6 +29,10 @@ function createTestApp() {
       startParam: c.get("startParam"),
     });
   });
+  app.post("/app/beacon", async (c) => {
+    const body = await c.req.json();
+    return c.json({ user: c.get("telegramUser"), type: body.type });
+  });
   return app;
 }
 
@@ -102,5 +106,29 @@ describe("initDataAuth middleware", () => {
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body.error).toBe("bad_user");
+  });
+
+  it("accepts initData from a beacon body and keeps the body readable", async () => {
+    const app = createTestApp();
+    const res = await app.request("/app/beacon", {
+      method: "POST",
+      headers: { "content-type": "text/plain;charset=UTF-8" },
+      body: JSON.stringify({ initData: makeInitData(), type: "channel_click" }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.user.id).toBe(98765);
+    expect(body.type).toBe("channel_click");
+  });
+
+  it("rejects a beacon body with forged initData", async () => {
+    const app = createTestApp();
+    const forged = makeInitData().replace(/hash=[0-9a-f]{64}/, `hash=${"1".repeat(64)}`);
+    const res = await app.request("/app/beacon", {
+      method: "POST",
+      headers: { "content-type": "text/plain;charset=UTF-8" },
+      body: JSON.stringify({ initData: forged, type: "channel_click" }),
+    });
+    expect(res.status).toBe(401);
   });
 });

@@ -1,63 +1,58 @@
 import {
   registerErrorSchema,
-  registerRequestSchema,
   registerResponseSchema,
   sessionResponseSchema,
   type RegisterRequest,
+  type SessionRequest,
   type SessionResponse,
 } from "@funnel/shared";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 export type RegisterResult =
   | { ok: true }
-  | { ok: false; field?: "name" | "phone"; message: string };
+  | { ok: false; field?: "name" | "phone"; message?: string };
 
-export async function fetchSession(initData: string): Promise<SessionResponse> {
-  const res = await fetch(`${API_URL}/app/session`, {
-    method: "POST",
-    headers: {
-      authorization: `tma ${initData}`,
-    },
-  });
-
-  if (!res.ok) {
-    throw new Error(`Session request failed: ${res.status}`);
-  }
-
-  const json = await res.json();
-  return sessionResponseSchema.parse(json);
-}
-
-export async function registerUser(
-  initData: string,
-  data: RegisterRequest,
-): Promise<RegisterResult> {
-  registerRequestSchema.parse(data);
-
-  const res = await fetch(`${API_URL}/app/register`, {
+export function miniAppPost(path: string, initData: string, body?: unknown) {
+  return fetch(`${API_URL}${path}`, {
     method: "POST",
     headers: {
       authorization: `tma ${initData}`,
       "content-type": "application/json",
     },
-    body: JSON.stringify(data),
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
+}
 
-  if (res.status === 200) {
-    const json = await res.json();
-    registerResponseSchema.parse(json);
+export function miniAppBeacon(path: string, initData: string, body: Record<string, unknown>) {
+  const payload = new Blob([JSON.stringify({ ...body, initData })], { type: "text/plain" });
+  if (navigator.sendBeacon?.(`${API_URL}${path}`, payload)) return;
+  void fetch(`${API_URL}${path}`, { method: "POST", body: payload, keepalive: true }).catch(() => {});
+}
+
+export async function fetchSession(
+  initData: string,
+  request: SessionRequest = { reason: "open" },
+): Promise<SessionResponse> {
+  const res = await miniAppPost("/app/session", initData, request);
+  if (!res.ok) {
+    throw new Error(`Session request failed: ${res.status}`);
+  }
+  return sessionResponseSchema.parse(await res.json());
+}
+
+export async function registerUser(initData: string, data: RegisterRequest): Promise<RegisterResult> {
+  const res = await miniAppPost("/app/register", initData, data);
+
+  if (res.ok) {
+    registerResponseSchema.parse(await res.json());
     return { ok: true };
   }
 
   if (res.status === 422) {
-    const json = await res.json().catch(() => ({}));
-    const parsed = registerErrorSchema.safeParse(json);
-    if (parsed.success) {
-      return { ok: false, field: parsed.data.field, message: parsed.data.message };
-    }
-    return { ok: false, message: "Noto'g'ri ma'lumot kiritildi" };
+    const parsed = registerErrorSchema.safeParse(await res.json().catch(() => ({})));
+    if (parsed.success) return { ok: false, ...parsed.data };
   }
 
-  return { ok: false, message: "Serverda xatolik yuz berdi" };
+  return { ok: false };
 }

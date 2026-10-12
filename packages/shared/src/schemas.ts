@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+export const sessionRequestSchema = z.object({
+  reason: z.enum(["open", "poll"]).default("open"),
+});
+
+export type SessionRequest = z.input<typeof sessionRequestSchema>;
+
 export const sessionResponseSchema = z.object({
   registered: z.boolean(),
   name: z.string().nullable(),
@@ -21,8 +27,11 @@ export const sessionResponseSchema = z.object({
 
 export type SessionResponse = z.infer<typeof sessionResponseSchema>;
 
+export const NAME_MIN_LENGTH = 2;
+export const NAME_MAX_LENGTH = 60;
+
 export const registerRequestSchema = z.object({
-  name: z.string(),
+  name: z.string().trim().min(NAME_MIN_LENGTH).max(NAME_MAX_LENGTH),
   phone: z.string().optional(),
 });
 

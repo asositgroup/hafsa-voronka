@@ -18,6 +18,7 @@ const schema = z
     VIDEO_DURATION_SEC: z.coerce.number().int().positive(),
     SEEK_LOCK: booleanEnv(true),
     GATE_PROCEED: booleanEnv(true),
+    COMPLETE_THRESHOLD: z.coerce.number().min(0.5).max(1).default(0.95),
     CORS_ORIGINS: z.string().optional(),
     SHEETS_ENABLED: booleanEnv(false),
     GOOGLE_SA_EMAIL: z.string().optional(),
@@ -26,6 +27,11 @@ const schema = z
       .optional()
       .transform((val) => (val ? val.replace(/\\n/g, "\n") : undefined)),
     SHEET_ID: z.string().optional(),
+    FB_PIXEL_ID: z.string().optional(),
+    FB_CAPI_TOKEN: z.string().optional(),
+    FB_TEST_EVENT_CODE: z.string().optional(),
+    ADMIN_PASSWORD_HASH: z.string().optional(),
+    SESSION_SECRET: z.string().min(32).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.SHEETS_ENABLED) {
@@ -58,7 +64,9 @@ export type Env = z.infer<typeof schema>;
 let parsed: Env | undefined;
 
 export function loadEnv() {
-  parsed ??= schema.parse(process.env);
+  parsed ??= schema.parse(
+    Object.fromEntries(Object.entries(process.env).filter(([, value]) => value !== "")),
+  );
   return parsed;
 }
 

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import type { EventType } from "@funnel/shared";
 import { events, users } from "@/db/schema";
@@ -54,65 +54,24 @@ export async function upsertUser(
   return { user: created, isNew: true };
 }
 
-export const upsertFromStart = upsertUser;
-
 export async function saveContactPhone(profile: TelegramProfile, phone: string) {
-  const profileFields = {
-    username: profile.username ?? null,
-    firstName: profile.first_name ?? null,
-    languageCode: profile.language_code ?? null,
-  };
-
-  const [existing] = await db()
-    .select()
-    .from(users)
-    .where(eq(users.telegramId, profile.id))
-    .limit(1);
-
-  if (existing) {
-    const [updated] = await db()
-      .update(users)
-      .set({
-        ...profileFields,
-        phone,
-        phoneVerified: true,
-      })
-      .where(eq(users.id, existing.id))
-      .returning();
-    return updated;
-  }
-
-  const [created] = await db()
-    .insert(users)
-    .values({
-      telegramId: profile.id,
-      ...profileFields,
-      phone,
-      phoneVerified: true,
-    })
-    .onConflictDoUpdate({
-      target: users.telegramId,
-      set: { ...profileFields, phone, phoneVerified: true },
-    })
+  const { user } = await upsertUser(profile, undefined);
+  const [updated] = await db()
+    .update(users)
+    .set({ phone, phoneVerified: true })
+    .where(eq(users.id, user.id))
     .returning();
-  return created;
+  return updated;
 }
 
-export async function registerUserRecord(
+export async function markRegistered(
   userId: number,
-  name: string,
-  phone: string,
-  phoneVerified: boolean,
+  fields: { name: string; phone: string; phoneVerified: boolean },
 ) {
   const [updated] = await db()
     .update(users)
-    .set({
-      name,
-      phone,
-      phoneVerified,
-      registeredAt: new Date(),
-    })
-    .where(eq(users.id, userId))
+    .set({ ...fields, registeredAt: new Date() })
+    .where(and(eq(users.id, userId), isNull(users.registeredAt)))
     .returning();
   return updated;
 }

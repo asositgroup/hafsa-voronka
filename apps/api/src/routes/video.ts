@@ -5,6 +5,7 @@ import {
   videoEventRequestSchema,
 } from "@funnel/shared";
 import type { AppEnv } from "@/auth";
+import { capiClient } from "@/http/clientIp";
 import { recordProgress, recordVideoEvent } from "@/watch/service";
 
 async function readJson(request: { json: () => Promise<unknown> }) {
@@ -25,7 +26,7 @@ videoRoutes.post("/progress", async (c) => {
   }
 
   const tgUser = c.get("telegramUser");
-  const result = await recordProgress(tgUser.id, parsed.data);
+  const result = await recordProgress(tgUser.id, parsed.data, new Date(), undefined, capiClient(c));
   if (!result.ok) {
     return c.json({ error: result.error }, 404);
   }

@@ -7,13 +7,10 @@ import { consumeRateLimit } from "@/http/rateLimit";
 
 export const trackRoutes = new Hono();
 
-trackRoutes.post("/", async (c) => {
-  const ip = clientIp(c);
-  const allowed = await consumeRateLimit(`track:${ip}`, 30, 60);
-  if (!allowed) {
-    return c.json({ error: "rate_limited" }, 429);
-  }
+export const TRACK_LIMIT_PER_VISITOR = 20;
+export const TRACK_LIMIT_PER_IP = 600;
 
+trackRoutes.post("/", async (c) => {
   let body: unknown;
   try {
     body = await c.req.json();
@@ -27,6 +24,13 @@ trackRoutes.post("/", async (c) => {
   }
 
   const data = parsed.data;
+  const withinLimits =
+    (await consumeRateLimit(`track:ip:${clientIp(c)}`, TRACK_LIMIT_PER_IP, 60)) &&
+    (await consumeRateLimit(`track:visitor:${data.visitor_id}`, TRACK_LIMIT_PER_VISITOR, 60));
+  if (!withinLimits) {
+    return c.json({ error: "rate_limited" }, 429);
+  }
+
   const meta: Record<string, string> = {};
   if (data.utm_source !== undefined) meta.utm_source = data.utm_source;
   if (data.utm_campaign !== undefined) meta.utm_campaign = data.utm_campaign;

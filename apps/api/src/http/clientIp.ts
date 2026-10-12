@@ -8,3 +8,11 @@ export function clientIp(c: Context) {
     "unknown"
   );
 }
+
+export function capiClient(c: Context) {
+  const ip = clientIp(c);
+  return {
+    userAgent: c.req.header("user-agent"),
+    ip: ip === "unknown" ? undefined : ip,
+  };
+}

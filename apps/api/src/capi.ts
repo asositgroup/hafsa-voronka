@@ -8,10 +8,16 @@ export const GRAPH_API_VERSION = "v26.0";
 
 export type CapiEventName = "CompleteRegistration" | "VideoComplete";
 
+export type CapiClient = {
+  userAgent?: string;
+  ip?: string;
+};
+
 export type CapiEvent = {
   name: CapiEventName;
   eventId: string;
   user: User;
+  client?: CapiClient;
 };
 
 export type CapiUserData = {
@@ -19,6 +25,8 @@ export type CapiUserData = {
   external_id: string;
   country: string;
   fbc?: string;
+  client_user_agent?: string;
+  client_ip_address?: string;
 };
 
 export type CapiEventItem = {
@@ -58,6 +66,12 @@ export function buildCapiPayload(event: CapiEvent, context: CapiContext = {}): C
   };
   if (ph) {
     userData.ph = ph;
+  }
+  if (event.client?.userAgent) {
+    userData.client_user_agent = event.client.userAgent;
+  }
+  if (event.client?.ip) {
+    userData.client_ip_address = event.client.ip;
   }
 
   if (event.user.fbclid) {

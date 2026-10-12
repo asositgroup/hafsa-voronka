@@ -139,29 +139,27 @@ describe.skipIf(!testDbUrl)("/track route integration", () => {
     expect(attribution.fbclid).toBe("fb_click_id_abc");
   });
 
-  it("enforces rate limit of 30 requests per minute per IP", async () => {
+  it("limits a single visitor but not many visitors behind one shared IP", async () => {
     const app = createApp();
     const ip = `198.51.100.${Math.floor(Math.random() * 200) + 10}`;
+    const runId = Math.random().toString(36).slice(2, 6);
 
-    const sendTrack = (index: number) =>
+    const sendTrack = (visitorId: string) =>
       app.request("/track", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Forwarded-For": ip,
-        },
-        body: JSON.stringify({
-          visitor_id: `rate_${String(index).padStart(5, "0")}`,
-          type: "landing_view",
-        }),
+        headers: { "Content-Type": "application/json", "X-Forwarded-For": ip },
+        body: JSON.stringify({ visitor_id: visitorId, type: "landing_view" }),
       });
 
-    for (let i = 0; i < 30; i++) {
-      const res = await sendTrack(i);
+    for (let i = 0; i < 50; i++) {
+      const res = await sendTrack(`s${runId}${String(i).padStart(5, "0")}`);
       expect(res.status).toBe(204);
     }
 
-    const blocked = await sendTrack(30);
-    expect(blocked.status).toBe(429);
+    const single = `r${runId}abcde`;
+    for (let i = 0; i < 20; i++) {
+      expect((await sendTrack(single)).status).toBe(204);
+    }
+    expect((await sendTrack(single)).status).toBe(429);
   });
 });

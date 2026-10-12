@@ -143,4 +143,19 @@ describe("Facebook Conversions API", () => {
 
     await expect(sendCapiEvent(event)).resolves.toBeUndefined();
   });
+
+  it("passes the client user agent and IP unhashed, as Meta requires for website events", () => {
+    const payload = buildCapiPayload(
+      {
+        name: "CompleteRegistration",
+        eventId: "reg_1",
+        user: makeUser(),
+        client: { userAgent: "Mozilla/5.0 Telegram-Android", ip: "84.54.70.1" },
+      },
+      { webUrl: "https://example.com" },
+    );
+    expect(payload.data[0].user_data.client_user_agent).toBe("Mozilla/5.0 Telegram-Android");
+    expect(payload.data[0].user_data.client_ip_address).toBe("84.54.70.1");
+  });
 });
+

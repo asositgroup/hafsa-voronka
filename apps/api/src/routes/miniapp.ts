@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { watchProgress } from "@/db/schema";
 import { env } from "@/env";
 import { logEvent, markRegistered, upsertUser } from "@/funnel/users";
+import { capiClient } from "@/http/clientIp";
 import { enqueueLead, formatLeadRow, sendLeadInline } from "@/sheets";
 import { validateRegistration } from "./registration";
 
@@ -80,6 +81,7 @@ miniappRoutes.post("/register", async (c) => {
     name: "CompleteRegistration",
     eventId: `reg_${user.id}`,
     user: registered,
+    client: capiClient(c),
   }).catch((error) => console.error("CAPI CompleteRegistration failed:", error));
 
   if (env.SHEETS_ENABLED) {

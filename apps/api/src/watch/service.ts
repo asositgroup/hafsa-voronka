@@ -1,7 +1,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { InlineKeyboard } from "grammy";
 import type { EventType } from "@funnel/shared";
-import { sendCapiEvent } from "@/capi";
+import { type CapiClient, sendCapiEvent } from "@/capi";
 import { db } from "@/db";
 import { users, watchProgress } from "@/db/schema";
 import { env } from "@/env";
@@ -28,6 +28,7 @@ export async function recordProgress(
   beat: WatchBeat,
   now: Date = new Date(),
   config?: WatchConfig,
+  client?: CapiClient,
 ): Promise<ProgressResult> {
   const user = await findByTelegramId(telegramId);
   if (!user || user.registeredAt === null) {
@@ -107,6 +108,7 @@ export async function recordProgress(
       name: "VideoComplete",
       eventId: `vc_${user.id}`,
       user: updatedUser ?? user,
+      client,
     }).catch((error) => console.error("CAPI VideoComplete failed:", error));
 
     if (!user.botBlocked) {

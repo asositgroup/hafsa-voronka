@@ -20,7 +20,7 @@ const FUNNEL_STEP_NAMES: Record<string, string> = {
   registered: "Ro‘yxatdan o‘tdi",
   video_start: "Videoni boshladi",
   video_complete: "Darsni ko‘rdi (70%)",
-  channel_click: "Kanalga o‘tdi",
+  channel_click: "Adminga yozdi",
 };
 
 const ORDERED_FUNNEL_STEPS = [
@@ -438,7 +438,7 @@ export async function getLeadsCsv(filters: QueryFilters): Promise<string> {
     "Kampaniya",
     "Ko'rish foizi",
     "Tugatilgan",
-    "Kanalga o'tilgan",
+    "Adminga yozgan",
   ];
 
   const lines: string[] = [headers.map(escapeCsvCell).join(",")];

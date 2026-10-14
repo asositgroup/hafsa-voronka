@@ -437,7 +437,7 @@ describe.skipIf(!testDbUrl)("Admin Integration Tests", () => {
     const csvText = buf.toString("utf-8");
     const lines = csvText.replace(/^\uFEFF/, "").trim().split(/\r?\n/);
     expect(lines[0]).toBe(
-      "Ro'yxatdan o'tgan sana,Ism,Telefon,Username,Manba,Kampaniya,Ko'rish foizi,Tugatilgan,Kanalga o'tilgan",
+      "Ro'yxatdan o'tgan sana,Ism,Telefon,Username,Manba,Kampaniya,Ko'rish foizi,Tugatilgan,Adminga yozgan",
     );
     expect(lines.length).toBe(54);
 

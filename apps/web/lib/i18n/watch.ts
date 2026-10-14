@@ -1,6 +1,6 @@
 export const watchUz = {
   seekLockedToast: "Videoni oldinga o‘tkazib bo‘lmaydi",
-  proceedButton: "Kanalga o‘tish",
+  proceedButton: "Adminga yozish",
   play: "Ijro etish",
   pause: "To‘xtatish",
   mute: "Ovozni o‘chirish",
@@ -10,9 +10,9 @@ export const watchUz = {
   lessonTitle: "Arab tilini o‘rganishdagi 5 muhim qadam",
   lessonSubtitle: "Hafsa ustoza",
   speed: "Tezlik",
-  channelUntil: "Kanalgacha",
+  channelUntil: "Adminga yozishgacha",
   remaining: (time: string) => `${time} qoldi`,
-  gateNote: "Darsning 70% qismini ko‘rganingizda kanal tugmasi ochiladi.",
-  lockedButton: (time: string) => `Kanal ${time} dan keyin ochiladi`,
-  unlockedText: "Darsning 70% qismini ko‘rdingiz. Kanal ochildi, darsni oxirigacha ham ko‘rishingiz mumkin.",
+  gateNote: "Darsning 70% qismini ko‘rganingizda «Adminga yozish» tugmasi ochiladi.",
+  lockedButton: (time: string) => `Tugma ${time} dan keyin ochiladi`,
+  unlockedText: "Darsning 70% qismini ko‘rdingiz. Endi adminga yozishingiz mumkin, darsni oxirigacha ham ko‘rishingiz mumkin.",
 };

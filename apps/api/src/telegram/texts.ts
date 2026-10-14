@@ -19,15 +19,15 @@ export const defaultBotTexts: Record<BotTextKey, string> = {
   askContactShort:
     "Video darsni olish uchun avval ro'yxatdan o'ting: pastdagi «📱 Raqamni yuborish» tugmasini bosing.",
   welcome: "Assalomu alaykum, {name}! 👋\n\nBepul video darsni ko'rish uchun quyidagi tugmani bosing.",
-  welcomeBack: "Yana xush kelibsiz, {name}! Darsni qayta ko'rishingiz yoki kanalga o'tishingiz mumkin.",
+  welcomeBack: "Yana xush kelibsiz, {name}! Darsni qayta ko'rishingiz yoki adminga yozishingiz mumkin.",
   registered: "Rahmat, ro'yxatdan o'tdingiz! ✅",
   watchPrompt: "Bepul video dars tayyor. Ko'rish uchun quyidagi tugmani bosing 👇",
   completion:
-    "Tabriklaymiz! Siz darsni muvaffaqiyatli yakunladingiz. 🎉\n\nKanalimizga a'zo bo'lish uchun quyidagi tugmani bosing:",
+    "Tabriklaymiz! Siz darsni muvaffaqiyatli yakunladingiz. 🎉\n\nAdminga yozish uchun quyidagi tugmani bosing:",
   fallback: "Video darsni ko'rish uchun quyidagi tugmani bosing.",
   shareContactButton: "📱 Raqamni yuborish",
   watchButton: "▶️ Videoni ko'rish",
-  channelButton: "Kanalga o'tish →",
+  channelButton: "Adminga yozish →",
 };
 
 type ReplyMarkup = InlineKeyboardMarkup | ReplyKeyboardMarkup | ReplyKeyboardRemove | ForceReply;

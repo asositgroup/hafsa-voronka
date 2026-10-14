@@ -15,19 +15,22 @@ import { env } from "@/env";
 
 export const defaultBotTexts: Record<BotTextKey, string> = {
   askContact:
-    "Assalomu alaykum, {name}! 👋\n\nBepul video darsni olish uchun ro'yxatdan o'ting: pastdagi «📱 Raqamni yuborish» tugmasini bosing.",
+    "Assalomu alaykum, {name}! 👋\n\nHafsa ustozaning «Arab tilini o'rganishdagi 5 muhim qadam» video darsi sizni kutmoqda: 12 yillik tajriba, atigi 17 daqiqada.\n\nDarsni bepul olish uchun pastdagi «📱 Raqamni yuborish» tugmasini bosing. Bir soniya ham ketmaydi 👇",
   askContactShort:
-    "Video darsni olish uchun avval ro'yxatdan o'ting: pastdagi «📱 Raqamni yuborish» tugmasini bosing.",
-  welcome: "Assalomu alaykum, {name}! 👋\n\nBepul video darsni ko'rish uchun quyidagi tugmani bosing.",
-  welcomeBack: "Yana xush kelibsiz, {name}! Darsni qayta ko'rishingiz yoki adminga yozishingiz mumkin.",
-  registered: "Rahmat, ro'yxatdan o'tdingiz! ✅",
-  watchPrompt: "Bepul video dars tayyor. Ko'rish uchun quyidagi tugmani bosing 👇",
+    "Bepul darsgacha bir qadam qoldi! 👇\nPastdagi «📱 Raqamni yuborish» tugmasini bosing, dars darhol ochiladi.",
+  welcome:
+    "Qaytganingizdan xursandmiz, {name}! 👋\n\nVideo dars hali ham sizni kutmoqda. Atigi 17 daqiqa, arab tilini qayerdan boshlashni aniq bilib olasiz 👇",
+  welcomeBack:
+    "Yana xush kelibsiz, {name}! 🌿\n\nDarsni qayta ko'rishingiz mumkin. Arab tilini Hafsa ustoza bilan chuqurroq o'rganmoqchi bo'lsangiz, adminga yozing. Sizga mos yo'lni ko'rsatib beradi.",
+  registered: "Ajoyib, siz ro'yxatdan o'tdingiz! ✅",
+  watchPrompt:
+    "🎁 Video dars tayyor!\n\nUnda arab tilini to'g'ri boshlash uchun 5 ta muhim qadamni bilib olasiz. Ko'pchilik aynan shu qadamlarni bilmagani uchun yarim yo'lda to'xtab qoladi.\n\n17 daqiqa ajrating va hoziroq ko'ring 👇",
   completion:
-    "Tabriklaymiz! Siz darsni muvaffaqiyatli yakunladingiz. 🎉\n\nAdminga yozish uchun quyidagi tugmani bosing:",
-  fallback: "Video darsni ko'rish uchun quyidagi tugmani bosing.",
+    "Barakalla! 🎉 Darsni ko'rib chiqdingiz. Bu arab tilini o'rganishdagi eng muhim qadam: to'g'ri boshlash.\n\nEndi bilganlaringizni amalda qo'llash vaqti. Arab tilini Hafsa ustoza bilan davom ettirmoqchimisiz yoki savollaringiz bormi? Adminga yozing, sizga batafsil ma'lumot beradi 👇",
+  fallback: "Video darsni ko'rish uchun pastdagi tugmani bosing 👇",
   shareContactButton: "📱 Raqamni yuborish",
-  watchButton: "▶️ Videoni ko'rish",
-  channelButton: "Adminga yozish →",
+  watchButton: "▶️ Bepul darsni ko'rish",
+  channelButton: "✍️ Adminga yozish",
 };
 
 type ReplyMarkup = InlineKeyboardMarkup | ReplyKeyboardMarkup | ReplyKeyboardRemove | ForceReply;

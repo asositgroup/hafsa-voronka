@@ -1,5 +1,5 @@
 export const watchUz = {
-  seekLockedToast: "Videoni oldinga o‘tkazib bo‘lmaydi",
+  seekLockedToast: "Darsni o‘tkazib yubormang, har bir qism muhim",
   proceedButton: "Adminga yozish",
   play: "Ijro etish",
   pause: "To‘xtatish",
@@ -8,11 +8,11 @@ export const watchUz = {
   fullscreen: "To‘liq ekran",
   exitFullscreen: "Kichik ekran",
   lessonTitle: "Arab tilini o‘rganishdagi 5 muhim qadam",
-  lessonSubtitle: "Hafsa ustoza",
+  lessonSubtitle: "Hafsa ustoza · 12 yillik tajriba",
   speed: "Tezlik",
-  channelUntil: "Adminga yozishgacha",
+  channelUntil: "Keyingi qadamgacha",
   remaining: (time: string) => `${time} qoldi`,
-  gateNote: "Darsning 70% qismini ko‘rganingizda «Adminga yozish» tugmasi ochiladi.",
+  gateNote: "Darsni diqqat bilan ko‘ring: har bir qadam muhim. 70% qismini ko‘rganingizda ustoz jamoasi bilan bog‘lanish imkoniyati ochiladi.",
   lockedButton: (time: string) => `Tugma ${time} dan keyin ochiladi`,
-  unlockedText: "Darsning 70% qismini ko‘rdingiz. Endi adminga yozishingiz mumkin, darsni oxirigacha ham ko‘rishingiz mumkin.",
+  unlockedText: "Barakalla! Endi bilganlaringizni amalda qo‘llash vaqti. Arab tilini Hafsa ustoza bilan davom ettirmoqchi bo‘lsangiz yoki savolingiz bo‘lsa, adminga yozing. Darsni oxirigacha ko‘rishni ham unutmang.",
 };

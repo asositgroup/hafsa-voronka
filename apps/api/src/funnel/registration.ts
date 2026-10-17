@@ -1,8 +1,6 @@
 import { type CapiActionSource, type CapiClient, sendCapiEvent } from "@/capi";
 import type { User } from "@/db/schema";
-import { env } from "@/env";
 import { attachLeadToUser } from "@/leads/service";
-import { enqueueLead, formatLeadRow, sendLeadInline } from "@/sheets";
 import { logEvent, markRegistered } from "./users";
 
 export type RegistrationFields = { name: string; phone: string; phoneVerified: boolean };
@@ -29,12 +27,6 @@ export async function completeRegistration(
     actionSource: source.actionSource,
     client: source.client,
   }).catch((error) => console.error("CAPI CompleteRegistration failed:", error));
-
-  if (env.SHEETS_ENABLED) {
-    void enqueueLead(user.id, formatLeadRow(registered))
-      .then(sendLeadInline)
-      .catch((error) => console.error("Sheets send error:", error));
-  }
 
   return registered;
 }

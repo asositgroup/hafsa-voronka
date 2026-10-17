@@ -289,8 +289,8 @@ export async function getHealthStats(): Promise<AdminStatsResponse["health"]> {
     last_event_at: string | null;
   }>(sql`
     SELECT
-      (SELECT count(*)::int FROM sheets_queue WHERE sent_at IS NULL AND attempts < 10) AS sheets_backlog,
-      (SELECT count(*)::int FROM sheets_queue WHERE sent_at IS NULL AND attempts >= 10) AS sheets_failures,
+      (SELECT count(*)::int FROM leads WHERE notify_version > sheets_synced_version AND sheets_attempts < 10) AS sheets_backlog,
+      (SELECT count(*)::int FROM leads WHERE notify_version > sheets_synced_version AND sheets_attempts >= 10) AS sheets_failures,
       (SELECT to_char(max(created_at), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') FROM events WHERE type = 'bot_start') AS last_bot_start_at,
       (SELECT to_char(max(created_at), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') FROM events) AS last_event_at
   `);

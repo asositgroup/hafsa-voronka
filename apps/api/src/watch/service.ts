@@ -6,7 +6,7 @@ import { db } from "@/db";
 import { users, watchProgress } from "@/db/schema";
 import { env } from "@/env";
 import { findByTelegramId, logEvent } from "@/funnel/users";
-import { markLeadCompleted } from "@/leads/service";
+import { refreshUserLeadCards } from "@/leads/service";
 import { bot } from "@/telegram/bot";
 import { botText, sendBotText } from "@/telegram/texts";
 import {
@@ -94,6 +94,12 @@ export async function recordProgress(
     });
   }
 
+  if (result.milestones.length > 0 && !result.completedNow) {
+    await refreshUserLeadCards(user.id).catch((error) =>
+      console.error("Lead progress update failed:", error),
+    );
+  }
+
   if (result.completedNow) {
     const [updatedUser] = await db()
       .update(users)
@@ -106,7 +112,7 @@ export async function recordProgress(
       visitorId: user.visitorId,
     });
 
-    await markLeadCompleted(user.id).catch((error) =>
+    await refreshUserLeadCards(user.id).catch((error) =>
       console.error("Lead completion update failed:", error),
     );
 

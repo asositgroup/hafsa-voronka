@@ -8,7 +8,7 @@ import { closeDb, db } from "@/db";
 import { runMigrations } from "@/db/migrate";
 import {
   events,
-  sheetsQueue,
+  leads,
   users,
   watchProgress,
 } from "@/db/schema";
@@ -47,8 +47,8 @@ describe.skipIf(!testDbUrl)("Admin Integration Tests", () => {
 
     await db().execute(sql`
       DELETE FROM events WHERE (created_at AT TIME ZONE 'Asia/Tashkent')::date >= '2026-05-01'::date AND (created_at AT TIME ZONE 'Asia/Tashkent')::date <= '2026-05-10'::date;
+      DELETE FROM leads WHERE user_id IN (SELECT id FROM users WHERE (registered_at AT TIME ZONE 'Asia/Tashkent')::date >= '2026-05-01'::date AND (registered_at AT TIME ZONE 'Asia/Tashkent')::date <= '2026-05-10'::date);
       DELETE FROM watch_progress WHERE user_id IN (SELECT id FROM users WHERE (registered_at AT TIME ZONE 'Asia/Tashkent')::date >= '2026-05-01'::date AND (registered_at AT TIME ZONE 'Asia/Tashkent')::date <= '2026-05-10'::date);
-      DELETE FROM sheets_queue WHERE user_id IN (SELECT id FROM users WHERE (registered_at AT TIME ZONE 'Asia/Tashkent')::date >= '2026-05-01'::date AND (registered_at AT TIME ZONE 'Asia/Tashkent')::date <= '2026-05-10'::date);
       DELETE FROM users WHERE (registered_at AT TIME ZONE 'Asia/Tashkent')::date >= '2026-05-01'::date AND (registered_at AT TIME ZONE 'Asia/Tashkent')::date <= '2026-05-10'::date;
     `);
   });
@@ -282,10 +282,10 @@ describe.skipIf(!testDbUrl)("Admin Integration Tests", () => {
       { type: "registered", userId: u3.id, createdAt: dateMay07Noon },
     ]);
 
-    await db().insert(sheetsQueue).values([
-      { userId: u1.id, row: ["Ali"], attempts: 1, sentAt: null },
-      { userId: u2.id, row: ["Bobur"], attempts: 2, sentAt: null },
-      { userId: u3.id, row: ["Charos"], attempts: 11, sentAt: null, lastError: "Rate limit" },
+    await db().insert(leads).values([
+      { source: "bot", userId: u1.id, name: "Ali", phone: "", sheetsAttempts: 1 },
+      { source: "bot", userId: u2.id, name: "Bobur", phone: "", sheetsAttempts: 2 },
+      { source: "bot", userId: u3.id, name: "Charos", phone: "", sheetsAttempts: 11, sheetsError: "Rate limit" },
     ]);
 
     const statsRes = await app.request(`/admin/stats?from=${fromDate}&to=${toDate}`, {

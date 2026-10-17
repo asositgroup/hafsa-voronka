@@ -74,15 +74,6 @@ export const campaignLinks = pgTable("campaign_links", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const sheetsQueue = pgTable("sheets_queue", {
-  id: bigserial("id", { mode: "number" }).primaryKey(),
-  userId: bigint("user_id", { mode: "number" }).references(() => users.id),
-  row: jsonb("row").$type<unknown[]>().notNull(),
-  attempts: integer("attempts").default(0).notNull(),
-  sentAt: timestamp("sent_at", { withTimezone: true }),
-  lastError: text("last_error"),
-});
-
 export type User = typeof users.$inferSelect;
 
 export const leads = pgTable(
@@ -102,12 +93,16 @@ export const leads = pgTable(
     userAgent: text("user_agent"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     linkedAt: timestamp("linked_at", { withTimezone: true }),
+    formSubmittedAt: timestamp("form_submitted_at", { withTimezone: true }),
     notifyVersion: integer("notify_version").default(1).notNull(),
     notifiedVersion: integer("notified_version").default(0).notNull(),
     notifyMessageId: integer("notify_message_id"),
     notifyAttempts: integer("notify_attempts").default(0).notNull(),
     notifyError: text("notify_error"),
     completionNotified: boolean("completion_notified").default(false).notNull(),
+    sheetsSyncedVersion: integer("sheets_synced_version").default(0).notNull(),
+    sheetsAttempts: integer("sheets_attempts").default(0).notNull(),
+    sheetsError: text("sheets_error"),
     assigneeTelegramId: bigint("assignee_telegram_id", { mode: "number" }),
     assigneeName: text("assignee_name"),
     assigneeUsername: text("assignee_username"),

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { Lead } from "@/db/schema";
-import { renderCompletionReply, renderLeadCard, renderLeadKeyboard, type CardUser } from "./card";
+import {
+  renderCompletionReply,
+  renderLeadCard,
+  renderLeadKeyboard,
+  watchedPercent,
+  type CardUser,
+} from "./card";
 
 const webLead: Lead = {
   id: 1,
@@ -17,12 +23,16 @@ const webLead: Lead = {
   userAgent: null,
   createdAt: new Date("2026-10-12T09:32:00Z"),
   linkedAt: null,
+  formSubmittedAt: new Date("2026-10-12T09:32:00Z"),
   notifyVersion: 1,
   notifiedVersion: 0,
   notifyMessageId: null,
   notifyAttempts: 0,
   notifyError: null,
   completionNotified: false,
+  sheetsSyncedVersion: 0,
+  sheetsAttempts: 0,
+  sheetsError: null,
   assigneeTelegramId: null,
   assigneeName: null,
   assigneeUsername: null,
@@ -64,8 +74,14 @@ describe("renderLeadCard", () => {
         "📅 Sayt: 2026-10-12 14:32 (Toshkent)",
         "📅 Bot: 2026-10-12 14:35 (Toshkent)",
         "🎯 UTM: facebook / autumn_sale",
+        "▶️ Video: hali ko'rilmagan",
       ].join("\n"),
     );
+  });
+
+  it("shows partial watch progress as a bar", () => {
+    const card = renderLeadCard({ ...webLead, userId: 5 }, { ...user, watchedPercent: 52 });
+    expect(card).toContain("▶️ Video: ▓▓▓▓▓░░░░░ 52%");
   });
 
   it("shows the Telegram phone separately when it differs from the form", () => {
@@ -77,7 +93,7 @@ describe("renderLeadCard", () => {
 
   it("renders a bot-only lead and the finished-video line", () => {
     const card = renderLeadCard(
-      { ...webLead, source: "bot", utmSource: null, utmCampaign: null },
+      { ...webLead, source: "bot", formSubmittedAt: null, utmSource: null, utmCampaign: null },
       { ...user, completedAt: new Date() },
     );
     expect(card.split("\n")).toEqual([
@@ -100,6 +116,14 @@ describe("renderLeadCard", () => {
       null,
     );
     expect(card.split("\n").slice(-2)).toEqual(["👨‍💼 Mas'ul: Sardor (@sardor_s)", "🏁 Natija: ✅ Muvaffaqiyatli"]);
+  });
+});
+
+describe("watchedPercent", () => {
+  it("rounds and clamps to 0..100", () => {
+    expect(watchedPercent(150, 600)).toBe(25);
+    expect(watchedPercent(700, 600)).toBe(100);
+    expect(watchedPercent(10, 0)).toBe(0);
   });
 });
 

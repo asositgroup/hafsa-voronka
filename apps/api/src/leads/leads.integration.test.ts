@@ -116,6 +116,22 @@ describe.skipIf(!testDbUrl)("Landing leads", () => {
     expect(rows[0]).toMatchObject({ name: "Ali Valiyev", phone: secondPhone, notifyVersion: 2 });
   });
 
+  it("starts a new lead when the same browser sends a different phone after 30 minutes", async () => {
+    const vid = visitorId();
+    const firstPhone = randomPhone();
+    const secondPhone = randomPhone();
+    await post({ visitor_id: vid, name: "Ali", phone: firstPhone });
+    await db()
+      .update(leads)
+      .set({ formSubmittedAt: new Date(Date.now() - 31 * 60 * 1000) })
+      .where(eq(leads.visitorId, vid));
+
+    await post({ visitor_id: vid, name: "Ali", phone: secondPhone });
+
+    const phones = (await leadsFor(vid)).map((lead) => lead.phone).sort();
+    expect(phones).toEqual([firstPhone, secondPhone].sort());
+  });
+
   it("rate limits a single visitor", async () => {
     const vid = visitorId();
     const statuses: number[] = [];
@@ -132,6 +148,30 @@ describe.skipIf(!testDbUrl)("Landing leads", () => {
 
     const match = await service.findMatchingWebLead("other-device", phone);
     expect(match?.visitorId).toBe(vid);
+  });
+
+  it("merges a form filled after bot registration into the bot lead", async () => {
+    const telegramPhone = randomPhone();
+    const [user] = await db()
+      .insert(users)
+      .values({
+        telegramId: 7_000_000 + Math.floor(Math.random() * 100_000),
+        name: "Muhammad",
+        phone: telegramPhone,
+        phoneVerified: true,
+        registeredAt: new Date(),
+      })
+      .returning();
+    await service.attachLeadToUser(user);
+
+    await post({ visitor_id: visitorId(), name: "Muhammaddiyor Noryigitov", phone: telegramPhone });
+
+    const rows = await db().select().from(leads).where(eq(leads.userId, user.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ source: "bot", name: "Muhammaddiyor Noryigitov", notifyVersion: 2 });
+    expect(rows[0].formSubmittedAt).not.toBeNull();
+    const submitted = await db().select().from(events).where(eq(events.type, "lead_submitted"));
+    expect(submitted.some((e) => (e.meta as { leadId?: number })?.leadId === rows[0].id)).toBe(true);
   });
 
   it("sends one card, edits it on registration and replies on completion", async () => {
@@ -175,7 +215,7 @@ describe.skipIf(!testDbUrl)("Landing leads", () => {
 
     const completedAt = new Date();
     await db().update(users).set({ completedAt }).where(eq(users.id, user.id));
-    await service.markLeadCompleted(user.id);
+    await service.refreshUserLeadCards(user.id);
     const [done] = await leadsFor(vid);
     await notifier.syncLeadCard(done, { ...user, completedAt }, sender);
     const [after] = await leadsFor(vid);

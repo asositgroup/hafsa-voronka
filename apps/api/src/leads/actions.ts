@@ -1,12 +1,10 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { leads } from "@/db/schema";
 import { assigneeLabel, type LeadAction } from "./card";
-import { kickLeadNotifier } from "./notifier";
+import { bumpLeadVersion, kickLeadNotifier } from "./notifier";
 
 export type LeadActor = { id: number; name: string; username?: string };
-
-const bumpNotify = { notifyVersion: sql`${leads.notifyVersion} + 1`, notifyAttempts: 0 };
 
 export const leadActionReplies = {
   claimed: "Lid sizga biriktirildi",
@@ -41,13 +39,13 @@ export async function applyLeadAction(leadId: number, action: LeadAction, actor:
             assigneeName: actor.name.slice(0, 60),
             assigneeUsername: actor.username ?? null,
             assignedAt: now,
-            ...bumpNotify,
+            ...bumpLeadVersion,
           })
           .where(and(eq(leads.id, leadId), isNull(leads.assigneeTelegramId), isNull(leads.outcome)))
           .returning({ id: leads.id })
       : await db()
           .update(leads)
-          .set({ outcome: action, outcomeAt: now, ...bumpNotify })
+          .set({ outcome: action, outcomeAt: now, ...bumpLeadVersion })
           .where(
             and(eq(leads.id, leadId), isNull(leads.outcome), eq(leads.assigneeTelegramId, actor.id)),
           )

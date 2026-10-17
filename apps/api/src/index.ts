@@ -4,7 +4,6 @@ import { closeDb } from "@/db";
 import { runMigrations } from "@/db/migrate";
 import { loadEnv } from "@/env";
 import { startLeadNotifyLoop } from "@/leads/notifier";
-import { startSheetsRetryLoop } from "@/sheets";
 import { bot } from "@/telegram/bot";
 
 const env = loadEnv();
@@ -12,15 +11,13 @@ const env = loadEnv();
 await runMigrations(env.DATABASE_URL);
 await bot().init();
 
-const stopSheetsRetry = env.SHEETS_ENABLED ? startSheetsRetryLoop() : undefined;
-const stopLeadNotify = env.LEADS_CHAT_ID ? startLeadNotifyLoop() : undefined;
+const stopLeadNotify = env.LEADS_CHAT_ID || env.SHEETS_ENABLED ? startLeadNotifyLoop() : undefined;
 
 const server = serve({ fetch: createApp().fetch, port: env.PORT }, (info) => {
   console.log(`API listening on :${info.port} as @${bot().botInfo.username}`);
 });
 
 async function shutdown() {
-  stopSheetsRetry?.();
   stopLeadNotify?.();
   server.close();
   await closeDb();

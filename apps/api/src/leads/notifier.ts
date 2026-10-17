@@ -1,16 +1,29 @@
 import { and, asc, eq, gt, lt, sql } from "drizzle-orm";
 import { GrammyError, type InlineKeyboard } from "grammy";
 import { db, rawClient } from "@/db";
-import { type Lead, leads, users } from "@/db/schema";
+import { type Lead, leads, users, watchProgress } from "@/db/schema";
 import { env } from "@/env";
 import { bot } from "@/telegram/bot";
-import { type CardUser, renderCompletionReply, renderLeadCard, renderLeadKeyboard } from "./card";
+import {
+  type CardUser,
+  renderCompletionReply,
+  renderLeadCard,
+  renderLeadKeyboard,
+  watchedPercent,
+} from "./card";
+import { flushLeadSheet } from "./sheet";
 
 const NOTIFY_LOCK_KEY = 849204813;
 const RETRY_INTERVAL_MS = 60 * 1000;
 const MAX_ATTEMPTS = 10;
 const MAX_AGE_DAYS = 3;
 const BATCH_SIZE = 50;
+
+export const bumpLeadVersion = {
+  notifyVersion: sql`${leads.notifyVersion} + 1`,
+  notifyAttempts: 0,
+  sheetsAttempts: 0,
+};
 
 export type LeadSender = {
   send(text: string, options?: { replyTo?: number; keyboard?: InlineKeyboard }): Promise<number>;
@@ -95,9 +108,10 @@ export async function syncLeadCard(lead: Lead, user: CardUser | null, sender: Le
 
 async function flushPending(sender: LeadSender) {
   const pending = await db()
-    .select({ lead: leads, user: users })
+    .select({ lead: leads, user: users, maxPosition: watchProgress.maxPosition })
     .from(leads)
     .leftJoin(users, eq(users.id, leads.userId))
+    .leftJoin(watchProgress, eq(watchProgress.userId, leads.userId))
     .where(
       and(
         gt(leads.notifyVersion, leads.notifiedVersion),
@@ -108,9 +122,13 @@ async function flushPending(sender: LeadSender) {
     .orderBy(asc(leads.id))
     .limit(BATCH_SIZE);
 
-  for (const { lead, user } of pending) {
+  for (const { lead, user, maxPosition } of pending) {
     try {
-      await syncLeadCard(lead, user, sender);
+      const cardUser = user && {
+        ...user,
+        watchedPercent: watchedPercent(maxPosition ?? 0, env.VIDEO_DURATION_SEC),
+      };
+      await syncLeadCard(lead, cardUser, sender);
       await db()
         .update(leads)
         .set({ notifiedVersion: lead.notifyVersion, notifyError: null })
@@ -148,7 +166,7 @@ let running: Promise<void> | undefined;
 let rerun = false;
 
 export function kickLeadNotifier() {
-  if (!env.LEADS_CHAT_ID) return;
+  if (!env.LEADS_CHAT_ID && !env.SHEETS_ENABLED) return;
   if (running) {
     rerun = true;
     return;
@@ -157,6 +175,7 @@ export function kickLeadNotifier() {
     do {
       rerun = false;
       await flushLeadNotifications().catch((error) => console.error("Lead notifier error:", error));
+      await flushLeadSheet().catch((error) => console.error("Lead sheet error:", error));
     } while (rerun);
   })().finally(() => {
     running = undefined;

@@ -5,7 +5,20 @@ import { formatTashkentDate } from "@/sheets";
 export type CardUser = Pick<
   User,
   "telegramId" | "username" | "phone" | "phoneVerified" | "registeredAt" | "completedAt"
->;
+> & { watchedPercent?: number };
+
+const PROGRESS_CELLS = 10;
+
+export function watchedPercent(maxPosition: number, duration: number) {
+  if (duration <= 0) return 0;
+  return Math.max(0, Math.min(100, Math.round((maxPosition / duration) * 100)));
+}
+
+function progressLine(percent: number | undefined) {
+  if (!percent) return "▶️ Video: hali ko'rilmagan";
+  const filled = Math.round((percent / 100) * PROGRESS_CELLS);
+  return `▶️ Video: ${"▓".repeat(filled)}${"░".repeat(PROGRESS_CELLS - filled)} ${percent}%`;
+}
 
 function tashkent(date: Date) {
   return `${formatTashkentDate(date)} (Toshkent)`;
@@ -44,8 +57,8 @@ export function renderLeadCard(lead: Lead, user: CardUser | null | undefined): s
 
   if (registered) lines.push(telegramLine(registered));
 
-  if (lead.source === "web" && registered?.registeredAt) {
-    lines.push(`📅 Sayt: ${tashkent(lead.createdAt)}`);
+  if (lead.formSubmittedAt && registered?.registeredAt) {
+    lines.push(`📅 Sayt: ${tashkent(lead.formSubmittedAt)}`);
     lines.push(`📅 Bot: ${tashkent(registered.registeredAt)}`);
   } else {
     lines.push(`📅 ${tashkent(registered?.registeredAt ?? lead.createdAt)}`);
@@ -56,6 +69,7 @@ export function renderLeadCard(lead: Lead, user: CardUser | null | undefined): s
 
   if (lead.source === "web" && !registered) lines.push("🔗 Telegram: hali botga kirmagan");
   if (registered?.completedAt) lines.push("🎬 Videoni ko'rib bo'ldi");
+  else if (registered) lines.push(progressLine(registered.watchedPercent));
 
   if (lead.assigneeTelegramId !== null) lines.push(`👨‍💼 Mas'ul: ${assigneeLabel(lead)}`);
   if (lead.outcome) lines.push(`🏁 Natija: ${outcomeLabels[lead.outcome]}`);

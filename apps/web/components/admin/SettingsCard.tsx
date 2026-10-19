@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { LINK_TTL_HOURS_MAX, LINK_TTL_HOURS_MIN } from "@funnel/shared";
+import { Button } from "@/components/admin/ui/Button";
+import { Field, Input } from "@/components/admin/ui/Field";
+import { Notice } from "@/components/admin/ui/Notice";
+import { SaveStatus } from "@/components/admin/ui/SaveStatus";
+import { Section } from "@/components/admin/ui/Section";
 import { fetchSettings, saveSettings } from "@/lib/admin/settings";
 import { adminUz } from "@/lib/i18n/admin";
 
@@ -40,42 +45,42 @@ export function SettingsCard() {
   };
 
   return (
-    <section className="flex flex-col gap-3 rounded-[16px] bg-white p-5">
-      <h2 className="m-0 text-[15px] font-semibold text-siyoh">{copy.title}</h2>
+    <Section title={copy.title}>
+      <Field
+        label={copy.linkTtlLabel}
+        hint={`${copy.linkTtlRange} ${copy.linkTtlHint}`}
+        error={invalid ? copy.invalid : null}
+        suffix={copy.hoursSuffix}
+        className="sm:max-w-sm"
+      >
+        {({ id, describedBy, invalid: isInvalid }) => (
+          <Input
+            id={id}
+            aria-describedby={describedBy}
+            invalid={isInvalid}
+            type="number"
+            inputMode="numeric"
+            min={LINK_TTL_HOURS_MIN}
+            max={LINK_TTL_HOURS_MAX}
+            value={value}
+            disabled={!loaded || phase === "saving"}
+            onChange={(e) => {
+              setValue(e.target.value);
+              setInvalid(false);
+              setPhase("idle");
+            }}
+          />
+        )}
+      </Field>
 
-      <label className="flex flex-col gap-1.5 text-xs text-qalam">
-        {copy.linkTtlLabel}
-        <input
-          type="number"
-          inputMode="numeric"
-          min={LINK_TTL_HOURS_MIN}
-          max={LINK_TTL_HOURS_MAX}
-          value={value}
-          disabled={!loaded || phase === "saving"}
-          onChange={(e) => {
-            setValue(e.target.value);
-            setInvalid(false);
-            setPhase("idle");
-          }}
-          className="h-11 rounded-[10px] border border-chegara/60 bg-white px-3 text-sm text-siyoh outline-none focus:border-siyoh focus:ring-2 focus:ring-siyoh/15 disabled:opacity-60"
-        />
-      </label>
+      {phase === "error" && <Notice tone="danger">{copy.error}</Notice>}
 
-      <p className="m-0 text-xs text-qalam">{copy.linkTtlHint}</p>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          disabled={!loaded || phase === "saving"}
-          onClick={() => void save()}
-          className="h-11 flex-1 rounded-[10px] bg-siyoh px-4 text-sm font-semibold text-varaq transition-opacity disabled:opacity-40 sm:flex-none"
-        >
-          {phase === "saving" ? copy.saving : copy.save}
-        </button>
-        {invalid && <span className="text-xs text-anor">{copy.invalid}</span>}
-        {phase === "saved" && <span className="text-xs text-qalam">{copy.saved}</span>}
-        {phase === "error" && <span className="text-xs text-anor">{copy.error}</span>}
+      <div className="flex items-center justify-end gap-3">
+        <SaveStatus state={phase === "saved" ? "saved" : "idle"} />
+        <Button disabled={!loaded} loading={phase === "saving"} loadingLabel={copy.saving} onClick={() => void save()}>
+          {copy.save}
+        </Button>
       </div>
-    </section>
+    </Section>
   );
 }

@@ -1,27 +1,30 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { type AdminVideoItem, formatMmSs } from "@funnel/shared";
+import { AdminVideoPlayer, type VideoMarker } from "@/components/admin/AdminVideoPlayer";
 import { VideoMarksEditor } from "@/components/admin/VideoMarksEditor";
-import { uploadVideoFile } from "@/lib/admin/r2Upload";
+import { Badge } from "@/components/admin/ui/Badge";
+import { Button } from "@/components/admin/ui/Button";
+import { ConfirmDialog } from "@/components/admin/ui/Dialog";
+import { Notice } from "@/components/admin/ui/Notice";
+import { Card } from "@/components/admin/ui/Section";
 import {
   type VideosResult,
   activateVideo,
   archiveVideo,
   deleteVideo,
   unarchiveVideo,
-  updateVideo,
 } from "@/lib/admin/videos";
 import { adminUz } from "@/lib/i18n/admin";
 
 const copy = adminUz.videos.card;
 const errors = adminUz.videos.errors;
 
-type Busy = "activate" | "archive" | "delete" | "offer" | null;
+type Busy = "activate" | "archive" | "delete" | null;
 
 type VideoCardProps = {
   item: AdminVideoItem;
-  uploadsEnabled: boolean;
   onItems: (items: AdminVideoItem[], uploadsEnabled: boolean) => void;
 };
 
@@ -30,21 +33,52 @@ function failureMessage(result: Extract<VideosResult, { ok: false }>) {
   return errors[result.error as keyof typeof errors] ?? errors.generic;
 }
 
-export function VideoCard({ item, uploadsEnabled, onItems }: VideoCardProps) {
+function MarksTimeline({ item }: { item: AdminVideoItem }) {
+  const marks = [
+    { label: adminUz.videos.marks.introEnd, value: item.introEndSec },
+    { label: adminUz.videos.marks.courseStart, value: item.courseStartSec },
+    { label: adminUz.videos.marks.price, value: item.priceSec },
+    { label: adminUz.videos.marks.unlock, value: item.unlockSec },
+  ];
+
+  return (
+    <div role="img" aria-label={copy.timelineLabel} className="relative h-4">
+      <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-varaq" />
+      {marks.map(({ label, value }) =>
+        value === null || item.duration <= 0 ? null : (
+          <span
+            key={label}
+            title={`${label}: ${formatMmSs(value)}`}
+            className="absolute top-0 h-4 w-0.5 -translate-x-1/2 rounded-full bg-siyoh"
+            style={{ left: `${Math.min(100, (value / item.duration) * 100)}%` }}
+          />
+        ),
+      )}
+    </div>
+  );
+}
+
+export function VideoCard({ item, onItems }: VideoCardProps) {
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState<string | null>(null);
-  const [offerPercent, setOfferPercent] = useState(0);
   const [marksOpen, setMarksOpen] = useState(false);
-  const offerInput = useRef<HTMLInputElement>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const archived = item.archivedAt !== null;
   const needsPrice = item.priceSec === null;
+  const markers: VideoMarker[] = [
+    { sec: item.introEndSec, label: adminUz.videos.marks.introEnd },
+    { sec: item.courseStartSec, label: adminUz.videos.marks.courseStart },
+    { sec: item.priceSec, label: adminUz.videos.marks.price },
+    { sec: item.unlockSec, label: adminUz.videos.marks.unlock },
+  ].filter((marker): marker is VideoMarker => marker.sec !== null);
 
-  async function run(action: Exclude<Busy, "offer" | null>, request: () => Promise<VideosResult>) {
+  async function run(action: Exclude<Busy, null>, request: () => Promise<VideosResult>) {
     setBusy(action);
     setError(null);
     const result = await request();
     setBusy(null);
+    setConfirmOpen(false);
     if (!result.ok) {
       setError(failureMessage(result));
       return;
@@ -52,143 +86,73 @@ export function VideoCard({ item, uploadsEnabled, onItems }: VideoCardProps) {
     onItems(result.items, result.uploadsEnabled);
   }
 
-  function remove() {
-    if (!window.confirm(copy.confirmDelete.replace("{title}", item.title))) return;
-    void run("delete", () => deleteVideo(item.id));
-  }
-
-  async function uploadOffer(file: File) {
-    setBusy("offer");
-    setError(null);
-    setOfferPercent(0);
-    try {
-      const fileUrl = await uploadVideoFile(file, "offer", {
-        onProgress: (bytes) => setOfferPercent(Math.round((bytes / file.size) * 100)),
-      });
-      const result = await updateVideo(item.id, { shortOfferVideoUrl: fileUrl });
-      if (!result.ok) {
-        setError(failureMessage(result));
-        return;
-      }
-      onItems(result.items, result.uploadsEnabled);
-    } catch {
-      setError(errors.generic);
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  const buttonClass =
-    "min-h-11 rounded-[10px] border border-chegara/60 px-4 text-sm font-medium text-siyoh transition-colors hover:border-siyoh disabled:opacity-50";
-
   return (
-    <article className="flex flex-col gap-3 rounded-[16px] bg-white p-5">
+    <Card>
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="m-0 break-words text-[15px] font-semibold text-siyoh">{item.title}</h3>
-          <p className="m-0 mt-0.5 text-xs tabular-nums text-qalam">
-            {formatMmSs(item.duration)} · {item.userCount} {copy.users}
+          <p className="m-0 mt-0.5 text-[13px] tabular-nums text-qalam">
+            {formatMmSs(item.duration)}, {item.userCount} {copy.users}
           </p>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          {item.isActive && (
-            <span className="rounded-full bg-zumrad/15 px-2.5 py-1 text-[11px] font-semibold text-zumrad">
-              {copy.active}
-            </span>
-          )}
-          {archived && (
-            <span className="rounded-full bg-chiziq px-2.5 py-1 text-[11px] font-semibold text-qalam">
-              {copy.archived}
-            </span>
-          )}
+        <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+          {item.isActive && <Badge tone="success">{copy.active}</Badge>}
+          {archived && <Badge>{copy.archived}</Badge>}
+          {needsPrice && !archived && <Badge tone="attention">{copy.needsPriceBadge}</Badge>}
         </div>
       </header>
 
-      <div className="flex flex-col gap-2 text-xs text-qalam">
-        <span>{copy.offerVideo}</span>
-        {item.shortOfferVideoUrl && (
-          <video
-            src={item.shortOfferVideoUrl}
-            controls
-            playsInline
-            preload="metadata"
-            className="max-h-[200px] w-full rounded-[12px] bg-black"
-          />
-        )}
-        {uploadsEnabled && (
-          <>
-            <input
-              ref={offerInput}
-              type="file"
-              accept="video/mp4"
-              hidden
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                e.target.value = "";
-                if (file) void uploadOffer(file);
-              }}
-            />
-            <button
-              type="button"
-              disabled={busy !== null}
-              onClick={() => offerInput.current?.click()}
-              className={buttonClass}
-            >
-              {busy === "offer"
-                ? `${copy.offerUploading} ${offerPercent}%`
-                : item.shortOfferVideoUrl
-                  ? copy.replaceOffer
-                  : copy.addOffer}
-            </button>
-          </>
-        )}
-      </div>
+      <MarksTimeline item={item} />
 
-      {needsPrice && !item.isActive && !archived && <p className="m-0 text-xs text-qalam">{copy.needsPrice}</p>}
+      <AdminVideoPlayer src={item.fileUrl} markers={markers} />
 
-      {error && (
-        <p role="alert" className="m-0 text-xs text-anor">
-          {error}
-        </p>
-      )}
+      {needsPrice && !item.isActive && !archived && <p className="m-0 text-[13px] text-qalam">{copy.needsPrice}</p>}
+
+      {error && <Notice tone="danger" onDismiss={() => setError(null)}>{error}</Notice>}
 
       <footer className="flex flex-wrap items-center gap-2 border-t border-chiziq pt-3">
-        <button type="button" onClick={() => setMarksOpen((open) => !open)} className={buttonClass}>
-          {marksOpen ? copy.hideMarks : copy.marks}
-        </button>
+        <Button variant="secondary" onClick={() => setMarksOpen(true)}>
+          {copy.marks}
+        </Button>
         {!item.isActive && !archived && (
-          <button
-            type="button"
+          <Button
             disabled={needsPrice || busy !== null}
+            loading={busy === "activate"}
+            loadingLabel={copy.activating}
             onClick={() => void run("activate", () => activateVideo(item.id))}
-            className="min-h-11 rounded-[10px] bg-siyoh px-4 text-sm font-semibold text-varaq transition-opacity disabled:opacity-40"
           >
-            {busy === "activate" ? copy.activating : copy.activate}
-          </button>
+            {copy.activate}
+          </Button>
         )}
         {!item.isActive && (
-          <button
-            type="button"
-            disabled={busy !== null}
-            onClick={() => void run("archive", () => (archived ? unarchiveVideo(item.id) : archiveVideo(item.id)))}
-            className={buttonClass}
-          >
-            {archived ? copy.unarchive : copy.archive}
-          </button>
-        )}
-        {!item.isActive && (
-          <button
-            type="button"
-            disabled={busy !== null}
-            onClick={remove}
-            className="ml-auto min-h-11 rounded-[10px] px-3 text-sm font-medium text-qalam transition-colors hover:text-anor disabled:opacity-50"
-          >
-            {busy === "delete" ? copy.deleting : copy.delete}
-          </button>
+          <>
+            <span className="ml-auto" />
+            <Button
+              variant="ghost"
+              disabled={busy !== null}
+              loading={busy === "archive"}
+              onClick={() => void run("archive", () => (archived ? unarchiveVideo(item.id) : archiveVideo(item.id)))}
+            >
+              {archived ? copy.unarchive : copy.archive}
+            </Button>
+            <Button variant="dangerGhost" disabled={busy !== null} onClick={() => setConfirmOpen(true)}>
+              {copy.delete}
+            </Button>
+          </>
         )}
       </footer>
 
-      {marksOpen && <VideoMarksEditor item={item} onItems={onItems} />}
-    </article>
+      {marksOpen && <VideoMarksEditor item={item} onItems={onItems} onClose={() => setMarksOpen(false)} />}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title={copy.confirmDeleteTitle}
+        description={copy.confirmDelete.replace("{title}", item.title)}
+        confirmLabel={copy.delete}
+        busy={busy === "delete"}
+        onConfirm={() => void run("delete", () => deleteVideo(item.id))}
+        onCancel={() => setConfirmOpen(false)}
+      />
+    </Card>
   );
 }

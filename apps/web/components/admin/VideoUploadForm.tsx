@@ -2,6 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { type AdminVideoItem, VIDEO_MAX_BYTES } from "@funnel/shared";
+import { Button } from "@/components/admin/ui/Button";
+import { Field, Input } from "@/components/admin/ui/Field";
+import { Notice } from "@/components/admin/ui/Notice";
+import { ProgressBar } from "@/components/admin/ui/ProgressBar";
+import { Section } from "@/components/admin/ui/Section";
 import { uploadVideoFile } from "@/lib/admin/r2Upload";
 import { readVideoDuration } from "@/lib/admin/videoDuration";
 import { createVideo } from "@/lib/admin/videos";
@@ -94,92 +99,61 @@ export function VideoUploadForm({ onItems }: VideoUploadFormProps) {
   const percent = file ? Math.min(100, Math.round((uploaded / file.size) * 100)) : 0;
 
   return (
-    <section className="flex flex-col gap-3 rounded-[16px] bg-white p-5">
-      <h2 className="m-0 text-[15px] font-semibold text-siyoh">{copy.title}</h2>
+    <Section title={copy.title}>
+      <Field label={copy.titleLabel}>
+        {({ id }) => <Input id={id} value={title} maxLength={120} disabled={busy} onChange={(e) => setTitle(e.target.value)} />}
+      </Field>
 
-      <label className="flex flex-col gap-1.5 text-xs text-qalam">
-        {copy.titleLabel}
-        <input
-          value={title}
-          maxLength={120}
-          disabled={busy}
-          onChange={(e) => setTitle(e.target.value)}
-          className="h-11 rounded-[10px] border border-chegara/60 bg-white px-3 text-sm text-siyoh outline-none focus:border-siyoh focus:ring-2 focus:ring-siyoh/15 disabled:opacity-60"
-        />
-      </label>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <input
-          ref={fileInput}
-          type="file"
-          accept="video/mp4"
-          hidden
-          onChange={(e) => {
-            pick(e.target.files?.[0]);
-            e.target.value = "";
-          }}
-        />
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => fileInput.current?.click()}
-          className="h-11 rounded-[10px] border border-chegara/60 px-4 text-sm font-medium text-siyoh transition-colors hover:border-siyoh disabled:opacity-50"
-        >
-          {copy.pick}
-        </button>
-        <span className="min-w-0 truncate text-xs text-qalam">
-          {file ? `${file.name} · ${Math.round(file.size / MB)} MB` : copy.fileLabel}
-        </span>
+      <div className="flex flex-col gap-2">
+        <span className="text-sm font-medium text-siyoh">{copy.fileLabel}</span>
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            ref={fileInput}
+            type="file"
+            accept="video/mp4"
+            hidden
+            onChange={(e) => {
+              pick(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+          <Button variant="secondary" disabled={busy} onClick={() => fileInput.current?.click()}>
+            {copy.pick}
+          </Button>
+          {file && (
+            <span className="min-w-0 truncate text-[13px] text-qalam">
+              {file.name}, {Math.round(file.size / MB)} MB
+            </span>
+          )}
+        </div>
+        <p className="m-0 text-[13px] text-qalam">{copy.faststartHint}</p>
       </div>
 
-      <p className="m-0 text-xs text-qalam">{copy.faststartHint}</p>
-
-      {phase === "reading" && <p className="m-0 text-xs text-qalam">{copy.readingDuration}</p>}
-      {phase === "saving" && <p className="m-0 text-xs text-qalam">{copy.saving}</p>}
+      {phase === "reading" && <p className="m-0 text-[13px] text-qalam">{copy.readingDuration}</p>}
+      {phase === "saving" && <p className="m-0 text-[13px] text-qalam">{copy.saving}</p>}
 
       {phase === "uploading" && file && (
         <div className="flex flex-col gap-2">
-          <div
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={percent}
-            className="h-2 overflow-hidden rounded-full bg-varaq"
-          >
-            <div className="h-full bg-zumrad transition-[width]" style={{ width: `${percent}%` }} />
-          </div>
-          <p className="m-0 text-xs tabular-nums text-qalam">
-            {copy.uploading}: {percent}% · {Math.round(uploaded / MB)} / {Math.round(file.size / MB)} MB
+          <ProgressBar value={percent} label={copy.uploading} />
+          <p className="m-0 text-[13px] tabular-nums text-qalam">
+            {copy.uploading}: {percent}%, {Math.round(uploaded / MB)} / {Math.round(file.size / MB)} MB
           </p>
-          <p className="m-0 rounded-[10px] bg-oltin/20 px-3 py-2 text-xs font-medium text-siyoh">{copy.keepOpen}</p>
+          <Notice tone="attention">{copy.keepOpen}</Notice>
         </div>
       )}
 
-      {error && (
-        <p role="alert" className="m-0 text-xs text-anor">
-          {error}
-        </p>
-      )}
+      {error && <Notice tone="danger">{error}</Notice>}
 
-      <div className="flex gap-2">
-        <button
-          type="button"
-          disabled={busy || !file || !title.trim()}
-          onClick={() => void submit()}
-          className="h-11 flex-1 rounded-[10px] bg-siyoh px-4 text-sm font-semibold text-varaq transition-opacity disabled:opacity-40 sm:flex-none"
-        >
-          {copy.submit}
-        </button>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         {phase === "uploading" && (
-          <button
-            type="button"
-            onClick={() => abort.current?.abort()}
-            className="h-11 rounded-[10px] px-4 text-sm font-medium text-qalam transition-colors hover:text-anor"
-          >
+          <Button variant="ghost" onClick={() => abort.current?.abort()}>
             {copy.cancel}
-          </button>
+          </Button>
         )}
+        <Button disabled={!file || !title.trim()} loading={busy} onClick={() => void submit()}>
+          {copy.submit}
+        </Button>
       </div>
-    </section>
+    </Section>
   );
 }

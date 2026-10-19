@@ -18,3 +18,14 @@ export function formatDate(dateStr: string): string {
   const [y, m, d] = dateStr.split("-");
   return `${d}.${m}.${y}`;
 }
+
+export type Preset = "today" | "7d" | "30d";
+
+export const PRESET_DAYS: Record<Preset, number> = { today: 0, "7d": 6, "30d": 29 };
+
+export function activePreset(from: string, to: string): Preset | null {
+  const today = getTashkentToday();
+  if (to !== today) return null;
+  const match = (Object.keys(PRESET_DAYS) as Preset[]).find((preset) => addDays(today, -PRESET_DAYS[preset]) === from);
+  return match ?? null;
+}

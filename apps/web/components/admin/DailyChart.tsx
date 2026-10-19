@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import type { DailyStat } from "@funnel/shared";
+import { Section } from "@/components/admin/ui/Section";
 import { useMounted } from "@/lib/admin/useMounted";
 import { adminUz } from "@/lib/i18n/admin";
 
@@ -23,10 +24,7 @@ export function DailyChart({ daily }: { daily: DailyStat[] }) {
   }));
 
   return (
-    <div className="bg-white rounded-[16px] p-5 sm:p-6 flex flex-col gap-4">
-      <h2 className="text-[18px] font-semibold text-siyoh m-0">
-        {adminUz.daily.title}
-      </h2>
+    <Section title={adminUz.daily.title}>
 
       <div className="h-72 sm:h-80 w-full">
         {mounted ? (
@@ -43,12 +41,12 @@ export function DailyChart({ daily }: { daily: DailyStat[] }) {
               <XAxis
                 dataKey="displayDate"
                 stroke="var(--color-qalam)"
-                fontSize={11}
+                fontSize={12}
                 tickLine={false}
               />
               <YAxis
                 stroke="var(--color-qalam)"
-                fontSize={11}
+                fontSize={12}
                 tickLine={false}
                 allowDecimals={false}
               />
@@ -57,7 +55,7 @@ export function DailyChart({ daily }: { daily: DailyStat[] }) {
                   if (!active || !payload?.length) return null;
                   const item = payload[0].payload as DailyStat;
                   return (
-                    <div className="rounded-[10px] border border-chiziq bg-white px-3 py-2 text-xs text-siyoh">
+                    <div className="rounded-[10px] border border-chiziq bg-white px-3 py-2 text-[13px] text-siyoh">
                       <div className="font-semibold text-siyoh mb-1">{item.date}</div>
                       <div className="flex items-center gap-2 text-siyoh">
                         <span className="h-2 w-2 rounded-full bg-siyoh" />
@@ -110,6 +108,6 @@ export function DailyChart({ daily }: { daily: DailyStat[] }) {
           </div>
         )}
       </div>
-    </div>
+    </Section>
   );
 }

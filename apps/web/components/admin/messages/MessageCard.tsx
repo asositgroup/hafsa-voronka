@@ -3,7 +3,10 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { type MessageTemplate, renderPlainText, SAMPLE_CONTEXT, variableValues } from "@funnel/shared";
+import { Badge } from "@/components/admin/ui/Badge";
+import { Switch } from "@/components/admin/ui/Switch";
 import { timingLabel } from "@/components/admin/messages/TimingPicker";
+import { GripIcon } from "@/components/icons";
 import { adminUz } from "@/lib/i18n/admin";
 
 const copy = adminUz.messages;
@@ -29,9 +32,7 @@ export function MessageCard({ item, onEdit, onToggle }: MessageCardProps) {
     <article
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`flex items-stretch gap-2 rounded-[14px] bg-white p-3 ${isDragging ? "z-10 opacity-80 shadow-lg" : ""} ${
-        item.isActive ? "" : "opacity-60"
-      }`}
+      className={`flex items-center gap-1 rounded-[16px] bg-white p-2 sm:p-3 ${isDragging ? "z-10 shadow-lg" : ""}`}
     >
       <button
         type="button"
@@ -39,45 +40,33 @@ export function MessageCard({ item, onEdit, onToggle }: MessageCardProps) {
         aria-label={copy.dragHandle}
         {...attributes}
         {...listeners}
-        className="flex w-8 shrink-0 cursor-grab touch-none items-center justify-center rounded-[8px] text-qalam hover:bg-varaq active:cursor-grabbing"
+        className="flex h-11 w-9 shrink-0 cursor-grab touch-none items-center justify-center self-start rounded-[10px] text-qalam hover:bg-varaq focus-visible:outline-2 focus-visible:outline-siyoh active:cursor-grabbing"
       >
-        <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5" fill="currentColor">
-          <circle cx="9" cy="6" r="1.6" />
-          <circle cx="15" cy="6" r="1.6" />
-          <circle cx="9" cy="12" r="1.6" />
-          <circle cx="15" cy="12" r="1.6" />
-          <circle cx="9" cy="18" r="1.6" />
-          <circle cx="15" cy="18" r="1.6" />
-        </svg>
-      </button>
-
-      <button type="button" onClick={onEdit} aria-label={copy.edit} className="flex min-w-0 flex-1 flex-col gap-1.5 text-left">
-        <p className="m-0 line-clamp-2 text-sm text-siyoh">{plainPreview(item.text)}</p>
-        <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold">
-          <span className="rounded-full bg-varaq px-2 py-0.5 text-siyoh">
-            {copy.timing[item.timing.type].replace("{time}", timingLabel(item.timing))}
-          </span>
-          {item.media && (
-            <span className="rounded-full bg-oltin/20 px-2 py-0.5 text-siyoh">{copy.mediaBadge[item.media.type]}</span>
-          )}
-          {item.buttons.length > 0 && (
-            <span className="rounded-full bg-varaq px-2 py-0.5 text-qalam">{item.buttons.length}</span>
-          )}
-        </div>
+        <GripIcon className="h-5 w-5" />
       </button>
 
       <button
         type="button"
-        role="switch"
-        aria-checked={item.isActive}
-        aria-label={item.isActive ? copy.active : copy.inactive}
-        onClick={() => onToggle(!item.isActive)}
-        className={`relative h-6 w-11 shrink-0 self-center rounded-full transition-colors ${item.isActive ? "bg-zumrad" : "bg-chegara"}`}
+        onClick={onEdit}
+        aria-label={copy.edit}
+        className="flex min-w-0 flex-1 flex-col gap-1.5 rounded-[10px] py-1 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-siyoh"
       >
-        <span
-          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${item.isActive ? "left-[22px]" : "left-0.5"}`}
-        />
+        <span className="flex flex-wrap items-center gap-2">
+          <span className={`text-[13px] font-semibold ${item.isActive ? "text-siyoh" : "text-qalam"}`}>
+            {copy.timing[item.timing.type].replace("{time}", timingLabel(item.timing))}
+          </span>
+          {!item.isActive && <Badge>{copy.inactive}</Badge>}
+        </span>
+        <span className={`line-clamp-2 text-sm ${item.isActive ? "text-siyoh" : "text-qalam"}`}>{plainPreview(item.text)}</span>
+        {(item.media || item.buttons.length > 0) && (
+          <span className="flex flex-wrap items-center gap-1.5">
+            {item.media && <Badge>{copy.mediaBadge[item.media.type]}</Badge>}
+            {item.buttons.length > 0 && <Badge>{copy.buttonsCount.replace("{n}", String(item.buttons.length))}</Badge>}
+          </span>
+        )}
       </button>
+
+      <Switch checked={item.isActive} onChange={onToggle} label={item.isActive ? copy.active : copy.inactive} />
     </article>
   );
 }

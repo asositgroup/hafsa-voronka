@@ -55,8 +55,8 @@ export function MessagePreview({ text, buttons }: MessagePreviewProps) {
   const sanitized = sanitizeTelegramHtml(text);
 
   return (
-    <div className="flex flex-col gap-2 rounded-[14px] bg-varaq p-3">
-      <div className="max-w-[340px] whitespace-pre-wrap break-words rounded-[14px] rounded-bl-[4px] bg-white px-3 py-2 text-sm leading-[1.45] text-siyoh">
+    <div className="flex flex-col gap-2 rounded-[12px] bg-varaq p-3">
+      <div className="max-w-[340px] whitespace-pre-wrap break-words rounded-[12px] rounded-bl-[4px] bg-white px-3 py-2 text-sm leading-[1.45] text-siyoh">
         {sanitized.ok && text.trim() ? buildNodes(sanitized.tokens) : <span className="text-qalam">{copy.previewEmpty}</span>}
       </div>
       {buttons.length > 0 && (

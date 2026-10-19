@@ -5,19 +5,12 @@ type Props = {
   base: number;
 };
 
-export function ReportMetricCell({ count, base }: Props) {
-  const percent = reportPercent(count, base);
-
+export function MetricValue({ count, base }: Props) {
+  if (count === null) return <span className="text-qalam">—</span>;
   return (
-    <td className="px-3 py-2.5 text-right tabular-nums whitespace-nowrap">
-      {count === null ? (
-        <span className="text-qalam">—</span>
-      ) : (
-        <>
-          <span className="block font-semibold text-siyoh">{count}</span>
-          <span className="block text-[12px] text-qalam">{percent}%</span>
-        </>
-      )}
-    </td>
+    <>
+      <span className="block font-semibold text-siyoh">{count}</span>
+      <span className="block text-xs font-normal text-qalam">{reportPercent(count, base)}%</span>
+    </>
   );
 }

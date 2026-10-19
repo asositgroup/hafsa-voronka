@@ -7,12 +7,12 @@ import {
   type TemplateButtonKind,
   templateButtonKinds,
 } from "@funnel/shared";
+import { Button } from "@/components/admin/ui/Button";
+import { Field, Input, Select } from "@/components/admin/ui/Field";
+import { PlusIcon } from "@/components/icons";
 import { adminUz } from "@/lib/i18n/admin";
 
 const copy = adminUz.messages.editor;
-
-const fieldClass =
-  "h-10 min-w-0 rounded-[10px] border border-chegara/60 bg-white px-3 text-sm text-siyoh outline-none focus:border-siyoh";
 
 function presetText(kind: TemplateButtonKind) {
   return kind in buttonPresets ? buttonPresets[kind as keyof typeof buttonPresets] : "";
@@ -43,69 +43,65 @@ export function ButtonsEditor({ buttons, onChange, prefillSupported }: ButtonsEd
   return (
     <div className="flex flex-col gap-3">
       {buttons.map((button, index) => (
-        <div key={index} className="flex flex-col gap-2 rounded-[12px] border border-chiziq p-3">
-          <div className="flex gap-2">
-            <select
-              value={button.kind}
-              onChange={(e) => update(index, convert(button, e.target.value as TemplateButtonKind))}
-              aria-label={copy.buttonsTitle}
-              className={`${fieldClass} w-44 shrink-0`}
-            >
-              {templateButtonKinds.map((kind) => (
-                <option key={kind} value={kind}>
-                  {copy.buttonKinds[kind]}
-                </option>
-              ))}
-            </select>
-            <input
-              value={button.text}
-              maxLength={64}
-              onChange={(e) => update(index, { ...button, text: e.target.value })}
-              placeholder={copy.buttonText}
-              aria-label={copy.buttonText}
-              className={`${fieldClass} flex-1`}
-            />
+        <div key={index} className="flex flex-col gap-3 rounded-[12px] bg-varaq p-3">
+          <div className="grid gap-3 sm:grid-cols-[11rem_1fr]">
+            <Field label={copy.buttonKind}>
+              {({ id }) => (
+                <Select id={id} value={button.kind} onChange={(e) => update(index, convert(button, e.target.value as TemplateButtonKind))}>
+                  {templateButtonKinds.map((kind) => (
+                    <option key={kind} value={kind}>
+                      {copy.buttonKinds[kind]}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+            <Field label={copy.buttonText}>
+              {({ id }) => (
+                <Input id={id} value={button.text} maxLength={64} onChange={(e) => update(index, { ...button, text: e.target.value })} />
+              )}
+            </Field>
           </div>
           {button.kind === "link" && (
-            <input
-              value={button.url}
-              onChange={(e) => update(index, { ...button, url: e.target.value })}
-              placeholder={copy.buttonUrl}
-              inputMode="url"
-              aria-label={copy.buttonUrl}
-              className={fieldClass}
-            />
+            <Field label={copy.buttonUrlLabel}>
+              {({ id }) => (
+                <Input
+                  id={id}
+                  value={button.url}
+                  inputMode="url"
+                  placeholder={copy.buttonUrl}
+                  onChange={(e) => update(index, { ...button, url: e.target.value })}
+                />
+              )}
+            </Field>
           )}
           {button.kind === "admin" && (
-            <input
-              value={button.prefill ?? ""}
-              maxLength={200}
-              onChange={(e) => update(index, { ...button, prefill: e.target.value })}
-              placeholder={copy.buttonPrefill}
-              aria-label={copy.buttonPrefill}
-              className={fieldClass}
-            />
+            <Field label={copy.buttonPrefill}>
+              {({ id }) => (
+                <Input id={id} value={button.prefill ?? ""} maxLength={200} onChange={(e) => update(index, { ...button, prefill: e.target.value })} />
+              )}
+            </Field>
           )}
-          <button
-            type="button"
-            onClick={() => onChange(buttons.filter((_, i) => i !== index))}
-            className="self-end text-xs font-medium text-qalam transition-colors hover:text-anor"
-          >
-            {copy.removeButton}
-          </button>
+          <div className="flex justify-end">
+            <Button variant="dangerGhost" onClick={() => onChange(buttons.filter((_, i) => i !== index))}>
+              {copy.removeButton}
+            </Button>
+          </div>
         </div>
       ))}
 
-      {hasPrefill && !prefillSupported && <p className="m-0 text-xs text-anor">{copy.prefillUnsupported}</p>}
+      {hasPrefill && !prefillSupported && <p className="m-0 text-[13px] text-anor">{copy.prefillUnsupported}</p>}
 
       {buttons.length < MAX_TEMPLATE_BUTTONS && (
-        <button
-          type="button"
-          onClick={() => onChange([...buttons, { kind: "resume", text: buttonPresets.resume }])}
-          className="h-9 self-start rounded-[9px] border border-chegara/60 px-3 text-[13px] font-medium text-siyoh transition-colors hover:border-siyoh"
-        >
-          {copy.addButton}
-        </button>
+        <div>
+          <Button
+            variant="secondary"
+            icon={<PlusIcon className="h-4 w-4" />}
+            onClick={() => onChange([...buttons, { kind: "resume", text: buttonPresets.resume }])}
+          >
+            {copy.addButton}
+          </Button>
+        </div>
       )}
     </div>
   );

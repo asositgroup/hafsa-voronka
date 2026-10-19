@@ -1,7 +1,8 @@
 "use client";
 
 import { useId, useState } from "react";
-import { ArrowRightIcon, FunnelIcon } from "@/components/icons";
+import { ArrowRightIcon } from "@/components/icons";
+import { Section } from "@/components/admin/ui/Section";
 import { adminUz } from "@/lib/i18n/admin";
 
 export type FlowStage = {
@@ -65,16 +66,7 @@ export function FlowFunnel({ title, subtitle, stages }: FlowFunnelProps) {
   const path = bandPath(stages.map((stage) => bandHeight(stage.count, max)));
 
   return (
-    <section className="bg-white rounded-[16px] p-5 sm:p-6 flex flex-col gap-5">
-      <header className="flex items-center gap-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-varaq text-zumrad">
-          <FunnelIcon className="h-[18px] w-[18px]" />
-        </span>
-        <div className="min-w-0">
-          <h2 className="m-0 text-[16px] font-semibold text-siyoh">{title}</h2>
-          {subtitle && <p className="m-0 text-xs text-qalam">{subtitle}</p>}
-        </div>
-      </header>
+    <Section title={title} description={subtitle}>
 
       <div className="overflow-x-auto">
         <div
@@ -131,7 +123,7 @@ export function FlowFunnel({ title, subtitle, stages }: FlowFunnelProps) {
               <span
                 key={stage.key}
                 aria-hidden="true"
-                className="pointer-events-none absolute top-1/2 z-[1] flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-siyoh tabular-nums shadow-[0_1px_4px_rgba(18,59,51,.18)]"
+                className="pointer-events-none absolute top-1/2 z-[1] flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-siyoh tabular-nums shadow-[0_1px_4px_rgba(18,59,51,.18)]"
                 style={{ left: `${((index + 1) / stages.length) * 100}%` }}
               >
                 {percentOf(stage.count, stages[index].count)}
@@ -157,7 +149,7 @@ export function FlowFunnel({ title, subtitle, stages }: FlowFunnelProps) {
               <div
                 key={stage.key}
                 tabIndex={0}
-                className="relative outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-siyoh/40 rounded-[6px]"
+                className="relative outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-siyoh/40 rounded-[10px]"
                 onMouseEnter={() => setActive(i)}
                 onFocus={() => setActive(i)}
                 onBlur={() => setActive(null)}
@@ -208,6 +200,6 @@ export function FlowFunnel({ title, subtitle, stages }: FlowFunnelProps) {
           ))}
         </tbody>
       </table>
-    </section>
+    </Section>
   );
 }

@@ -2,7 +2,7 @@ type IconProps = {
   className?: string;
 };
 
-function StrokeIcon({ className = "", children }: IconProps & { children: React.ReactNode }) {
+function StrokeIcon({ className = "", strokeWidth = 2, children }: IconProps & { strokeWidth?: number; children: React.ReactNode }) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -10,7 +10,7 @@ function StrokeIcon({ className = "", children }: IconProps & { children: React.
       focusable="false"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2"
+      strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
       className={`shrink-0 ${className}`}
@@ -98,6 +98,97 @@ export function SpinnerIcon({ className = "" }: IconProps) {
   return (
     <StrokeIcon className={`animate-spin motion-reduce:animate-none ${className}`}>
       <path d="M21 12a9 9 0 1 1-6.22-8.56" />
+    </StrokeIcon>
+  );
+}
+
+export function ChartIcon({ className }: IconProps) {
+  return (
+    <StrokeIcon className={className} strokeWidth={1.8}>
+      <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+    </StrokeIcon>
+  );
+}
+
+export function TableIcon({ className }: IconProps) {
+  return (
+    <StrokeIcon className={className} strokeWidth={1.8}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M3 10h18M9 10v10" />
+    </StrokeIcon>
+  );
+}
+
+export function ChatIcon({ className }: IconProps) {
+  return (
+    <StrokeIcon className={className} strokeWidth={1.8}>
+      <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z" />
+    </StrokeIcon>
+  );
+}
+
+export function PlayIcon({ className }: IconProps) {
+  return (
+    <StrokeIcon className={className} strokeWidth={1.8}>
+      <rect x="3" y="5" width="18" height="14" rx="3" />
+      <path d="m10 9.5 4.5 2.5-4.5 2.5Z" />
+    </StrokeIcon>
+  );
+}
+
+export function MoreIcon({ className }: IconProps) {
+  return (
+    <StrokeIcon className={className} strokeWidth={1.8}>
+      <circle cx="5" cy="12" r="1" />
+      <circle cx="12" cy="12" r="1" />
+      <circle cx="19" cy="12" r="1" />
+    </StrokeIcon>
+  );
+}
+
+export function TextIcon({ className }: IconProps) {
+  return (
+    <StrokeIcon className={className} strokeWidth={1.8}>
+      <path d="M4 6h16M4 12h10M4 18h14" />
+    </StrokeIcon>
+  );
+}
+
+export function SettingsIcon({ className }: IconProps) {
+  return (
+    <StrokeIcon className={className} strokeWidth={1.8}>
+      <path d="M4 7h10M18 7h2M4 17h2M10 17h10" />
+      <circle cx="16" cy="7" r="2" />
+      <circle cx="8" cy="17" r="2" />
+    </StrokeIcon>
+  );
+}
+
+export function PlusIcon({ className }: IconProps) {
+  return (
+    <StrokeIcon className={className} strokeWidth={1.8}>
+      <path d="M12 5v14M5 12h14" />
+    </StrokeIcon>
+  );
+}
+
+export function GripIcon({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="currentColor" className={`shrink-0 ${className}`}>
+      <circle cx="9" cy="6" r="1.6" />
+      <circle cx="15" cy="6" r="1.6" />
+      <circle cx="9" cy="12" r="1.6" />
+      <circle cx="15" cy="12" r="1.6" />
+      <circle cx="9" cy="18" r="1.6" />
+      <circle cx="15" cy="18" r="1.6" />
+    </svg>
+  );
+}
+
+export function ChevronDownIcon({ className }: IconProps) {
+  return (
+    <StrokeIcon className={className} strokeWidth={1.8}>
+      <path d="m6 9 6 6 6-6" />
     </StrokeIcon>
   );
 }

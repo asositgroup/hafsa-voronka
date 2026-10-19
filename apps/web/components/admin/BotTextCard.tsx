@@ -16,6 +16,12 @@ import {
   saveBotText,
   uploadBotMedia,
 } from "@/lib/admin/botTexts";
+import { Badge } from "@/components/admin/ui/Badge";
+import { Button } from "@/components/admin/ui/Button";
+import { ConfirmDialog } from "@/components/admin/ui/Dialog";
+import { Field, Input, Textarea } from "@/components/admin/ui/Field";
+import { SaveStatus } from "@/components/admin/ui/SaveStatus";
+import { Card } from "@/components/admin/ui/Section";
 import { adminUz } from "@/lib/i18n/admin";
 
 const copy = adminUz.botTexts;
@@ -41,6 +47,7 @@ export function BotTextCard({ item, mediaEnabled, onItems }: BotTextCardProps) {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [previewFailed, setPreviewFailed] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const isButton = item.kind === "button";
@@ -69,32 +76,33 @@ export function BotTextCard({ item, mediaEnabled, onItems }: BotTextCardProps) {
   const save = () =>
     run("save", () => saveBotText(item.key, draft), () => setSaved(true));
 
-  const reset = () =>
-    run("reset", () => resetBotText(item.key), () => setDraft(item.defaultText));
+  const reset = async () => {
+    await run("reset", () => resetBotText(item.key), () => setDraft(item.defaultText));
+    setResetOpen(false);
+  };
 
   const upload = (file: File) => {
     setPreviewFailed(false);
     void run("upload", () => uploadBotMedia(item.key, file));
   };
 
+  const fieldError = error ?? (dirty && validation ? errorMessage(item, validation ?? undefined) : null);
+  const status = dirty ? "dirty" : saved ? "saved" : "idle";
+
   return (
-    <article className="flex flex-col gap-3 rounded-[16px] bg-white p-5">
+    <Card>
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="m-0 text-[15px] font-semibold text-siyoh">{label}</h3>
-          <p className="m-0 mt-0.5 text-xs text-qalam">{when}</p>
+          <p className="m-0 mt-0.5 text-[13px] text-qalam">{when}</p>
         </div>
-        {edited && (
-          <span className="shrink-0 rounded-full bg-oltin/20 px-2.5 py-1 text-[11px] font-semibold text-siyoh">
-            {copy.edited}
-          </span>
-        )}
+        {edited && <Badge tone="attention">{copy.edited}</Badge>}
       </header>
 
       {hasMedia && (
         <div className="relative overflow-hidden rounded-[12px] bg-varaq">
           {previewFailed ? (
-            <p className="m-0 p-4 text-xs text-qalam">{copy.mediaPreviewUnavailable}</p>
+            <p className="m-0 p-4 text-[13px] text-qalam">{copy.mediaPreviewUnavailable}</p>
           ) : item.media?.type === "photo" ? (
             <Image
               src={botMediaUrl(item)}
@@ -117,41 +125,32 @@ export function BotTextCard({ item, mediaEnabled, onItems }: BotTextCardProps) {
         </div>
       )}
 
-      {isButton ? (
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          aria-label={label}
-          aria-invalid={validation !== null}
-          className="h-11 rounded-[10px] border border-chegara/60 bg-white px-3 text-sm text-siyoh outline-none focus:border-siyoh focus:ring-2 focus:ring-siyoh/15"
-        />
-      ) : (
-        <textarea
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          rows={Math.min(8, Math.max(3, draft.split("\n").length + 1))}
-          aria-label={label}
-          aria-invalid={validation !== null}
-          className="resize-y rounded-[10px] border border-chegara/60 bg-white px-3 py-2.5 text-sm leading-[1.5] text-siyoh outline-none focus:border-siyoh focus:ring-2 focus:ring-siyoh/15"
-        />
-      )}
+      <Field
+        label={label}
+        hideLabel
+        hint={item.placeholders.includes("name") ? copy.placeholderName : undefined}
+        error={fieldError}
+        counter={<span className={length > limit ? "text-anor" : ""}>{length} / {limit}</span>}
+      >
+        {({ id, describedBy, invalid }) =>
+          isButton ? (
+            <Input id={id} aria-describedby={describedBy} invalid={invalid || validation !== null} value={draft} onChange={(e) => setDraft(e.target.value)} />
+          ) : (
+            <Textarea
+              id={id}
+              aria-describedby={describedBy}
+              invalid={invalid || validation !== null}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              rows={Math.min(8, Math.max(3, draft.split("\n").length + 1))}
+            />
+          )
+        }
+      </Field>
 
-      <div className="flex items-center justify-between gap-3 text-xs">
-        <span className="text-qalam">{item.placeholders.includes("name") ? copy.placeholderName : ""}</span>
-        <span className={`tabular-nums ${length > limit ? "text-anor" : "text-qalam"}`}>
-          {length} / {limit}
-        </span>
-      </div>
-
-      {(error || (dirty && validation)) && (
-        <p role="alert" className="m-0 text-xs text-anor">
-          {error ?? errorMessage(item, validation ?? undefined)}
-        </p>
-      )}
-
-      <footer className="flex flex-wrap items-center gap-2 border-t border-chiziq pt-3">
-        {!isButton && mediaEnabled && (
-          <>
+      {!isButton && mediaEnabled && (
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <input
               ref={fileInput}
               type="file"
@@ -163,50 +162,51 @@ export function BotTextCard({ item, mediaEnabled, onItems }: BotTextCardProps) {
                 if (file) upload(file);
               }}
             />
-            <button
-              type="button"
+            <Button
+              variant="secondary"
               disabled={busy !== null}
+              loading={busy === "upload"}
+              loadingLabel={copy.uploading}
               onClick={() => fileInput.current?.click()}
-              className="h-9 rounded-[9px] border border-chegara/60 px-3 text-[13px] font-medium text-siyoh transition-colors hover:border-siyoh disabled:opacity-50"
             >
-              {busy === "upload" ? copy.uploading : hasMedia ? copy.replaceMedia : copy.addMedia}
-            </button>
+              {hasMedia ? copy.replaceMedia : copy.addMedia}
+            </Button>
             {hasMedia && (
-              <button
-                type="button"
-                disabled={busy !== null}
-                onClick={() => void run("remove", () => removeBotMedia(item.key))}
-                className="h-9 rounded-[9px] px-3 text-[13px] font-medium text-qalam transition-colors hover:text-anor disabled:opacity-50"
-              >
+              <Button variant="dangerGhost" disabled={busy !== null} onClick={() => void run("remove", () => removeBotMedia(item.key))}>
                 {copy.removeMedia}
-              </button>
+              </Button>
             )}
-          </>
-        )}
-
-        <div className="ml-auto flex items-center gap-2">
-          {saved && !dirty && <span className="text-xs text-zumrad">{copy.saved}</span>}
-          {edited && (
-            <button
-              type="button"
-              disabled={busy !== null}
-              onClick={reset}
-              className="h-9 rounded-[9px] px-3 text-[13px] font-medium text-qalam transition-colors hover:text-siyoh disabled:opacity-50"
-            >
-              {copy.reset}
-            </button>
-          )}
-          <button
-            type="button"
-            disabled={!dirty || validation !== null || busy !== null}
-            onClick={save}
-            className="h-9 rounded-[9px] bg-siyoh px-4 text-[13px] font-semibold text-varaq transition-opacity disabled:opacity-40"
-          >
-            {busy === "save" ? copy.saving : copy.save}
-          </button>
+          </div>
+          <p className="m-0 text-[13px] text-qalam">{copy.mediaHint}</p>
         </div>
+      )}
+
+      <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-chiziq pt-3">
+        {edited && (
+          <Button variant="ghost" disabled={busy !== null} onClick={() => setResetOpen(true)}>
+            {copy.reset}
+          </Button>
+        )}
+        <SaveStatus state={status} />
+        <Button
+          disabled={!dirty || validation !== null}
+          loading={busy === "save"}
+          loadingLabel={copy.saving}
+          onClick={save}
+        >
+          {copy.save}
+        </Button>
       </footer>
 
-    </article>
+      <ConfirmDialog
+        open={resetOpen}
+        title={copy.resetConfirmTitle}
+        description={copy.resetConfirm}
+        confirmLabel={copy.reset}
+        busy={busy === "reset"}
+        onConfirm={() => void reset()}
+        onCancel={() => setResetOpen(false)}
+      />
+    </Card>
   );
 }

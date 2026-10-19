@@ -13,11 +13,17 @@ import {
 } from "@dnd-kit/core";
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { type FunnelSegment, funnelSegments, type MessageTemplate, TEMPLATE_DAYS } from "@funnel/shared";
-import { AdminNav } from "@/components/admin/AdminNav";
 import { MessageCard } from "@/components/admin/messages/MessageCard";
 import { MessageEditor } from "@/components/admin/messages/MessageEditor";
+import { Button } from "@/components/admin/ui/Button";
+import { Notice } from "@/components/admin/ui/Notice";
+import { Page, PageHeader } from "@/components/admin/ui/Page";
+import { Section } from "@/components/admin/ui/Section";
+import { Segmented } from "@/components/admin/ui/Segmented";
+import { EmptyState, ErrorState, LoadingState } from "@/components/admin/ui/States";
+import { Stepper } from "@/components/admin/ui/Stepper";
+import { PlusIcon } from "@/components/icons";
 import { fetchMessages, reorderMessages, setMessageActive } from "@/lib/admin/messages";
-import { useAdminSession } from "@/lib/admin/useAdminSession";
 import { adminUz } from "@/lib/i18n/admin";
 
 const copy = adminUz.messages;
@@ -38,7 +44,6 @@ function byDayOrder(items: MessageTemplate[]) {
 }
 
 export default function AdminMessagesPage() {
-  const authorized = useAdminSession();
   const [segment, setSegment] = useState<FunnelSegment>("A");
   const [day, setDay] = useState(1);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
@@ -62,8 +67,12 @@ export default function AdminMessagesPage() {
     setLoaded(result.data);
   }, []);
 
+  function retry() {
+    setFailed(false);
+    void load(segment);
+  }
+
   useEffect(() => {
-    if (!authorized) return;
     let active = true;
     void fetchMessages(segment).then((result) => {
       if (!active) return;
@@ -77,7 +86,7 @@ export default function AdminMessagesPage() {
     return () => {
       active = false;
     };
-  }, [authorized, segment]);
+  }, [segment]);
 
   function selectSegment(next: FunnelSegment) {
     if (next === segment) return;
@@ -139,75 +148,78 @@ export default function AdminMessagesPage() {
     setEditing(null);
   }
 
+  const steps = funnelSegments.map((value) => ({ value, label: adminUz.segments[value].label, hint: adminUz.segments[value].hint }));
+  const dayItemsLabel = copy.dayLabel.replace("{n}", String(day));
+  const activeCount = loaded?.items.filter((item) => item.isActive).length ?? 0;
+
+  const addButton = (
+    <Button variant="secondary" icon={<PlusIcon className="h-4 w-4" />} onClick={() => setEditing({ item: null })}>
+      {copy.addMessage}
+    </Button>
+  );
+
   return (
-    <div className="min-h-screen bg-varaq text-siyoh">
-      <main className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8">
-        <AdminNav />
+    <Page width="narrow">
+      <PageHeader title={adminUz.pages.messages.title} description={adminUz.pages.messages.description} />
 
-        <div>
-          <h1 className="m-0 text-[28px] font-bold leading-tight text-siyoh">{copy.title}</h1>
-          <p className="m-0 mt-1 text-sm text-qalam">{copy.subtitle}</p>
-        </div>
-
-        <div role="tablist" aria-label={copy.segmentLabel} className="flex overflow-x-auto rounded-[12px] bg-white p-1">
-          {funnelSegments.map((value) => (
-            <button
-              key={value}
-              type="button"
-              role="tab"
-              aria-selected={value === segment}
-              onClick={() => selectSegment(value)}
-              className={`shrink-0 whitespace-nowrap rounded-[9px] px-4 py-2 text-sm font-semibold transition-colors ${
-                value === segment ? "bg-siyoh text-varaq" : "text-qalam hover:text-siyoh"
-              }`}
-            >
-              {copy.segments[value]}
-            </button>
-          ))}
-        </div>
-
-        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-          {days.map((value) => {
-            const count = loaded?.items.filter((item) => item.day === value).length ?? 0;
-            return (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={value === day}
-                onClick={() => setDay(value)}
-                className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
-                  value === day ? "bg-siyoh text-varaq" : "bg-white text-siyoh hover:bg-white/70"
-                }`}
-              >
-                {copy.dayLabel.replace("{n}", String(value))}
-                <span
-                  className={`rounded-full px-1.5 text-[11px] tabular-nums ${
-                    value === day ? "bg-varaq/20 text-varaq" : "bg-varaq text-qalam"
-                  }`}
-                >
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {notice && (
-          <p role="alert" className="m-0 rounded-[12px] bg-oltin/20 px-4 py-3 text-xs text-siyoh">
-            {notice}
+      <Section>
+        <Stepper label={copy.segmentLabel} steps={steps} value={segment} onChange={selectSegment} />
+        <p className="m-0 border-t border-chiziq pt-3 text-[13px] text-qalam">{adminUz.segmentsNote}</p>
+        {loaded && (
+          <p className="m-0 text-[13px] font-medium text-siyoh">
+            {copy.countSummary.replace("{total}", String(loaded.items.length)).replace("{active}", String(activeCount))}
           </p>
         )}
-        {failed && <p className="m-0 text-sm text-anor">{adminUz.common.error}</p>}
-        {!loaded && !failed && <p className="m-0 py-16 text-center text-sm text-qalam">{adminUz.common.loading}</p>}
+      </Section>
 
-        {loaded && (
-          <section className="flex flex-col gap-3">
-            {dayItems.length === 0 ? (
-              <p className="m-0 rounded-[14px] bg-white px-4 py-8 text-center text-sm text-qalam">{copy.emptyDay}</p>
-            ) : (
+      <div className="flex flex-col gap-1.5">
+        <span className="text-sm font-medium text-siyoh">{copy.dayHeading}</span>
+        <Segmented
+          label={copy.dayHeading}
+          role="tablist"
+          fill
+          value={day}
+          onChange={setDay}
+          items={days.map((value) => {
+            const count = loaded?.items.filter((item) => item.day === value).length ?? 0;
+            return { value, label: value, sub: loaded && count > 0 ? count : "–" };
+          })}
+        />
+      </div>
+
+      {notice && (
+        <Notice tone="attention" onDismiss={() => setNotice(null)}>
+          {notice}
+        </Notice>
+      )}
+      {failed && <ErrorState onRetry={retry} />}
+      {!loaded && !failed && <LoadingState variant="list" rows={3} />}
+
+      {loaded && (
+        <section className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-baseline gap-3">
+              <h2 className="m-0 text-[17px] font-semibold text-siyoh">{dayItemsLabel}</h2>
+              <span className="text-[13px] text-qalam">{copy.listCount.replace("{n}", String(dayItems.length))}</span>
+            </div>
+            <div className="hidden sm:block">{addButton}</div>
+          </div>
+
+          {dayItems.length === 0 ? (
+            <EmptyState
+              title={copy.emptyTitle.replace("{n}", String(day))}
+              description={copy.emptyHint}
+              action={
+                <Button icon={<PlusIcon className="h-4 w-4" />} onClick={() => setEditing({ item: null })}>
+                  {copy.addMessage}
+                </Button>
+              }
+            />
+          ) : (
+            <>
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(event) => void onDragEnd(event)}>
                 <SortableContext items={dayItems.map((item) => item.id)} strategy={verticalListSortingStrategy}>
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-3">
                     {dayItems.map((item) => (
                       <MessageCard
                         key={item.id}
@@ -219,17 +231,15 @@ export default function AdminMessagesPage() {
                   </div>
                 </SortableContext>
               </DndContext>
-            )}
-            <button
-              type="button"
-              onClick={() => setEditing({ item: null })}
-              className="h-11 self-start rounded-[10px] bg-siyoh px-5 text-sm font-semibold text-varaq"
-            >
-              {copy.addMessage}
-            </button>
-          </section>
-        )}
-      </main>
+              <div className="sm:hidden">
+                <Button variant="secondary" block icon={<PlusIcon className="h-4 w-4" />} onClick={() => setEditing({ item: null })}>
+                  {copy.addMessage}
+                </Button>
+              </div>
+            </>
+          )}
+        </section>
+      )}
 
       {loaded && editing && (
         <MessageEditor
@@ -245,6 +255,6 @@ export default function AdminMessagesPage() {
           onClose={() => setEditing(null)}
         />
       )}
-    </div>
+    </Page>
   );
 }

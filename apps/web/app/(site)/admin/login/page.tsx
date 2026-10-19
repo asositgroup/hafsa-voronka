@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { adminLogin, adminMe } from "@/lib/admin/api";
+import { Button } from "@/components/admin/ui/Button";
+import { Field, Input } from "@/components/admin/ui/Field";
+import { Notice } from "@/components/admin/ui/Notice";
+import { LoadingState } from "@/components/admin/ui/States";
 import { adminUz } from "@/lib/i18n/admin";
 
 export default function AdminLoginPage() {
@@ -52,53 +56,44 @@ export default function AdminLoginPage() {
 
   if (checking) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4 bg-varaq text-siyoh">
-        <div className="text-sm text-qalam">{adminUz.common.loading}</div>
+      <div className="px-4 py-6">
+        <LoadingState variant="section" />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4 sm:p-6 bg-varaq text-siyoh">
-      <div className="w-full max-w-sm rounded-[16px] bg-white p-6 sm:p-8 flex flex-col gap-5">
-        <div className="text-center">
-          <h1 className="text-xl font-bold tracking-tight text-siyoh m-0">
-            {adminUz.login.title}
-          </h1>
-          <p className="mt-1 text-xs text-qalam m-0">
-            {adminUz.login.subtitle}
-          </p>
+    <div className="flex min-h-screen flex-col bg-varaq text-siyoh">
+      <div className="bg-siyoh-deep px-4 pb-24 pt-12 text-varaq sm:pt-16">
+        <div className="mx-auto flex w-full max-w-sm flex-col gap-1">
+          <span className="text-2xl font-bold leading-tight">{adminUz.brand.name}</span>
+          <span className="text-sm text-kumush">{adminUz.brand.sub}</span>
         </div>
+      </div>
 
-        {error && (
-          <div className="rounded-[10px] border border-anor bg-anor/10 p-3 text-xs text-anor">
-            {error}
-          </div>
-        )}
+      <div className="-mt-16 px-4 pb-10">
+        <form onSubmit={handleSubmit} className="mx-auto flex w-full max-w-sm flex-col gap-4 rounded-[20px] bg-white p-5 sm:p-6">
+          <p className="m-0 text-sm text-qalam">{adminUz.login.subtitle}</p>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <label className="block text-xs font-medium text-qalam">
-              {adminUz.login.passwordLabel}
-            </label>
-            <input
-              type="password"
-              autoFocus
-              required
-              value={password}
-              placeholder={adminUz.login.passwordPlaceholder}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full min-h-[40px] rounded-[10px] border border-chegara bg-white px-3.5 py-2 text-sm text-siyoh placeholder:text-qalam/50 focus:border-siyoh focus:outline-none focus:ring-1 focus:ring-siyoh"
-            />
-          </div>
+          <Field label={adminUz.login.passwordLabel}>
+            {({ id }) => (
+              <Input
+                id={id}
+                type="password"
+                autoFocus
+                required
+                value={password}
+                placeholder={adminUz.login.passwordPlaceholder}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            )}
+          </Field>
 
-          <button
-            type="submit"
-            disabled={loading || !password}
-            className="w-full min-h-[44px] rounded-[10px] bg-siyoh py-2.5 text-xs font-semibold text-varaq hover:opacity-95 transition disabled:opacity-50"
-          >
-            {loading ? adminUz.login.submitting : adminUz.login.submitButton}
-          </button>
+          {error && <Notice tone="danger">{error}</Notice>}
+
+          <Button type="submit" block disabled={!password} loading={loading} loadingLabel={adminUz.login.submitting}>
+            {adminUz.login.submitButton}
+          </Button>
         </form>
       </div>
     </div>

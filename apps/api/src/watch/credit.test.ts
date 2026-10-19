@@ -6,6 +6,10 @@ const config: WatchConfig = {
   threshold: 0.95,
 };
 
+function seededState(position: number): WatchState {
+  return { ...initialState(), maxPosition: position, lastPosition: position };
+}
+
 function initialState(): WatchState {
   return {
     maxPosition: 0,
@@ -127,7 +131,7 @@ describe("applyBeat crediting rules", () => {
   });
 
   it("limits a seek-ahead jump to only elapsed time", () => {
-    let state = initialState();
+    let state = seededState(10);
     const t0 = new Date(1000000);
     state = applyBeat(
       state,
@@ -147,12 +151,12 @@ describe("applyBeat crediting rules", () => {
     const expectedCredit = 10 * 2 * 1.1 + 2;
     expect(res.state.watchedSecs).toBeCloseTo(expectedCredit);
     expect(res.state.maxPosition).toBeCloseTo(10 + expectedCredit);
-    expect(res.state.lastPosition).toBe(80);
+    expect(res.state.lastPosition).toBe(10 + expectedCredit);
     expect(res.completedNow).toBe(false);
   });
 
   it("earns nothing when seeking after pause and long wait", () => {
-    let state = initialState();
+    let state = seededState(20);
     const t0 = new Date(1000000);
     state = applyBeat(
       state,
@@ -181,7 +185,7 @@ describe("applyBeat crediting rules", () => {
 
     expect(playRes.state.watchedSecs).toBe(state.watchedSecs);
     expect(playRes.state.maxPosition).toBe(state.maxPosition);
-    expect(playRes.state.lastPosition).toBe(80);
+    expect(playRes.state.lastPosition).toBe(30);
     expect(playRes.state.playing).toBe(true);
 
     const t3 = new Date(t2.getTime() + 1000);
@@ -283,7 +287,7 @@ describe("applyBeat crediting rules", () => {
   });
 
   it("earns nothing on rewind and keeps maxPosition", () => {
-    let state = initialState();
+    let state = seededState(50);
     const t0 = new Date(1000000);
     state = applyBeat(
       state,
@@ -409,7 +413,7 @@ describe("applyBeat crediting rules", () => {
       config,
     );
 
-    expect(res.state.lastPosition).toBe(100);
+    expect(res.state.lastPosition).toBe(0);
     expect(res.state.maxPosition).toBe(0);
   });
 
@@ -427,7 +431,7 @@ describe("applyBeat crediting rules", () => {
   });
 
   it("earns nothing when the app was killed mid-play and playback restarts later", () => {
-    let state = applyBeat(initialState(), { position: 10, event: "play" }, new Date(0), config).state;
+    let state = applyBeat(seededState(10), { position: 10, event: "play" }, new Date(0), config).state;
     expect(state.playing).toBe(true);
 
     const res = applyBeat(state, { position: 95, event: "play" }, new Date(3_600_000), config);
@@ -437,7 +441,7 @@ describe("applyBeat crediting rules", () => {
 
     state = res.state;
     const next = applyBeat(state, { position: 100, event: "ended" }, new Date(3_605_000), config);
-    expect(next.state.watchedSecs).toBeCloseTo(5);
+    expect(next.state.watchedSecs).toBeCloseTo(5 * 2 * 1.1 + 2);
     expect(next.completedNow).toBe(false);
   });
 
@@ -478,6 +482,40 @@ describe("applyBeat crediting rules", () => {
       if (res.completedNow) completedAt = second;
     }
     expect(completedAt).toBe(35);
+  });
+});
+
+describe("applyBeat anti-cheat", () => {
+  const priced: WatchConfig = { duration: 1000, threshold: 0.95, courseStartSec: 300 };
+
+  it("does not move the credit base for a forged play at the price point", () => {
+    let state = seededState(100);
+    state = applyBeat(state, { position: 700, event: "play" }, new Date(0), priced).state;
+    expect(state.lastPosition).toBe(100);
+    expect(state.maxPosition).toBe(100);
+  });
+
+  it("keeps maxPosition below the price after a forged play followed by ticks", () => {
+    let state = seededState(100);
+    state = applyBeat(state, { position: 700, event: "play" }, new Date(0), priced).state;
+    for (let second = 5; second <= 60; second += 5) {
+      state = applyBeat(state, { position: 700 + second, event: "tick" }, new Date(second * 1000), priced).state;
+    }
+    expect(state.maxPosition).toBeLessThanOrEqual(100 + 60 * 2 * 1.1 + 2 * 12);
+    expect(state.maxPosition).toBeLessThan(700);
+  });
+
+  it("allows a play at the course start and credits real-time watching from there", () => {
+    let state = applyBeat(seededState(100), { position: 300, event: "play" }, new Date(0), priced).state;
+    expect(state.lastPosition).toBe(300);
+    state = applyBeat(state, { position: 310, event: "tick" }, new Date(10_000), priced).state;
+    expect(state.maxPosition).toBe(310);
+    expect(state.watchedSecs).toBe(10);
+  });
+
+  it("allows a play within two seconds of maxPosition", () => {
+    const state = applyBeat(seededState(100), { position: 102, event: "play" }, new Date(0), priced).state;
+    expect(state.lastPosition).toBe(102);
   });
 });
 

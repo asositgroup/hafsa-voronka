@@ -157,9 +157,9 @@ describe.skipIf(!testDbUrl)("Video Integration Tests", () => {
       .where(and(eq(events.userId, userId), eq(events.type, "price_reached")));
   }
 
-  async function walkTo(telegramId: number, positions: number[]) {
+  async function walkTo(telegramId: number, positions: number[], resume = false) {
     const start = new Date(1700000000000);
-    await recordProgress(telegramId, { position: 0, event: "play" }, start);
+    if (!resume) await recordProgress(telegramId, { position: 0, event: "play" }, start);
     for (const position of positions) {
       await recordProgress(telegramId, { position, event: "tick" }, new Date(start.getTime() + position * 1000));
     }
@@ -176,7 +176,7 @@ describe.skipIf(!testDbUrl)("Video Integration Tests", () => {
     await walkTo(telegramId, [10, 20, 30, 40]);
     expect(await priceReachedEvents(user.id)).toHaveLength(0);
 
-    await walkTo(telegramId, [50, 60]);
+    await walkTo(telegramId, [50, 60], true);
     const logged = await priceReachedEvents(user.id);
     expect(logged).toHaveLength(1);
     expect(logged[0].meta).toMatchObject({ videoId: video.id, priceSec: 50 });

@@ -228,6 +228,13 @@ describe.skipIf(!testDbUrl)("Funnel Integration Tests", () => {
       expect((await session(user.telegramId, { start: "bogus" })).startAt).toBe(120);
     });
 
+    it("exposes the video id and price point to the player", async () => {
+      const user = await sessionUser({}, { priceSec: 600 });
+      const body = await session(user.telegramId);
+      expect(body.priceSec).toBe(600);
+      expect(typeof body.videoId).toBe("number");
+    });
+
     it("falls back to the resume position for offer when the video has no course start", async () => {
       const user = await sessionUser({}, { priceSec: 600 });
       await db().insert(watchProgress).values({ userId: user.id, lastPosition: 45, maxPosition: 45 });

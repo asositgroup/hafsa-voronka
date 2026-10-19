@@ -59,7 +59,11 @@ export async function recordProgress(
   if (!video && !config) {
     return { ok: false, error: "no_video" };
   }
-  const watchConfig: WatchConfig = config ?? { duration: video!.duration, threshold: env.COMPLETE_THRESHOLD };
+  const watchConfig: WatchConfig = config ?? {
+    duration: video!.duration,
+    threshold: env.COMPLETE_THRESHOLD,
+    courseStartSec: video!.courseStartSec,
+  };
 
   const { result, previousMax } = await db().transaction(async (tx) => {
     await tx

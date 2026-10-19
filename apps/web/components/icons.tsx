@@ -373,3 +373,20 @@ export function ClockIcon({ className }: IconProps) {
     </StrokeIcon>
   );
 }
+
+export function RestartIcon({ className }: IconProps) {
+  return (
+    <StrokeIcon className={className} strokeWidth={2}>
+      <path d="M4 12a8 8 0 1 0 2.6-5.9" />
+      <path d="M4 4v4.5h4.5" />
+    </StrokeIcon>
+  );
+}
+
+export function PlayTriangleIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="currentColor" className={`shrink-0 ${className ?? ""}`}>
+      <path d="M8 5v14l11-7z" />
+    </svg>
+  );
+}

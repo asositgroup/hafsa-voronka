@@ -58,6 +58,8 @@ miniappRoutes.post("/session", async (c) => {
     completed: user.completedAt !== null,
     unlocked: user.unlockedAt !== null,
     unlockAt: effectiveUnlockSec(video),
+    videoId: video.id,
+    priceSec: video.priceSec,
     expired,
     startAt: start === "offer" ? (video.courseStartSec ?? lastPosition) : lastPosition,
     progress: {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef } from "react";
+import { isSeekBlocked } from "@/lib/video/resume";
 
 type ProgressBarProps = {
   currentTime: number;
@@ -35,7 +36,7 @@ export function ProgressBar({
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
     const target = calculateTargetTime(e.clientX);
-    if (seekLocked && target > maxReached + 1) {
+    if (isSeekBlocked(target, maxReached, seekLocked)) {
       onSeekBlocked();
       return;
     }
@@ -54,9 +55,19 @@ export function ProgressBar({
     >
       <div className="relative h-1 w-full rounded-[2px] bg-varaq/25">
         <div
-          className="absolute top-0 bottom-0 left-0 rounded-[2px] bg-varaq/55"
+          className="absolute top-0 bottom-0 left-0 rounded-[2px] bg-zumrad brightness-150"
           style={{ width: `${maxReachedPct}%` }}
         />
+        {seekLocked && (
+          <div
+            className="absolute top-0 right-0 bottom-0 rounded-r-[2px]"
+            style={{
+              left: `${maxReachedPct}%`,
+              backgroundImage:
+                "repeating-linear-gradient(135deg, rgba(255,255,255,.32) 0 2px, transparent 2px 5px)",
+            }}
+          />
+        )}
         <div
           className="absolute top-0 bottom-0 left-0 rounded-[2px] bg-oltin"
           style={{ width: `${currentPct}%` }}

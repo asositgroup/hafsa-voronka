@@ -4,10 +4,11 @@ import { closeDb, db } from "@/db";
 import { runMigrations } from "@/db/migrate";
 import { users, videos } from "@/db/schema";
 import { upsertUser } from "@/funnel/users";
+import { isolatedDatabase } from "@/test/isolatedDb";
 import { createTestVideo, ensureActiveTestVideo } from "@/test/videos";
 import { activeVideo, seedVideoFromEnv, videoForUser } from "./service";
 
-const testDbUrl = process.env.TEST_DATABASE_URL;
+const database = isolatedDatabase("vf_videos");
 
 const violatesMarksOrder = { cause: { constraint_name: "videos_marks_order" } };
 
@@ -23,24 +24,26 @@ async function insertUser(videoId: number | null = null) {
   return user;
 }
 
-describe.skipIf(!testDbUrl)("Videos", () => {
+describe.skipIf(!database.url)("Videos", () => {
   beforeAll(async () => {
+    await database.create();
     Object.assign(process.env, {
       BOT_TOKEN: "123456:TEST-token",
       BOT_USERNAME: "test_bot",
       WEBHOOK_SECRET: "test-secret-0123456789",
       API_URL: "https://api.example.com",
       WEB_URL: "https://example.com",
-      DATABASE_URL: testDbUrl,
+      DATABASE_URL: database.url,
       CHANNEL_URL: "https://t.me/example",
       VIDEO_POSTER_URL: "https://video.example.com/poster.webp",
     });
-    await runMigrations(testDbUrl!);
+    await runMigrations(database.url!);
     await ensureActiveTestVideo();
   });
 
   afterAll(async () => {
     await closeDb();
+    await database.drop();
   });
 
   it("rejects a second active video", async () => {

@@ -12,7 +12,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file-if-exists=.env src/db/migrate-cli.ts",
     "set-webhook": "tsx --env-file-if-exists=.env scripts/set-webhook.ts",
-    "hash-password": "tsx scripts/hash-password.ts"
+    "hash-password": "tsx scripts/hash-password.ts",
+    "seed:templates": "tsx --env-file-if-exists=.env scripts/seed-templates.ts"
   },
   "dependencies": {
     "@funnel/shared": "workspace:*",

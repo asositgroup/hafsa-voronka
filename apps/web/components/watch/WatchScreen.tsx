@@ -51,7 +51,8 @@ export function WatchScreen() {
   }, [session.unlocked]);
 
   const isSeekLocked = session.config.seekLock && !session.completed;
-  const isUnlocked = !session.config.gateProceed || session.unlocked;
+  const reachedUnlockAt = session.unlockAt !== null && maxReached >= session.unlockAt;
+  const isUnlocked = !session.config.gateProceed || session.unlocked || reachedUnlockAt;
 
   const triggerToast = useCallback(() => {
     setToastVisible(true);
@@ -117,6 +118,12 @@ export function WatchScreen() {
     },
     [initData, session, setSession],
   );
+
+  useEffect(() => {
+    if (!reachedUnlockAt || isUnlockedRef.current) return;
+    const video = videoRef.current;
+    if (video) void sendProgress(video.currentTime, "tick");
+  }, [reachedUnlockAt, sendProgress]);
 
   useEffect(() => {
     const video = videoRef.current;

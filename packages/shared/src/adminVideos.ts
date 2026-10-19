@@ -21,6 +21,16 @@ export type VideoMarks = {
   unlockSec?: number | null;
 };
 
+export const DEFAULT_LESSON_START_SEC = 300;
+
+export function defaultLessonStartSec(
+  marks: Pick<VideoMarks, "courseStartSec" | "priceSec">,
+  duration: number,
+): number {
+  const lessonEnd = marks.courseStartSec ?? marks.priceSec ?? duration;
+  return Math.max(0, Math.min(DEFAULT_LESSON_START_SEC, lessonEnd - 1));
+}
+
 export function validateVideoMarks(
   marks: VideoMarks,
   duration: number,

@@ -214,6 +214,7 @@ describe.skipIf(!testDbUrl)("Admin video flow in Telegram", () => {
     expect(created).toMatchObject({
       title: "Bot darsi",
       duration: 600,
+      introEndSec: 119,
       courseStartSec: 120,
       priceSec: 300,
       isActive: true,

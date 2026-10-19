@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatMmSs, parseMmSs, validateVideoMarks } from "@funnel/shared";
+import { defaultLessonStartSec, formatMmSs, parseMmSs, validateVideoMarks } from "@funnel/shared";
 
 describe("formatMmSs", () => {
   it("pads and floors", () => {
@@ -79,5 +79,19 @@ describe("validateVideoMarks", () => {
     expect(validateVideoMarks({ introEndSec: 60, courseStartSec: 60 }, 900, open)).toBe("intro_after_course");
     expect(validateVideoMarks({ introEndSec: 600, priceSec: 600 }, 900, open)).toBe("intro_after_course");
     expect(validateVideoMarks({ introEndSec: 900 }, 900, open)).toBe("intro_after_course");
+  });
+});
+
+describe("defaultLessonStartSec", () => {
+  it("is 5:00 unless the course part starts earlier", () => {
+    expect(defaultLessonStartSec({ courseStartSec: 900, priceSec: 1102 }, 1500)).toBe(300);
+    expect(defaultLessonStartSec({ courseStartSec: 240, priceSec: 600 }, 900)).toBe(239);
+    expect(defaultLessonStartSec({ courseStartSec: null, priceSec: 200 }, 900)).toBe(199);
+    expect(defaultLessonStartSec({ courseStartSec: null, priceSec: null }, 120)).toBe(119);
+  });
+
+  it("always passes the marks check", () => {
+    const open = { requirePrice: false };
+    expect(validateVideoMarks({ introEndSec: defaultLessonStartSec({ courseStartSec: 1, priceSec: 5 }, 9), courseStartSec: 1, priceSec: 5 }, 9, open)).toBeNull();
   });
 });

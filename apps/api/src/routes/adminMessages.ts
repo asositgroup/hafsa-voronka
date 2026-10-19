@@ -19,7 +19,7 @@ import {
 } from "@funnel/shared";
 import { requireAdminAuth } from "@/admin/auth";
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { users, videos } from "@/db/schema";
 import { env } from "@/env";
 import { templateContextFor } from "@/messages/context";
 import { renderTemplate } from "@/messages/render";
@@ -49,6 +49,15 @@ adminMessageRoutes.use("*", requireAdminAuth);
 const mediaContentTypes = { photo: "image/jpeg", video: "video/mp4", voice: "audio/ogg" } as const;
 const PREFILL_CHANNEL_PATTERN = /^https:\/\/t\.me\/[A-Za-z][A-Za-z0-9_]{4,31}\/?$/;
 const MAX_UPLOAD_BYTES = Math.max(...Object.values(TEMPLATE_MEDIA_LIMITS)) + 1024 * 1024;
+
+async function activeVideoMarks() {
+  const [video] = await db()
+    .select({ introEndSec: videos.introEndSec, courseStartSec: videos.courseStartSec, priceSec: videos.priceSec })
+    .from(videos)
+    .where(eq(videos.isActive, true))
+    .limit(1);
+  return video ?? null;
+}
 
 async function adminOptions() {
   const ids = [...env.ADMIN_TELEGRAM_IDS];
@@ -88,6 +97,7 @@ adminMessageRoutes.get("/", async (c) => {
     admins: await adminOptions(),
     mediaEnabled: botMediaChat() !== null,
     prefillSupported: PREFILL_CHANNEL_PATTERN.test(env.CHANNEL_URL),
+    videoMarks: await activeVideoMarks(),
   });
 });
 
@@ -109,7 +119,7 @@ adminMessageRoutes.post("/preview-schedule", async (c) => {
   const preview = previewChain(
     segmentChainInput(await activeTemplateRows(body.data.segment), {
       segment: body.data.segment,
-      anchorAt: givenAt,
+      enteredAt: givenAt,
       linkExpiresAt,
     }),
   );

@@ -5,9 +5,9 @@ import postgres from "postgres";
 import type { FunnelSegment, TemplateButton } from "@funnel/shared";
 import { closeDb, db } from "@/db";
 import { runMigrations } from "@/db/migrate";
-import { events, messageTemplates, segmentRuns, sentMessages, users } from "@/db/schema";
+import { events, messageTemplates, segmentRuns, sentMessages, settings, users, type Video, watchProgress } from "@/db/schema";
 import { signInitData } from "@/telegram/initData";
-import { ensureActiveTestVideo } from "@/test/videos";
+import { createTestVideo, ensureActiveTestVideo } from "@/test/videos";
 import { setTestEnv, TEST_BOT_TOKEN } from "@/test/env";
 
 const serverDbUrl = process.env.TEST_DATABASE_URL;
@@ -93,6 +93,7 @@ describe.skipIf(!testDbUrl)("Message dispatcher", () => {
     await db().delete(events);
     await db().delete(segmentRuns);
     await db().delete(messageTemplates);
+    await db().delete(watchProgress);
     await db().delete(users);
   });
 
@@ -621,5 +622,107 @@ describe.skipIf(!testDbUrl)("Message dispatcher", () => {
     expect(deletes().map((call) => call.payload.message_id)).toEqual([1001, 1002]);
     const all = await rows();
     expect(all.map((row) => row.deletedAt !== null)).toEqual([true, true, false]);
+  });
+
+  describe("segment B", () => {
+    let lesson: Video;
+
+    beforeAll(async () => {
+      lesson = await createTestVideo({ duration: 1500, introEndSec: 300, courseStartSec: 900, priceSec: 1102 });
+    });
+
+    async function watcher(maxPosition: number, lastBeatAt: Date, playing = false) {
+      const user = await makeUser({ videoId: lesson.id, linkGivenAt: entry, linkExpiresAt: at(24 * 60) });
+      await db().insert(watchProgress).values({ userId: user.id, maxPosition, lastPosition: maxPosition, startedAt: entry, lastBeatAt, playing });
+      const run = await openRun(user.id, "B");
+      return { user, run };
+    }
+
+    async function moveTo(userId: number, maxPosition: number, lastBeatAt: Date, playing = false) {
+      await db().update(watchProgress).set({ maxPosition, lastPosition: maxPosition, lastBeatAt, playing }).where(eq(watchProgress.userId, userId));
+    }
+
+    async function variants() {
+      await makeTemplate({ segment: "B", position: 0, text: "0-5", timingValue: 30, statuses: ["korishni_boshladi"] });
+      await makeTemplate({ segment: "B", position: 1, text: "5-15", timingValue: 30, statuses: ["dars_yarmida"] });
+      await makeTemplate({ segment: "B", position: 2, text: "15-narx", timingValue: 30, statuses: ["sotuvda_toxtadi"] });
+    }
+
+    it("sends the text for the stop point 30 minutes after the stop and re-times after a new stop", async () => {
+      const { user } = await watcher(180, at(5));
+      await variants();
+      await tick(at(34));
+      expect(sends()).toHaveLength(0);
+      await tick(at(35));
+      expect(sends().map((call) => call.payload.text)).toEqual(["0-5"]);
+
+      await moveTo(user.id, 960, at(60));
+      for (let minute = 61; minute < 90; minute += 1) await tick(at(minute));
+      expect(sends()).toHaveLength(1);
+      await tick(at(90));
+      for (let minute = 91; minute <= 150; minute += 5) await tick(at(minute));
+      expect(sends().map((call) => call.payload.text)).toEqual(["0-5", "15-narx"]);
+    });
+
+    it("sends nothing while the person is watching and keeps the item due", async () => {
+      const { user } = await watcher(400, at(119), true);
+      await makeTemplate({ segment: "B", text: "10 soat", timingType: "before_expiry", timingValue: 22 * 60 });
+      await tick(at(120));
+      expect(sends()).toHaveLength(0);
+      await moveTo(user.id, 420, at(121), false);
+      await tick(at(122));
+      expect(sends().map((call) => call.payload.text)).toEqual(["10 soat"]);
+    });
+
+    it("caps B at four a day and seven in total", async () => {
+      await watcher(100, entry);
+      for (let position = 0; position < 10; position += 1) {
+        await makeTemplate({ segment: "B", position, text: `d1-${position}`, timingValue: 60 + position });
+      }
+      for (let position = 0; position < 6; position += 1) {
+        await makeTemplate({ segment: "B", day: 2, position, text: `d2-${position}`, timingType: "day_time", timingValue: 540 + position });
+      }
+      for (let minute = 60; minute <= 80; minute += 1) await tick(at(minute));
+      expect(sends()).toHaveLength(4);
+      for (let minute = 23 * 60; minute <= 23 * 60 + 10; minute += 1) await tick(at(minute));
+      expect(sends()).toHaveLength(7);
+      expect(sends().slice(4).map((call) => call.payload.text)).toEqual(["d2-0", "d2-1", "d2-2"]);
+    });
+
+    it("applies caps edited in the settings", async () => {
+      const { invalidateSettings } = await import("@/settings/service");
+      const value = JSON.stringify({ A: { daily: 10, total: null }, B: { daily: 2, total: 7 }, C: { daily: 10, total: null } });
+      await db().insert(settings).values({ key: "MESSAGE_CAPS", value }).onConflictDoUpdate({ target: settings.key, set: { value } });
+      invalidateSettings();
+      try {
+        await watcher(100, entry);
+        for (let position = 0; position < 4; position += 1) {
+          await makeTemplate({ segment: "B", position, timingValue: 60 + position });
+        }
+        for (let minute = 60; minute <= 70; minute += 1) await tick(at(minute));
+        expect(sends()).toHaveLength(2);
+      } finally {
+        await db().delete(settings).where(eq(settings.key, "MESSAGE_CAPS"));
+        invalidateSettings();
+      }
+    });
+
+    it("stops at narxni_kurdi, at a manual wrote-to-admin mark and when blocked", async () => {
+      const { syncSegment } = await import("@/funnel/segments");
+      await makeTemplate({ segment: "B", text: "B", timingValue: 30 });
+      const priced = await watcher(600, at(5));
+      const wrote = await watcher(600, at(5));
+      const blocked = await watcher(600, at(5));
+
+      await moveTo(priced.user.id, 1102, at(6));
+      await syncSegment(priced.user.id, at(6));
+      await db().update(users).set({ wroteAdminAt: at(10) }).where(eq(users.id, wrote.user.id));
+      await db().update(users).set({ botBlocked: true }).where(eq(users.id, blocked.user.id));
+
+      for (let minute = 35; minute <= 40; minute += 1) await tick(at(minute));
+      expect(sends()).toHaveLength(0);
+      const [bRun] = await db().select().from(segmentRuns).where(eq(segmentRuns.userId, priced.user.id)).orderBy(segmentRuns.id);
+      expect(bRun.endedAt).toEqual(at(6));
+    });
   });
 });

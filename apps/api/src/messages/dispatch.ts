@@ -1,9 +1,20 @@
 import { and, asc, eq, gt, isNotNull, isNull, lt, lte, ne, sql } from "drizzle-orm";
 import { type Api, GrammyError, HttpError } from "grammy";
-import type { FunnelSegment, TemplateButton } from "@funnel/shared";
+import type { FunnelSegment, FunnelStatus, TemplateButton } from "@funnel/shared";
 import { db, rawClient } from "@/db";
-import { messageTemplates, type MessageTemplateRow, type SentLinkTarget, sentMessages, users, segmentRuns } from "@/db/schema";
+import {
+  messageTemplates,
+  type MessageTemplateRow,
+  type SentLinkTarget,
+  sentMessages,
+  users,
+  segmentRuns,
+  videos,
+  watchProgress,
+} from "@/db/schema";
 import { env } from "@/env";
+import { NO_VIDEO_MARKS, statusFor } from "@/funnel/status";
+import { messageCaps } from "@/settings/service";
 import { bot } from "@/telegram/bot";
 import { isBlockedError, markBlocked } from "@/telegram/blocked";
 import { templateContextFor } from "./context";
@@ -12,12 +23,15 @@ import { activeTemplateRows, toTemplate } from "./repo";
 import {
   CHAIN_MS,
   DAY_MS,
+  isWatchingNow,
   nextPendingDue,
   pickNext,
   type PlanItem,
   planChain,
   segmentChainInput,
+  type SendUsage,
   tashkentDayStart,
+  type WatchSnapshot,
 } from "./plan";
 import { sendRendered } from "./send";
 
@@ -47,7 +61,9 @@ type Candidate = {
   telegramId: number;
   linkExpiresAt: Date | null;
   sentKeys: string[];
-  sentToday: number;
+  usage: SendUsage;
+  status: FunnelStatus | null;
+  watch: WatchSnapshot;
 };
 
 type Pick = { candidate: Candidate; item: PlanItem<MessageTemplateRow> };
@@ -93,11 +109,25 @@ async function loadCandidates(now: Date, userId?: number): Promise<Candidate[]> 
       enteredAt: segmentRuns.enteredAt,
       telegramId: users.telegramId,
       linkExpiresAt: users.linkExpiresAt,
+      registeredAt: users.registeredAt,
+      wroteAdminAt: users.wroteAdminAt,
+      maxPosition: watchProgress.maxPosition,
+      startedAt: watchProgress.startedAt,
+      lastBeatAt: watchProgress.lastBeatAt,
+      playing: watchProgress.playing,
+      duration: videos.duration,
+      introEndSec: videos.introEndSec,
+      courseStartSec: videos.courseStartSec,
+      priceSec: videos.priceSec,
       sentKeys: sql<string[]>`coalesce(array_agg(${sentMessages.templateId}::text || ':' || ${sentMessages.slot}) filter (where ${sentMessages.id} is not null), '{}')::text[]`,
       sentToday: sql<number>`(select count(*) from sent_messages c where c.user_id = ${segmentRuns.userId} and c.sent_at >= ${dayStart}::timestamptz)::int`,
+      runToday: sql<number>`(count(*) filter (where ${sentMessages.sentAt} >= ${dayStart}::timestamptz))::int`,
+      runTotal: sql<number>`count(${sentMessages.sentAt})::int`,
     })
     .from(segmentRuns)
     .innerJoin(users, eq(users.id, segmentRuns.userId))
+    .leftJoin(watchProgress, eq(watchProgress.userId, users.id))
+    .leftJoin(videos, eq(videos.id, users.videoId))
     .leftJoin(sentMessages, eq(sentMessages.segmentRunId, segmentRuns.id))
     .where(
       and(
@@ -108,8 +138,30 @@ async function loadCandidates(now: Date, userId?: number): Promise<Candidate[]> 
         userId === undefined ? undefined : eq(segmentRuns.userId, userId),
       ),
     )
-    .groupBy(segmentRuns.id, users.id);
-  return rows;
+    .groupBy(segmentRuns.id, users.id, watchProgress.userId, videos.id);
+  return rows.map((row) => ({
+    runId: row.runId,
+    userId: row.userId,
+    segment: row.segment,
+    enteredAt: row.enteredAt,
+    telegramId: row.telegramId,
+    linkExpiresAt: row.linkExpiresAt,
+    sentKeys: row.sentKeys,
+    usage: { today: row.sentToday, runToday: row.runToday, runTotal: row.runTotal },
+    status: statusFor(
+      row.maxPosition === null ? undefined : { maxPosition: row.maxPosition, startedAt: row.startedAt },
+      row.duration === null
+        ? NO_VIDEO_MARKS
+        : {
+            duration: row.duration,
+            introEndSec: row.introEndSec,
+            courseStartSec: row.courseStartSec,
+            priceSec: row.priceSec,
+          },
+      row,
+    ),
+    watch: { lastBeatAt: row.lastBeatAt, playing: row.playing ?? false },
+  }));
 }
 
 async function markInterrupted(now: Date) {
@@ -280,8 +332,10 @@ function chainFor(candidate: Candidate, templates: MessageTemplateRow[]) {
   return planChain(
     segmentChainInput(templates, {
       segment: candidate.segment,
-      anchorAt: candidate.enteredAt,
+      enteredAt: candidate.enteredAt,
       linkExpiresAt: candidate.linkExpiresAt,
+      status: candidate.status,
+      watch: candidate.watch,
     }),
   );
 }
@@ -298,10 +352,12 @@ async function sendDue(api: Api, now: Date, pace: Pace) {
     bySegment.set(template.segment, [...(bySegment.get(template.segment) ?? []), template]);
   }
 
+  const caps = await messageCaps();
   const picks: Pick[] = [];
   for (const candidate of await loadCandidates(now)) {
+    if (isWatchingNow(candidate.watch, now)) continue;
     const plan = chainFor(candidate, bySegment.get(candidate.segment) ?? []);
-    const item = pickNext(plan, new Set(candidate.sentKeys), now, candidate.sentToday);
+    const item = pickNext(plan, new Set(candidate.sentKeys), now, candidate.usage, caps[candidate.segment]);
     if (item) picks.push({ candidate, item });
   }
   picks.sort((a, b) => a.item.sendAt.getTime() - b.item.sendAt.getTime());

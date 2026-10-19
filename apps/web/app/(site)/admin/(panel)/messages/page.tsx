@@ -16,6 +16,7 @@ import { AudienceTabs } from "@/components/admin/messages/AudienceTabs";
 import { MessageCard } from "@/components/admin/messages/MessageCard";
 import { MessageEditor, type MessagePreset } from "@/components/admin/messages/MessageEditor";
 import { ScheduleSimulator } from "@/components/admin/messages/ScheduleSimulator";
+import type { VideoMarks } from "@/components/admin/messages/StopPointPicker";
 import { Button } from "@/components/admin/ui/Button";
 import { Notice } from "@/components/admin/ui/Notice";
 import { Page, PageHeader } from "@/components/admin/ui/Page";
@@ -31,6 +32,7 @@ type Loaded = {
   admins: { telegramId: number; label: string }[];
   mediaEnabled: boolean;
   prefillSupported: boolean;
+  videoMarks: VideoMarks;
 };
 
 type Editing = { item: MessageTemplate | null; preset?: MessagePreset } | null;
@@ -265,6 +267,7 @@ export default function AdminMessagesPage() {
                         <MessageCard
                           key={item.id}
                           item={item}
+                          videoMarks={loaded.videoMarks}
                           onEdit={() => setEditing({ item })}
                           onToggle={(isActive) => void toggle(item, isActive)}
                           onMoveUp={sameMoment(previousItem) ? () => void move(group.items, index, -1) : undefined}
@@ -289,6 +292,7 @@ export default function AdminMessagesPage() {
           admins={loaded.admins}
           mediaEnabled={loaded.mediaEnabled}
           prefillSupported={loaded.prefillSupported}
+          videoMarks={loaded.videoMarks}
           onSaved={saved}
           onDeleted={deleted}
           onClose={() => setEditing(null)}

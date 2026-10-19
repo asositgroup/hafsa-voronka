@@ -3,6 +3,8 @@ import type { User, Video } from "@/db/schema";
 
 export type StatusProgress = { maxPosition: number; startedAt: Date | null };
 
+export const NO_VIDEO_MARKS = { duration: 1, introEndSec: null, courseStartSec: null, priceSec: null };
+
 export function statusFor(
   progress: StatusProgress | undefined,
   video: Pick<Video, "duration" | "introEndSec" | "courseStartSec" | "priceSec">,
@@ -16,9 +18,8 @@ export function statusFor(
   if (video.priceSec !== null && position >= video.priceSec) return "narxni_kurdi";
   if (video.courseStartSec !== null && position >= video.courseStartSec) return "sotuvda_toxtadi";
 
-  const lessonEnd = video.courseStartSec ?? video.priceSec ?? video.duration;
-  const midpoint = ((video.introEndSec ?? 0) + lessonEnd) / 2;
-  return position >= midpoint ? "dars_yarmida" : "korishni_boshladi";
+  const lessonStart = video.introEndSec ?? (video.courseStartSec ?? video.priceSec ?? video.duration) / 2;
+  return position >= lessonStart ? "dars_yarmida" : "korishni_boshladi";
 }
 
 export function segmentFor(status: FunnelStatus | null): FunnelSegment | null {

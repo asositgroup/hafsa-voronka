@@ -4,6 +4,7 @@ import { type MessageTemplate, plainTextPreview, renderPlainText, SAMPLE_CONTEXT
 import { Badge } from "@/components/admin/ui/Badge";
 import { IconButton } from "@/components/admin/ui/IconButton";
 import { Switch } from "@/components/admin/ui/Switch";
+import { stopPointLabel, type VideoMarks } from "@/components/admin/messages/StopPointPicker";
 import { timelineLabel } from "@/components/admin/messages/TimingPicker";
 import { ButtonsIcon, ChevronDownIcon, ChevronUpIcon, PhotoIcon, VideoIcon, VoiceIcon } from "@/components/icons";
 import { adminUz } from "@/lib/i18n/admin";
@@ -19,13 +20,14 @@ function MediaIcon({ type }: { type: keyof typeof mediaIcons }) {
 
 type MessageCardProps = {
   item: MessageTemplate;
+  videoMarks: VideoMarks;
   onEdit: () => void;
   onToggle: (isActive: boolean) => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
 };
 
-export function MessageCard({ item, onEdit, onToggle, onMoveUp, onMoveDown }: MessageCardProps) {
+export function MessageCard({ item, videoMarks, onEdit, onToggle, onMoveUp, onMoveDown }: MessageCardProps) {
   return (
     <li className="flex items-center gap-1 px-2 py-2 sm:px-3">
       <button
@@ -40,9 +42,12 @@ export function MessageCard({ item, onEdit, onToggle, onMoveUp, onMoveDown }: Me
           {timelineLabel(item.timing)}
         </span>
         <span className={`flex min-w-0 flex-1 flex-col gap-1 ${item.isActive ? "" : "opacity-60"}`}>
-          {item.timing.type === "night_notice" && (
-            <span className="flex">
-              <Badge tone="attention">{copy.nightNotice.badge}</Badge>
+          {(item.timing.type === "night_notice" || item.statuses) && (
+            <span className="flex flex-wrap gap-1">
+              {item.timing.type === "night_notice" && <Badge tone="attention">{copy.nightNotice.badge}</Badge>}
+              {item.statuses?.map((status) => (
+                <Badge key={status}>{stopPointLabel(status, videoMarks)}</Badge>
+              ))}
             </span>
           )}
           <span className="line-clamp-2 text-sm text-siyoh">

@@ -1,0 +1,4 @@
+ALTER TABLE "message_templates" ADD COLUMN "statuses" text[];--> statement-breakpoint
+ALTER TABLE "message_templates" ADD CONSTRAINT "message_templates_statuses_values" CHECK ("message_templates"."statuses" is null or (cardinality("message_templates"."statuses") > 0 and "message_templates"."statuses" <@ array['link_berildi', 'korishni_boshladi', 'dars_yarmida', 'sotuvda_toxtadi', 'narxni_kurdi', 'adminga_yozdi']::text[]));--> statement-breakpoint
+UPDATE "videos" SET "intro_end_sec" = GREATEST(0, LEAST(300, COALESCE("course_start_sec", "price_sec", "duration") - 1)) WHERE "intro_end_sec" IS NULL;--> statement-breakpoint
+INSERT INTO "settings" ("key", "value") VALUES ('MESSAGE_CAPS', '{"A":{"daily":10,"total":null},"B":{"daily":4,"total":7},"C":{"daily":10,"total":null}}') ON CONFLICT ("key") DO NOTHING;

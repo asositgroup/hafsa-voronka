@@ -1,5 +1,5 @@
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
-import type { FunnelSegment, MessageTemplate, MessageTemplateInput } from "@funnel/shared";
+import { type FunnelSegment, type MessageTemplate, type MessageTemplateInput, normalizeStatuses } from "@funnel/shared";
 import { db } from "@/db";
 import { type MessageTemplateRow, messageTemplates } from "@/db/schema";
 
@@ -27,6 +27,7 @@ export function toTemplate(row: MessageTemplateRow): MessageTemplate {
     timing: { type: row.timingType, value: row.timingValue },
     buttons: row.buttons,
     isActive: row.isActive,
+    statuses: row.statuses,
     updatedAt: row.updatedAt.toISOString(),
   };
 }
@@ -40,6 +41,7 @@ function columns(input: MessageTemplateInput) {
     timingValue: input.timing.value,
     buttons: input.buttons,
     isActive: input.isActive,
+    statuses: normalizeStatuses(input.segment, input.statuses),
   };
 }
 

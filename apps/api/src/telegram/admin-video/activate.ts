@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import type { Api } from "grammy";
+import { defaultLessonStartSec } from "@funnel/shared";
 import { db } from "@/db";
 import { botVideoDrafts } from "@/db/schema";
 import { uz } from "@/i18n/uz";
@@ -56,6 +57,7 @@ async function resolveActivation(draftId: number, allowDone: boolean): Promise<O
         title: draftTitle(draft.caption),
         fileUrl: draft.fileUrl,
         duration: draft.duration!,
+        introEndSec: defaultLessonStartSec(draft, draft.duration!),
         courseStartSec: draft.courseStartSec,
         priceSec: draft.priceSec,
       });

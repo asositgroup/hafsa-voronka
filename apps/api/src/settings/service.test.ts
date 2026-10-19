@@ -3,7 +3,8 @@ import { closeDb, db } from "@/db";
 import { runMigrations } from "@/db/migrate";
 import { settings } from "@/db/schema";
 import { setTestEnv } from "@/test/env";
-import { invalidateSettings, linkTtlHours } from "./service";
+import { DEFAULT_MESSAGE_CAPS } from "@funnel/shared";
+import { invalidateSettings, linkTtlHours, messageCaps } from "./service";
 
 const testDbUrl = process.env.TEST_DATABASE_URL;
 
@@ -40,6 +41,16 @@ describe.skipIf(!testDbUrl)("Settings", () => {
       await db().insert(settings).values({ key: "LINK_TTL_HOURS", value });
       invalidateSettings();
       expect(await linkTtlHours()).toBe(24);
+    }
+  });
+
+  it("defaults the message caps and ignores broken values", async () => {
+    expect(await messageCaps()).toEqual(DEFAULT_MESSAGE_CAPS);
+    for (const value of ["nope", "{}", JSON.stringify({ ...DEFAULT_MESSAGE_CAPS, B: { daily: 50, total: 7 } })]) {
+      await db().delete(settings);
+      await db().insert(settings).values({ key: "MESSAGE_CAPS", value });
+      invalidateSettings();
+      expect(await messageCaps()).toEqual(DEFAULT_MESSAGE_CAPS);
     }
   });
 });

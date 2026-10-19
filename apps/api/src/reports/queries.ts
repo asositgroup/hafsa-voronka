@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   ATTRIBUTION_WINDOW_HOURS,
-  LEFT_EARLY_SEC,
+  DEFAULT_LESSON_START_SEC,
   plainTextPreview,
   type AdminReportResponse,
   type FunnelSegment,
@@ -33,7 +33,7 @@ export async function getVideoReport({ from, to }: DateRange): Promise<VideoRepo
       count(*) AS given,
       count(*) FILTER (WHERE ao.last_open_at IS NOT NULL OR wp.started_at IS NOT NULL) AS opened,
       count(*) FILTER (WHERE (ao.last_open_at IS NOT NULL OR wp.started_at IS NOT NULL)
-        AND coalesce(wp.max_position, 0) < ${LEFT_EARLY_SEC}::int
+        AND coalesce(wp.max_position, 0) < coalesce(v.intro_end_sec, ${DEFAULT_LESSON_START_SEC}::int)
         AND greatest(wp.last_beat_at, ao.last_open_at, wp.started_at) < now() - interval '30 minutes') AS left_early,
       count(*) FILTER (WHERE v.course_start_sec IS NOT NULL AND coalesce(wp.max_position, 0) >= v.course_start_sec) AS reached_course,
       count(*) FILTER (WHERE v.price_sec IS NOT NULL AND coalesce(wp.max_position, 0) >= v.price_sec) AS reached_price,

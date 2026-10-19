@@ -5,8 +5,9 @@ import postgres from "postgres";
 import { hashPassword } from "@/admin/auth";
 import { closeDb, db } from "@/db";
 import { runMigrations } from "@/db/migrate";
-import { events, messageTemplates, users } from "@/db/schema";
+import { events, messageTemplates, users, videos } from "@/db/schema";
 import { setTestEnv } from "@/test/env";
+import { ensureActiveTestVideo } from "@/test/videos";
 
 const serverDbUrl = process.env.TEST_DATABASE_URL;
 const isolatedDbName = `vf_messages_${process.pid}`;
@@ -183,6 +184,32 @@ describe.skipIf(!testDbUrl)("Message constructor", () => {
 
     expect((await send("", "POST", { ...draft, day: 9 })).status).toBe(400);
     expect(await list()).toEqual([]);
+  });
+
+  it("saves a stop-point filter in B and refuses it elsewhere", async () => {
+    const targeted = await send("", "POST", { ...draft, segment: "B", statuses: ["sotuvda_toxtadi"] });
+    expect(targeted.status).toBe(201);
+    expect(await targeted.json()).toMatchObject({ segment: "B", statuses: ["sotuvda_toxtadi"] });
+
+    const everyone = await send("", "POST", {
+      ...draft,
+      segment: "B",
+      statuses: ["sotuvda_toxtadi", "dars_yarmida", "korishni_boshladi"],
+    });
+    expect(await everyone.json()).toMatchObject({ statuses: null });
+    expect(await (await send("", "POST", draft)).json()).toMatchObject({ statuses: null });
+
+    const inA = await send("", "POST", { ...draft, statuses: ["korishni_boshladi"] });
+    expect(inA.status).toBe(422);
+    expect(await inA.json()).toEqual({ error: "statuses_invalid" });
+    expect((await send("", "POST", { ...draft, segment: "B", statuses: ["nimadir"] })).status).toBe(400);
+  });
+
+  it("returns the active video's marks for the audience chips", async () => {
+    const video = await ensureActiveTestVideo();
+    await db().update(videos).set({ introEndSec: 300, courseStartSec: 600, priceSec: 800 }).where(eq(videos.id, video.id));
+    const body = await (await request("?segment=B")).json();
+    expect(body.videoMarks).toEqual({ introEndSec: 300, courseStartSec: 600, priceSec: 800 });
   });
 
   describe("night notice", () => {

@@ -2,11 +2,9 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import type { FunnelSegment, SegmentEndReason } from "@funnel/shared";
 import { db } from "@/db";
 import { segmentRuns, users, videos, watchProgress } from "@/db/schema";
-import { segmentFor, statusFor } from "./status";
+import { NO_VIDEO_MARKS, segmentFor, statusFor } from "./status";
 
 type Executor = Pick<ReturnType<typeof db>, "select">;
-
-const noVideoMarks = { duration: 1, introEndSec: null, courseStartSec: null, priceSec: null };
 
 async function snapshot(executor: Executor, userId: number) {
   const [row] = await executor
@@ -21,7 +19,7 @@ async function snapshot(executor: Executor, userId: number) {
 
   const target: FunnelSegment | null = row.user.botBlocked
     ? null
-    : segmentFor(statusFor(row.progress ?? undefined, row.video ?? noVideoMarks, row.user));
+    : segmentFor(statusFor(row.progress ?? undefined, row.video ?? NO_VIDEO_MARKS, row.user));
   const endReason: SegmentEndReason = target !== null ? "advanced" : row.user.botBlocked ? "bot_blocked" : "wrote_admin";
   return { target, endReason, open: row.open };
 }

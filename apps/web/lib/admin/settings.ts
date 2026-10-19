@@ -1,4 +1,4 @@
-import { type AdminSettings, adminSettingsSchema } from "@funnel/shared";
+import { type AdminSettings, adminSettingsSchema, type AdminSettingsUpdate } from "@funnel/shared";
 import { API_URL } from "@/lib/api";
 import { authHeaders } from "@/lib/admin/api";
 
@@ -22,4 +22,4 @@ async function call(init: RequestInit = {}): Promise<SettingsResult> {
 }
 
 export const fetchSettings = () => call();
-export const saveSettings = (input: AdminSettings) => call({ method: "PUT", body: JSON.stringify(input) });
+export const saveSettings = (input: AdminSettingsUpdate) => call({ method: "PUT", body: JSON.stringify(input) });

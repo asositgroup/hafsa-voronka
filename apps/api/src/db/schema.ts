@@ -18,6 +18,7 @@ import { sql } from "drizzle-orm";
 import {
   eventTypes,
   funnelSegments,
+  type FunnelStatus,
   segmentEndReasons,
   type TemplateButton,
   templateMediaTypes,
@@ -270,6 +271,7 @@ export const messageTemplates = pgTable(
     timingType: text("timing_type", { enum: timingTypes }).notNull(),
     timingValue: integer("timing_value").notNull(),
     buttons: jsonb("buttons").$type<TemplateButton[]>().default([]).notNull(),
+    statuses: text("statuses").array().$type<FunnelStatus[]>(),
     isActive: boolean("is_active").default(true).notNull(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -292,6 +294,10 @@ export const messageTemplates = pgTable(
     uniqueIndex("message_templates_night_notice_idx")
       .on(t.segment)
       .where(sql`${t.timingType} = 'night_notice' and ${t.deletedAt} is null`),
+    check(
+      "message_templates_statuses_values",
+      sql`${t.statuses} is null or (cardinality(${t.statuses}) > 0 and ${t.statuses} <@ array['link_berildi', 'korishni_boshladi', 'dars_yarmida', 'sotuvda_toxtadi', 'narxni_kurdi', 'adminga_yozdi']::text[])`,
+    ),
     check("message_templates_media_pair", sql`(${t.mediaType} is null) = (${t.mediaFileId} is null)`),
     check(
       "message_templates_day_time_range",

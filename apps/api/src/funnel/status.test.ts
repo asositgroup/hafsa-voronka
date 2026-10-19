@@ -32,10 +32,20 @@ describe("statusFor", () => {
     expect(statusFor(progress(0), fullMarks, registered)).toBe("korishni_boshladi");
   });
 
-  it("splits korishni_boshladi and dars_yarmida at exactly the lesson midpoint", () => {
-    expect(statusFor(progress(399), fullMarks, registered)).toBe("korishni_boshladi");
-    expect(statusFor(progress(400), fullMarks, registered)).toBe("dars_yarmida");
+  it("splits korishni_boshladi and dars_yarmida exactly at the lesson start mark", () => {
+    expect(statusFor(progress(99), fullMarks, registered)).toBe("korishni_boshladi");
+    expect(statusFor(progress(100), fullMarks, registered)).toBe("dars_yarmida");
     expect(statusFor(progress(699), fullMarks, registered)).toBe("dars_yarmida");
+  });
+
+  it("uses each video's own marks for the TZ 5:00, 15:00 and 18:22 boundaries", () => {
+    const tz: Marks = { duration: 1500, introEndSec: 300, courseStartSec: 900, priceSec: 1102 };
+    expect(statusFor(progress(299), tz, registered)).toBe("korishni_boshladi");
+    expect(statusFor(progress(300), tz, registered)).toBe("dars_yarmida");
+    expect(statusFor(progress(899), tz, registered)).toBe("dars_yarmida");
+    expect(statusFor(progress(900), tz, registered)).toBe("sotuvda_toxtadi");
+    expect(statusFor(progress(1101), tz, registered)).toBe("sotuvda_toxtadi");
+    expect(statusFor(progress(1102), tz, registered)).toBe("narxni_kurdi");
   });
 
   it("switches to sotuvda_toxtadi exactly at the course start mark", () => {
@@ -62,10 +72,10 @@ describe("statusFor", () => {
     expect(statusFor(progress(600), marks, registered)).toBe("narxni_kurdi");
   });
 
-  it("offsets the midpoint by the intro end", () => {
-    const marks = { ...noMarks, introEndSec: 200, courseStartSec: 800 };
-    expect(statusFor(progress(499), marks, registered)).toBe("korishni_boshladi");
-    expect(statusFor(progress(500), marks, registered)).toBe("dars_yarmida");
+  it("uses the lesson start mark even when the course start is missing", () => {
+    const marks = { ...noMarks, introEndSec: 200, priceSec: 800 };
+    expect(statusFor(progress(199), marks, registered)).toBe("korishni_boshladi");
+    expect(statusFor(progress(200), marks, registered)).toBe("dars_yarmida");
   });
 });
 

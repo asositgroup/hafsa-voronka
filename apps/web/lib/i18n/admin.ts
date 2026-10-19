@@ -29,7 +29,7 @@ export const adminUz = {
     B: {
       label: "Ko‘rib to‘xtaganlar",
       explanation:
-        "Videoni ochgan, lekin narx aytiladigan joyga yetmagan odamlar. Narxni eshitishi bilan bu xabarlar to‘xtaydi va «Narxni ko‘rib, yozmaganlar» xabarlari boshlanadi.",
+        "Videoni ochgan, lekin narx aytiladigan joyga yetmagan odamlar. Vaqt odam videoni oxirgi marta to‘xtatgan paytdan hisoblanadi, ko‘rib turgan paytda xabar bormaydi. Narxni eshitishi bilan bu xabarlar to‘xtaydi va «Narxni ko‘rib, yozmaganlar» xabarlari boshlanadi.",
     },
     C: {
       label: "Narxni ko‘rib, yozmaganlar",
@@ -149,7 +149,7 @@ export const adminUz = {
       archived: "Arxiv",
       given: "Berildi",
       opened: "Ochdi",
-      leftEarly: "5 daqiqada chiqdi",
+      leftEarly: "Asosiy darsgacha chiqdi",
       reachedCourse: "Kurs qismiga yetdi",
       reachedPrice: "Narxga yetdi",
       wroteAdmin: "Adminga yozdi",
@@ -192,7 +192,7 @@ export const adminUz = {
     timing: {
       after_entry: {
         A: "Havolani olganidan {time} keyin",
-        B: "Videoni ochganidan {time} keyin",
+        B: "To‘xtaganidan {time} keyin",
         C: "Narxni ko‘rganidan {time} keyin",
       },
       day_time: "Soat {time}",
@@ -227,6 +227,17 @@ export const adminUz = {
       failed: "Jadvalni hisoblab bo‘lmadi. Qayta urinib ko‘ring.",
     },
     reorderFailed: "Tartib boshqa joyda o‘zgargan. Ro‘yxat yangilandi.",
+    stopPoints: {
+      title: "Kimga",
+      hint: "Odam videoning qayerida to‘xtaganiga qarab mos matn boradi. Yuborish paytidagi joyi hisobga olinadi.",
+      all: "Hammasi",
+      price: "narx",
+      names: {
+        korishni_boshladi: "Boshida to‘xtaganlar",
+        dars_yarmida: "Dars o‘rtasida to‘xtaganlar",
+        sotuvda_toxtadi: "Kurs qismida to‘xtaganlar",
+      },
+    },
     editor: {
       day: "Kun",
       newTitle: "Yangi eslatma",
@@ -279,7 +290,7 @@ export const adminUz = {
       timingTypes: {
         after_entry: {
           A: "Havolani olganidan keyin",
-          B: "Videoni ochganidan keyin",
+          B: "To‘xtaganidan keyin",
           C: "Narxni ko‘rganidan keyin",
         },
         day_time: "Belgilangan kun va soatda",
@@ -289,7 +300,7 @@ export const adminUz = {
       timingExamples: {
         after_entry: {
           A: "Masalan: havolani olganidan 30 daqiqa o‘tib",
-          B: "Masalan: videoni ochganidan 2 soat o‘tib",
+          B: "Masalan: videoni to‘xtatganidan 30 daqiqa o‘tib. Yana ko‘rib, yana to‘xtasa, vaqt qaytadan hisoblanadi",
           C: "Masalan: narxni ko‘rganidan 1 soat o‘tib",
         },
         day_time: "Masalan: 2-kun, soat 09:00 da",
@@ -344,6 +355,7 @@ export const adminUz = {
       night: "Tungi vaqt (23:00–07:00) mumkin emas",
       linked_only: "Tungi ogohlantirish faqat havolaga bog‘liq bo‘limlarda ishlaydi",
       night_notice_exists: "Bu bo‘limda tungi ogohlantirish allaqachon bor",
+      statuses_invalid: "To‘xtagan joy bo‘yicha tanlash faqat «Ko‘rib to‘xtaganlar» uchun",
       unsupported_type: "Fayl turi qo‘llab-quvvatlanmaydi",
       too_large: "Fayl juda katta",
       media_not_configured: "Media yuklash sozlanmagan",
@@ -431,6 +443,16 @@ export const adminUz = {
     saved: "Saqlandi",
     invalid: "1 dan 720 gacha butun son kiriting",
     error: "Saqlashda xatolik yuz berdi",
+    caps: {
+      title: "Xabar limitlari",
+      description: "Bitta odamga shu bo‘limda yuboriladigan eslatmalar soni. Barcha bo‘limlar bo‘yicha kuniga 10 tadan oshmaydi.",
+      daily: "Kuniga",
+      total: "Jami",
+      suffix: "ta",
+      noLimit: "Cheklanmagan",
+      hint: "Kuniga 1 dan 10 gacha. Jami 1 dan 100 gacha yoki bo‘sh — cheklanmagan.",
+      invalid: "Kuniga 1–10, jami 1–100 yoki bo‘sh bo‘lishi kerak",
+    },
   },
   videos: {
     uploadsDisabled: "Video yuklash serverda yoqilmagan. Dasturchiga ayting.",
@@ -478,8 +500,9 @@ export const adminUz = {
       failed: "Videoni yuklab bo‘lmadi.",
     },
     marks: {
-      introEnd: "Kirish tugashi",
-      courseStart: "Dars boshlanishi",
+      introEnd: "Asosiy dars boshlanishi",
+      introEndHint: "Shu joygacha to‘xtaganlar «Boshida to‘xtaganlar», keyin «Dars o‘rtasida to‘xtaganlar» hisoblanadi. Odatda 05:00.",
+      courseStart: "Kurs haqidagi qism",
       price: "Narx aytiladigan joy",
       unlock: "Tugma ochiladigan vaqt",
       unlockHint: "Bo‘sh qolsa, narx vaqti ishlatiladi",
@@ -495,8 +518,8 @@ export const adminUz = {
     },
     errors: {
       mark_negative: "Belgilar 0 dan katta bo‘lishi kerak",
-      intro_after_course: "Kirish tugashi dars boshlanishidan oldin bo‘lishi kerak",
-      course_after_price: "Dars boshlanishi narx joyidan oldin bo‘lishi kerak",
+      intro_after_course: "Asosiy dars boshlanishi kurs haqidagi qismdan oldin bo‘lishi kerak",
+      course_after_price: "Kurs haqidagi qism narx joyidan oldin bo‘lishi kerak",
       price_after_duration: "Narx joyi video tugashidan oldin bo‘lishi kerak",
       unlock_out_of_range: "Tugma ochiladigan vaqt 0 dan katta va video tugashidan oldin bo‘lishi kerak",
       price_required: "Faol videoda narx joyi bo‘lishi shart",

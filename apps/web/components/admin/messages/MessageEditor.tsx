@@ -14,6 +14,7 @@ import {
   validateTiming,
   visibleLength,
   sanitizeTelegramHtml,
+  statusTargetSegments,
 } from "@funnel/shared";
 import { Button } from "@/components/admin/ui/Button";
 import { ConfirmDialog, Dialog, Sheet } from "@/components/admin/ui/Dialog";
@@ -25,6 +26,7 @@ import { Segmented } from "@/components/admin/ui/Segmented";
 import { Switch } from "@/components/admin/ui/Switch";
 import { ButtonsEditor } from "@/components/admin/messages/ButtonsEditor";
 import { MessagePreview } from "@/components/admin/messages/MessagePreview";
+import { StopPointPicker, type VideoMarks } from "@/components/admin/messages/StopPointPicker";
 import { TextEditor } from "@/components/admin/messages/editor/TextEditor";
 import { defaultTiming, TimingPicker, timingSummary } from "@/components/admin/messages/TimingPicker";
 import {
@@ -60,6 +62,7 @@ type MessageEditorProps = {
   admins: Admin[];
   mediaEnabled: boolean;
   prefillSupported: boolean;
+  videoMarks: VideoMarks;
   onSaved: (item: MessageTemplate) => void;
   onDeleted: (id: number) => void;
   onClose: () => void;
@@ -72,6 +75,7 @@ export function MessageEditor({
   admins,
   mediaEnabled,
   prefillSupported,
+  videoMarks,
   onSaved,
   onDeleted,
   onClose,
@@ -86,6 +90,7 @@ export function MessageEditor({
           timing: item.timing,
           buttons: item.buttons,
           isActive: item.isActive,
+          statuses: item.statuses,
         }
       : {
           segment,
@@ -95,6 +100,7 @@ export function MessageEditor({
           timing: preset?.timing ?? defaultTiming("after_entry", 1),
           buttons: [],
           isActive: true,
+          statuses: null,
         },
   );
   const [busy, setBusy] = useState<"save" | "upload" | "delete" | "test" | null>(null);
@@ -233,6 +239,14 @@ export function MessageEditor({
 
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-x-8">
             <div className={`${tab === "edit" ? "flex" : "hidden"} flex-col gap-5 lg:flex`}>
+              {statusTargetSegments.includes(segment) && (
+                <StopPointPicker
+                  segment={segment}
+                  value={draft.statuses}
+                  marks={videoMarks}
+                  onChange={(statuses) => patch({ statuses })}
+                />
+              )}
               <TextEditor
                 value={draft.text}
                 onChange={(text) => patch({ text })}

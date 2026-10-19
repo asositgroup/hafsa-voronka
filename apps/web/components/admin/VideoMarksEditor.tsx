@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { type AdminVideoItem, formatMmSs, parseMmSs, validateVideoMarks } from "@funnel/shared";
+import { type AdminVideoItem, defaultLessonStartSec, formatMmSs, parseMmSs, validateVideoMarks } from "@funnel/shared";
 import { AdminVideoPlayer } from "@/components/admin/AdminVideoPlayer";
 import { CloseIcon } from "@/components/icons";
 import { Button } from "@/components/admin/ui/Button";
@@ -36,7 +36,7 @@ type VideoMarksEditorProps = {
 export function VideoMarksEditor({ item, onItems, onClose }: VideoMarksEditorProps) {
   const player = useRef<HTMLVideoElement>(null);
   const [text, setText] = useState<Record<FieldKey, string>>({
-    introEndSec: initialText(item.introEndSec),
+    introEndSec: initialText(item.introEndSec ?? defaultLessonStartSec(item, item.duration)),
     courseStartSec: initialText(item.courseStartSec),
     priceSec: initialText(item.priceSec),
     unlockSec: initialText(item.unlockSec),
@@ -113,7 +113,7 @@ export function VideoMarksEditor({ item, onItems, onClose }: VideoMarksEditorPro
             <Field
               key={key}
               label={label}
-              hint={key === "unlockSec" ? copy.unlockHint : undefined}
+              hint={key === "unlockSec" ? copy.unlockHint : key === "introEndSec" ? copy.introEndHint : undefined}
               suffix={
                 <span className="flex items-center gap-1">
                   <Button variant="secondary" onClick={() => markHere(key)}>

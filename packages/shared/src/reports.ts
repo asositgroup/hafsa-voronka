@@ -3,7 +3,6 @@ import { funnelSegments } from "./funnel";
 
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
-export const LEFT_EARLY_SEC = 300;
 export const ATTRIBUTION_WINDOW_HOURS = 48;
 
 export const adminReportQuerySchema = z.object({

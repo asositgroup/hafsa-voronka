@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { type FunnelSegment, funnelSegments } from "./funnel";
+import { type FunnelSegment, funnelSegments, type FunnelStatus, funnelStatuses } from "./funnel";
 import { formatMmSs } from "./time";
 
 export const templateVariables = [
@@ -35,6 +35,29 @@ export const NIGHT_NOTICE_MINUTE = 22 * 60;
 export const MORNING_SEND_MINUTE = 7 * 60 + 30;
 export const EXTENDED_EXPIRY_MINUTE = 9 * 60;
 export const linkBoundSegments: readonly FunnelSegment[] = ["A", "B"];
+
+export const segmentStatuses: Record<FunnelSegment, readonly FunnelStatus[]> = {
+  A: ["link_berildi"],
+  B: ["korishni_boshladi", "dars_yarmida", "sotuvda_toxtadi"],
+  C: ["narxni_kurdi"],
+};
+
+export const statusTargetSegments: readonly FunnelSegment[] = ["B"];
+
+export function normalizeStatuses(
+  segment: FunnelSegment,
+  statuses: readonly FunnelStatus[] | null,
+): FunnelStatus[] | null {
+  if (statuses === null) return null;
+  const chosen = segmentStatuses[segment].filter((status) => statuses.includes(status));
+  return chosen.length === segmentStatuses[segment].length ? null : chosen;
+}
+
+export function statusesError(segment: FunnelSegment, statuses: readonly FunnelStatus[] | null): boolean {
+  if (statuses === null) return false;
+  if (!statusTargetSegments.includes(segment) || statuses.length === 0) return true;
+  return statuses.some((status) => !segmentStatuses[segment].includes(status));
+}
 
 export type TemplateContext = {
   name: string | null;
@@ -524,13 +547,15 @@ export const messageTemplateBaseSchema = z.object({
   timing: templateTimingSchema,
   buttons: z.array(templateButtonSchema).max(MAX_TEMPLATE_BUTTONS),
   isActive: z.boolean(),
+  statuses: z.array(z.enum(funnelStatuses)).min(1).max(funnelStatuses.length).nullable().default(null),
 });
 
 export type MessageTemplateInput = z.infer<typeof messageTemplateBaseSchema>;
 
 export type TemplateValidationIssue =
   | { path: "text"; error: TemplateTextError["error"]; variable?: string }
-  | { path: "timing"; error: TimingError };
+  | { path: "timing"; error: TimingError }
+  | { path: "statuses"; error: "statuses_invalid" };
 
 export function validateTemplateInput(input: MessageTemplateInput): TemplateValidationIssue | null {
   const textError = validateTemplateText(input.text, input.media !== null);
@@ -540,6 +565,7 @@ export function validateTemplateInput(input: MessageTemplateInput): TemplateVali
   if (input.timing.type === "night_notice" && !linkBoundSegments.includes(input.segment)) {
     return { path: "timing", error: "linked_only" };
   }
+  if (statusesError(input.segment, input.statuses)) return { path: "statuses", error: "statuses_invalid" };
   return null;
 }
 
@@ -549,7 +575,7 @@ export const messageTemplateInputSchema = messageTemplateBaseSchema.superRefine(
   ctx.addIssue({
     code: "custom",
     message: issue.error,
-    path: issue.path === "text" ? ["text"] : ["timing", "value"],
+    path: issue.path === "timing" ? ["timing", "value"] : [issue.path],
   });
 });
 
@@ -566,6 +592,13 @@ export const messageTemplatesResponseSchema = z.object({
   admins: z.array(z.object({ telegramId: z.number().int(), label: z.string() })),
   mediaEnabled: z.boolean(),
   prefillSupported: z.boolean(),
+  videoMarks: z
+    .object({
+      introEndSec: z.number().nullable(),
+      courseStartSec: z.number().nullable(),
+      priceSec: z.number().nullable(),
+    })
+    .nullable(),
 });
 
 export type MessageTemplatesResponse = z.infer<typeof messageTemplatesResponseSchema>;

@@ -532,6 +532,12 @@ Execute the complete end-to-end user journey:
 - [ ] The night notice (22:00 warning before the expiry night) is not seeded: an admin must create a message with the "night notice" timing in the messages constructor, otherwise no warning is sent. Use "Jadvalni sinash" to check the resulting schedule
 - [ ] Run TZ Test 6 (Range / 206) against the production video URL: `scripts/check-range.sh https://video.yourdomain.uz/lesson-1/master.mp4`. It prints `status=206 accept-ranges=bytes` and exits non-zero otherwise. Use the MP4 URL; for HLS check a `.ts` segment
 - [ ] Lead cards in the leads chat now have a «Yozdi» button; pressing it (or marking the lead "won") stops reminders for that person. Check it on one test lead
+- [ ] Migrations 0017 (`second_chance`: link grants and the «Qayta imkon» run) and 0018 (`video_imports`) also run at API startup; nothing to run by hand
+- [ ] Google Drive import: enable the Google Drive API in the same Google Cloud project as the Sheets service account, then share each Drive file (or its folder) with the service account email. Without both, `/admin/videos` import fails
+- [ ] Load the starting reminder texts for segments A, B and C once: `pnpm --filter api seed:templates`. It only fills segments that have no templates yet, so rerunning is safe. Review and edit the texts in the constructor afterwards
+- [ ] Write the «Qayta imkon» (segment D) afsus texts, one per day for days 1 to 7, in the constructor before deploying. They are not seeded, and without them no afsus is sent
+- [ ] The first scheduler tick after deploy sends afsus 1 to everyone whose link expired in the last 7 days. Expect a burst; check the texts and the audience size first
+- [ ] Still pending and not part of this release: the «Keyinroq» time picker (6a) and the short «Kurs haqida» video on "Ha" (6b)
 
 ---
 

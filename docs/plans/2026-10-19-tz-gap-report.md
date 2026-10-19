@@ -9,7 +9,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing · ➖ not applicable
 | Requirement | Status | Notes |
 |---|---|---|
 | Link expires after 24h | ✅ | Default is now 24h, editable in Sozlamalar (90b5203). Production may still hold 72 until saved |
-| Reminder schedule (1, 3, 5, 7, 9, 14, 19, 20–23h) | 🟡 | Can be built in the constructor as "before expiry" messages; the TZ texts are not entered |
+| Reminder schedule (1, 3, 5, 7, 9, 14, 19, 20–23h) | ✅ | Built in the constructor as "before expiry" messages; `pnpm --filter api seed:templates` loads the TZ texts as starting templates for segments A, B and C (empty segments only) |
 | `[X] soat` remaining time | ✅ | `{qolgan_vaqt}` |
 | Counted back from expiry, recalculated if expiry changes | ✅ | before_expiry is computed live from `link_expires_at` |
 | Stops when the video is opened | ✅ | User moves to segment B |
@@ -23,12 +23,12 @@ Legend: ✅ done · 🟡 partial · ❌ missing · ➖ not applicable
 
 | Requirement | Status | Notes |
 |---|---|---|
-| «Afsus» message with Ha / Keyinroq | ❌ | The Mini App shows a "link expired, write to admin" screen; reminders keep running after expiry |
-| "Ha" reopens the link once for 24h | ❌ | |
-| "Keyinroq" → choose a time (Bugun 20:00 / Ertaga 08:00 / Ertaga 20:00 / Boshqa vaqt: day + hour 07–22) | ❌ | Existing «Qachon ko'rasiz?» menu (Bugun/Ertaga/Keyinroq) only logs the answer and replies |
-| Store `tanlangan_vaqt`, status `qayta_imkon_kutilmoqda` | ❌ | |
-| Reminder 1h before; at the chosen time a new link and a restart of the §1 chain | ❌ | |
-| Repeat at most once a day, 7 times over 7 days; 7-day «afsus» text bank, no repeats | ❌ | |
+| «Afsus» message with Ha / Keyinroq | ✅ | At expiry the A/B chain ends and the «Qayta imkon» (D) run sends the afsus page (4d4baf0). The texts are written by an admin; none are seeded |
+| "Ha" reopens the link once for 24h | ✅ | One reopening per offer, restarts the chain with the night rules and keeps progress (4d4baf0) |
+| "Keyinroq" → choose a time (Bugun 20:00 / Ertaga 08:00 / Ertaga 20:00 / Boshqa vaqt: day + hour 07–22) | 🟡 | 6a pending: «Keyinroq» is a plain later button; the time picker is not built |
+| Store `tanlangan_vaqt`, status `qayta_imkon_kutilmoqda` | 🟡 | Afsus run and `qayta_imkon` statuses exist (4d4baf0); `tanlangan_vaqt` waits for 6a |
+| Reminder 1h before; at the chosen time a new link and a restart of the §1 chain | 🟡 | Restart of the chain after "Ha" works; the 1h-before reminder and the timed new link wait for 6a |
+| Repeat at most once a day, 7 times over 7 days; 7-day «afsus» text bank, no repeats | ✅ | At most once a day, 7 times in 7 days, day-k text (4d4baf0) |
 
 ## §3. People who stopped before the sales part
 
@@ -42,14 +42,14 @@ Legend: ✅ done · 🟡 partial · ❌ missing · ➖ not applicable
 | At most 7 messages in this chain and at most 4 per day | ✅ | Per-audience caps in Sozlamalar; B defaults to 4 per day, 7 total (5dcb166) |
 | Night messages move to 07:00–08:00 | ✅ | Now collapsed into one at 07:30 (c2ba852) |
 | Stops on narxni_kurdi / adminga_yozdi / bloklagan | ✅ | |
-| §3.8 different «afsus» text, and "Ha" first plays the short «Kurs haqida» video | ❌ | This is what the short offer video is for; its upload is built but hidden and nothing plays it |
+| §3.8 different «afsus» text, and "Ha" first plays the short «Kurs haqida» video | 🟡 | Text variant for people who stopped before the price is done (4d4baf0); 6b pending: the short video is not played on "Ha" |
 | §3.9 metrics | ✅ | `/admin/reports` |
 
 ## §4. Saw the price but didn't write (progrev)
 
 | Requirement | Status | Notes |
 |---|---|---|
-| Messages at 10–15 min / 3h / next day / 2–3 days | ✅ | Segment C in the constructor; the TZ texts are not entered |
+| Messages at 10–15 min / 3h / next day / 2–3 days | ✅ | Segment C in the constructor; the seed command loads the TZ texts as starting templates |
 | "Adminga yozish" with pre-filled text | ✅ | Needs `CHANNEL_URL` to be a `t.me/username` link |
 | Admin marks "yozdi" by hand so progrev stops | ✅ | «Yozdi» lead-card button and "won" both stop reminders (90b5203) |
 
@@ -58,13 +58,13 @@ Legend: ✅ done · 🟡 partial · ❌ missing · ➖ not applicable
 | Requirement | Status | Notes |
 |---|---|---|
 | link_berildi → ko'rdi → adminga_yozdi, plus the partial-viewer statuses | ✅ | |
-| `qayta_imkon` statuses | ❌ | Depends on §2 |
+| `qayta_imkon` statuses | ✅ | (4d4baf0) |
 | Video sent by the bot with `protect_content`, deleted after 24h | ➖ | We use the Mini App, not a video message |
 | Only one reminder in the chat; the previous one is deleted | ✅ | Plus the 47h cleanup sweep |
-| On expiry, delete all reminders tied to that link | ❌ | |
-| Separate text bank per day; never repeat a text to the same person | 🟡 | No repeats within one chain; no rule across second chances |
+| On expiry, delete all reminders tied to that link | ✅ | Links are grants; that link's reminders are deleted at expiry (4d4baf0) |
+| Separate text bank per day; never repeat a text to the same person | ✅ | Day-k afsus text per second chance, no repeats (4d4baf0) |
 | Scheduler every minute; 403 marks the user blocked and stops | ✅ | |
-| `tanlangan_vaqt` stored | ❌ | Depends on §2 |
+| `tanlangan_vaqt` stored | 🟡 | Waits for the 6a time picker |
 
 ## §6. Resume in the Mini App
 
@@ -91,24 +91,22 @@ Legend: ✅ done · 🟡 partial · ❌ missing · ➖ not applicable
 | §7 7-day constructor | ✅ | Timeline view with the full Telegram-HTML editor; drag reorder replaced by time order |
 | §7.3 rules | ✅ | Telegram's 48h delete limit covered by the 47h sweep |
 | §8 Videos page, «Shu joyni belgilash», activate, archive | ✅ | Plus per-video unlock time and the player |
-| §8 Google Drive / YouTube links | ❌ | Deferred |
-| §8 short «Kurs haqida» video | 🟡 | Upload is built but hidden; nothing uses it yet (see §3.8) |
+| §8 Google Drive / YouTube links | 🟡 | Google Drive import is done (1aaaf81): `/admin/videos` copies a Drive file to R2 through the Drive API. YouTube links are not supported |
+| §8 short «Kurs haqida» video | 🟡 | Upload is built but hidden; nothing plays it yet (6b, see §3.8) |
 | §8.2 replace the video from the bot (Test 1) | ✅ | Files over 20 MB need the local Bot API server, not yet tried on staging |
 | §9 reports and Excel | ✅ | |
 
 ## Where the full TZ contradicts what is built
 
-1. **Link length**: the TZ says 24h; the default is 72h.
-2. **Chain start**: the TZ counts §3 timings from when the person **stopped**; we count from when they **entered the segment**.
+1. **Keyinroq**: the TZ wants a time picker (Bugun 20:00 / Ertaga 08:00 / Ertaga 20:00 / Boshqa vaqt); «Keyinroq» is still a plain later button (6a).
+2. **Short «Kurs haqida» video**: the TZ wants it played on "Ha" for people who stopped before the price; it is not played (6b).
 3. **The 5:00 status boundary**: the TZ fixes it at 5:00, but §8.3 forbids hardcoded times. Using the optional `asosiy_dars_boshlanishi` mark satisfies both.
-4. **Night handling**: the TZ wants the expiry extension, collapsing night reminders and a 22:00 evening warning; we shift each message to 07:00.
-5. **After expiry**: the TZ wants the §2 «afsus» flow; we show an expired screen and reminders keep running.
-6. **Daily cap**: 4 per day for §3 in the TZ; we have 10 per day globally.
+4. **Daily cap**: 4 per day for §3 in the TZ; the cap is a per-audience panel setting (B defaults to 4 per day, 7 total).
+5. **YouTube links** are not supported; only Drive import and direct upload.
 
 ## Biggest gaps
 
-1. §2 second-chance flow, together with §3.8 and the short video
-2. §1.1 night rules
-3. §3.4 sub-status targeting and §3.6 timings counted from the stop
-4. §6 resume reliability
-5. Small items: admin marks "yozdi" by hand, 24h default, the 5:00 boundary, the 4-per-day cap for §3
+1. 6a: the «Keyinroq» time picker with `tanlangan_vaqt`, the 1h-before reminder and the timed new link
+2. 6b: playing the short «Kurs haqida» video on "Ha" (§3.8)
+3. Acceptance: the whole TZ test list (including Test 6 against the production video URL) has not been run end-to-end in Telegram
+4. Content: the «Qayta imkon» afsus texts must be written by an admin; the night notice template must be created

@@ -19,6 +19,7 @@ async function readJson(request: { json: () => Promise<unknown> }) {
 export const videoRoutes = new Hono<AppEnv>();
 
 videoRoutes.post("/progress", async (c) => {
+  c.header("cache-control", "no-store");
   const body = await readJson(c.req);
   const parsed = progressRequestSchema.safeParse(body);
   if (!parsed.success) {

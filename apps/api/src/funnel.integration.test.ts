@@ -176,7 +176,7 @@ describe.skipIf(!testDbUrl)("Funnel Integration Tests", () => {
       return sessionResponseSchema.parse(await res.json());
     }
 
-    it("stamps link_given_at and link_expires_at 72 hours out on registration", async () => {
+    it("stamps link_given_at and link_expires_at 24 hours out on registration", async () => {
       const { completeRegistration } = await import("./funnel/registration");
       const video = await createTestVideo();
       const [created] = await db()
@@ -190,7 +190,7 @@ describe.skipIf(!testDbUrl)("Funnel Integration Tests", () => {
       );
       expect(registered?.linkGivenAt).toEqual(registered?.registeredAt);
       const ttlMs = registered!.linkExpiresAt!.getTime() - registered!.linkGivenAt!.getTime();
-      expect(ttlMs).toBe(72 * 3_600_000);
+      expect(ttlMs).toBe(24 * 3_600_000);
     });
 
     it("reports expired only after the deadline and while neither completed nor written to admin", async () => {
@@ -204,8 +204,18 @@ describe.skipIf(!testDbUrl)("Funnel Integration Tests", () => {
       const completed = await sessionUser({ linkExpiresAt: past, completedAt: new Date() });
       expect((await session(completed.telegramId)).expired).toBe(false);
 
-      const clicked = await sessionUser({ linkExpiresAt: past, channelClickAt: new Date() });
+      const clicked = await sessionUser({ linkExpiresAt: past, wroteAdminAt: new Date() });
       expect((await session(clicked.telegramId)).expired).toBe(false);
+    });
+
+    it("marks the session response as not cacheable", async () => {
+      const user = await sessionUser();
+      const res = await createApp().request("/app/session", {
+        method: "POST",
+        headers: { authorization: makeAuthHeader(user.telegramId), "content-type": "application/json" },
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get("cache-control")).toBe("no-store");
     });
 
     it("returns the resume position by default and the course start for offer", async () => {

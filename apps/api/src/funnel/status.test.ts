@@ -4,7 +4,7 @@ import { segmentFor, statusFor } from "./status";
 
 type Marks = { duration: number; introEndSec: number | null; courseStartSec: number | null; priceSec: number | null };
 
-const registered = { registeredAt: new Date(1), channelClickAt: null as Date | null };
+const registered = { registeredAt: new Date(1), wroteAdminAt: null as Date | null };
 const fullMarks: Marks = { duration: 1000, introEndSec: 100, courseStartSec: 700, priceSec: 900 };
 const noMarks: Marks = { duration: 1000, introEndSec: null, courseStartSec: null, priceSec: null };
 
@@ -14,11 +14,11 @@ function progress(maxPosition: number, started = true) {
 
 describe("statusFor", () => {
   it("is null for an unregistered user", () => {
-    expect(statusFor(progress(500), fullMarks, { registeredAt: null, channelClickAt: null })).toBeNull();
+    expect(statusFor(progress(500), fullMarks, { registeredAt: null, wroteAdminAt: null })).toBeNull();
   });
 
   it("is adminga_yozdi once the user wrote to admin, even past the price mark", () => {
-    const user = { registeredAt: new Date(1), channelClickAt: new Date(3) };
+    const user = { registeredAt: new Date(1), wroteAdminAt: new Date(3) };
     expect(statusFor(progress(950), fullMarks, user)).toBe("adminga_yozdi");
     expect(statusFor(undefined, fullMarks, user)).toBe("adminga_yozdi");
   });

@@ -274,6 +274,7 @@ describe.skipIf(!testDbUrl)("Video Integration Tests", () => {
 
     const [user1] = await db().select().from(users).where(eq(users.id, user.id));
     expect(user1.channelClickAt).toEqual(t1);
+    expect(user1.wroteAdminAt).toEqual(t1);
 
     const t2 = new Date(1700001000000);
     const res2 = await recordVideoEvent(telegramId, "channel_click", t2);
@@ -281,11 +282,26 @@ describe.skipIf(!testDbUrl)("Video Integration Tests", () => {
 
     const [user2] = await db().select().from(users).where(eq(users.id, user.id));
     expect(user2.channelClickAt).toEqual(t1);
+    expect(user2.wroteAdminAt).toEqual(t1);
 
     const clickEvents = (
       await db().select().from(events).where(eq(events.userId, user.id))
     ).filter((e) => e.type === "channel_click");
     expect(clickEvents.length).toBe(2);
+  });
+
+  it("marks the progress response as not cacheable", async () => {
+    const telegramId = Math.floor(Math.random() * 1000000) + 450000;
+    await createRegisteredUser(telegramId);
+
+    const res = await createApp().request("/app/progress", {
+      method: "POST",
+      headers: { authorization: makeAuthHeader(telegramId), "content-type": "application/json" },
+      body: JSON.stringify({ position: 10, event: "tick" }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("no-store");
   });
 
   it("returns 404 for an unregistered user", async () => {

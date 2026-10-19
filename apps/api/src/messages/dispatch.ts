@@ -102,7 +102,7 @@ async function loadCandidates(now: Date, userId?: number): Promise<Candidate[]> 
       and(
         isNull(segmentRuns.endedAt),
         eq(users.botBlocked, false),
-        isNull(users.channelClickAt),
+        isNull(users.wroteAdminAt),
         gt(segmentRuns.enteredAt, since),
         userId === undefined ? undefined : eq(segmentRuns.userId, userId),
       ),
@@ -206,7 +206,7 @@ async function sendOne(api: Api, pick: Pick, now: Date, pace: Pace): Promise<Sen
     select ${userId}, ${item.template.id}, ${runId}, ${item.dueAt.toISOString()}::timestamptz, ${nowIso}::timestamptz
     where exists (
         select 1 from segment_runs r join users u on u.id = r.user_id
-        where r.id = ${runId} and r.ended_at is null and u.bot_blocked = false and u.channel_click_at is null
+        where r.id = ${runId} and r.ended_at is null and u.bot_blocked = false and u.wrote_admin_at is null
       )
       and exists (
         select 1 from message_templates t

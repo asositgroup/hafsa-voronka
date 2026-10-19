@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { settings } from "@/db/schema";
 
-const DEFAULT_LINK_TTL_HOURS = 72;
+const DEFAULT_LINK_TTL_HOURS = 24;
 
 let cache: Map<string, string> | undefined;
 

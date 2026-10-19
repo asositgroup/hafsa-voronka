@@ -22,6 +22,7 @@ async function readJson(request: { json: () => Promise<unknown> }) {
 export const miniappRoutes = new Hono<AppEnv>();
 
 miniappRoutes.post("/session", async (c) => {
+  c.header("cache-control", "no-store");
   const { reason, start, sentMessageId } = sessionRequestSchema.catch({ reason: "open" }).parse(await readJson(c.req));
   const { user } = await upsertUser(c.get("telegramUser"), c.get("startParam"));
   const video = await videoForUser(user);
@@ -48,7 +49,7 @@ miniappRoutes.post("/session", async (c) => {
     user.linkExpiresAt !== null &&
     new Date() >= user.linkExpiresAt &&
     user.completedAt === null &&
-    user.channelClickAt === null;
+    user.wroteAdminAt === null;
 
   return c.json({
     registered: user.registeredAt !== null,

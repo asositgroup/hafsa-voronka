@@ -48,6 +48,8 @@ const user: CardUser = {
   phoneVerified: true,
   registeredAt: new Date("2026-10-12T09:35:00Z"),
   completedAt: null,
+  wroteAdminAt: null,
+  wroteAdminBy: null,
 };
 
 describe("renderLeadCard", () => {
@@ -119,6 +121,33 @@ describe("renderLeadCard", () => {
   });
 });
 
+describe("renderLeadCard wrote-admin mark", () => {
+  const linked: Lead = { ...webLead, userId: 5 };
+  const wroteAt = new Date("2026-10-12T10:00:00Z");
+
+  it("shows the mark with the admin who set it and the time", () => {
+    const card = renderLeadCard(
+      { ...linked, assigneeTelegramId: 42, assigneeName: "Sardor" },
+      { ...user, wroteAdminAt: wroteAt, wroteAdminBy: 42 },
+    );
+    expect(card).toContain("✍️ Adminga yozdi · Sardor · 2026-10-12 15:00 (Toshkent)");
+  });
+
+  it("falls back to the telegram id for an admin who is not the assignee", () => {
+    const card = renderLeadCard(linked, { ...user, wroteAdminAt: wroteAt, wroteAdminBy: 77 });
+    expect(card).toContain("✍️ Adminga yozdi · ID 77 · 2026-10-12 15:00 (Toshkent)");
+  });
+
+  it("omits the who part when the user wrote on their own", () => {
+    const card = renderLeadCard(linked, { ...user, wroteAdminAt: wroteAt });
+    expect(card).toContain("✍️ Adminga yozdi · 2026-10-12 15:00 (Toshkent)");
+  });
+
+  it("shows nothing before the mark", () => {
+    expect(renderLeadCard(linked, user)).not.toContain("Adminga yozdi");
+  });
+});
+
 describe("watchedPercent", () => {
   it("rounds and clamps to 0..100", () => {
     expect(watchedPercent(150, 600)).toBe(25);
@@ -129,7 +158,7 @@ describe("watchedPercent", () => {
 
 describe("renderLeadKeyboard", () => {
   const buttons = (lead: Lead) =>
-    renderLeadKeyboard(lead).inline_keyboard.map((row) =>
+    renderLeadKeyboard(lead, null).inline_keyboard.map((row) =>
       row.map((b) => `${b.text}|${"callback_data" in b ? b.callback_data : ""}`),
     );
 
@@ -148,5 +177,41 @@ describe("renderLeadKeyboard", () => {
 
   it("removes the buttons once an outcome is set", () => {
     expect(buttons({ ...webLead, assigneeTelegramId: 42, outcome: "lost" })).toEqual([]);
+  });
+
+  const linkedLead: Lead = { ...webLead, userId: 5 };
+  const linkedButtons = (lead: Lead, cardUser: CardUser | null) =>
+    renderLeadKeyboard(lead, cardUser).inline_keyboard.map((row) =>
+      row.map((b) => `${b.text}|${"callback_data" in b ? b.callback_data : ""}`),
+    );
+
+  it("adds the wrote button for a linked lead whose user has not written to admin", () => {
+    expect(linkedButtons(linkedLead, user)).toEqual([
+      ["🙋 Men olaman|lead:claim:1"],
+      ["✅ Muvaffaqiyatli|lead:won:1", "❌ Yo'qotildi|lead:lost:1"],
+      ["✍️ Yozdi|lead:wrote:1"],
+    ]);
+  });
+
+  it("keeps the wrote button after an outcome is set", () => {
+    expect(linkedButtons({ ...linkedLead, assigneeTelegramId: 42, outcome: "lost" }, user)).toEqual([
+      ["✍️ Yozdi|lead:wrote:1"],
+    ]);
+  });
+
+  it("hides the wrote button once the user wrote to admin", () => {
+    const wrote = { ...user, wroteAdminAt: new Date("2026-10-12T10:00:00Z") };
+    expect(linkedButtons(linkedLead, wrote)).toEqual([
+      ["🙋 Men olaman|lead:claim:1"],
+      ["✅ Muvaffaqiyatli|lead:won:1", "❌ Yo'qotildi|lead:lost:1"],
+    ]);
+    expect(linkedButtons({ ...linkedLead, outcome: "won" }, wrote)).toEqual([]);
+  });
+
+  it("hides the wrote button for a lead without a user row", () => {
+    expect(linkedButtons(webLead, null)).toEqual([
+      ["🙋 Men olaman|lead:claim:1"],
+      ["✅ Muvaffaqiyatli|lead:won:1", "❌ Yo'qotildi|lead:lost:1"],
+    ]);
   });
 });

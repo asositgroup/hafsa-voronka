@@ -61,7 +61,7 @@ function createBot() {
     });
   });
 
-  root.callbackQuery(/^lead:(claim|won|lost):(\d+)$/, async (ctx) => {
+  root.callbackQuery(/^lead:(claim|won|lost|wrote):(\d+)$/, async (ctx) => {
     if (!isLeadsChat(ctx.chat)) {
       await ctx.answerCallbackQuery();
       return;

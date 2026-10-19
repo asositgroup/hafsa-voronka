@@ -4,7 +4,7 @@ import { formatTashkentDate } from "@/sheets";
 
 export type CardUser = Pick<
   User,
-  "telegramId" | "username" | "phone" | "phoneVerified" | "registeredAt" | "completedAt"
+  "telegramId" | "username" | "phone" | "phoneVerified" | "registeredAt" | "completedAt" | "wroteAdminAt" | "wroteAdminBy"
 > & { watchedPercent?: number };
 
 const PROGRESS_CELLS = 10;
@@ -32,6 +32,13 @@ function utmLine(lead: Lead) {
 function telegramLine(user: CardUser) {
   const handle = user.username ? `@${user.username.replace(/^@/, "")}` : "username yo'q";
   return `💬 ${handle} · ID ${user.telegramId}`;
+}
+
+function wroteAdminLine(lead: Lead, at: Date, by: number | null) {
+  const parts = ["✍️ Adminga yozdi"];
+  if (by !== null) parts.push(by === lead.assigneeTelegramId ? assigneeLabel(lead) : `ID ${by}`);
+  parts.push(tashkent(at));
+  return parts.join(" · ");
 }
 
 export function renderLeadCard(lead: Lead, user: CardUser | null | undefined): string {
@@ -71,13 +78,14 @@ export function renderLeadCard(lead: Lead, user: CardUser | null | undefined): s
   if (registered?.completedAt) lines.push("🎬 Videoni ko'rib bo'ldi");
   else if (registered) lines.push(progressLine(registered.watchedPercent));
 
+  if (user?.wroteAdminAt) lines.push(wroteAdminLine(lead, user.wroteAdminAt, user.wroteAdminBy));
   if (lead.assigneeTelegramId !== null) lines.push(`👨‍💼 Mas'ul: ${assigneeLabel(lead)}`);
   if (lead.outcome) lines.push(`🏁 Natija: ${outcomeLabels[lead.outcome]}`);
 
   return lines.join("\n");
 }
 
-export type LeadAction = "claim" | "won" | "lost";
+export type LeadAction = "claim" | "won" | "lost" | "wrote";
 
 export const outcomeLabels = {
   won: "✅ Muvaffaqiyatli",
@@ -93,15 +101,24 @@ export function leadActionData(action: LeadAction, leadId: number) {
   return `lead:${action}:${leadId}`;
 }
 
-export function renderLeadKeyboard(lead: Lead): InlineKeyboard {
-  if (lead.outcome) return new InlineKeyboard([]);
-  const claimText =
-    lead.assigneeTelegramId === null ? "🙋 Men olaman" : `👤 ${lead.assigneeName || "Biriktirilgan"}`;
-  return new InlineKeyboard()
-    .text(claimText, leadActionData("claim", lead.id))
-    .row()
-    .text(outcomeLabels.won, leadActionData("won", lead.id))
-    .text(outcomeLabels.lost, leadActionData("lost", lead.id));
+export function renderLeadKeyboard(
+  lead: Lead,
+  user: Pick<CardUser, "wroteAdminAt"> | null | undefined,
+): InlineKeyboard {
+  const rows: { text: string; data: string }[][] = [];
+  if (!lead.outcome) {
+    const claimText =
+      lead.assigneeTelegramId === null ? "🙋 Men olaman" : `👤 ${lead.assigneeName || "Biriktirilgan"}`;
+    rows.push([{ text: claimText, data: leadActionData("claim", lead.id) }]);
+    rows.push([
+      { text: outcomeLabels.won, data: leadActionData("won", lead.id) },
+      { text: outcomeLabels.lost, data: leadActionData("lost", lead.id) },
+    ]);
+  }
+  if (lead.userId !== null && user && user.wroteAdminAt === null) {
+    rows.push([{ text: "✍️ Yozdi", data: leadActionData("wrote", lead.id) }]);
+  }
+  return new InlineKeyboard(rows.map((row) => row.map(({ text, data }) => InlineKeyboard.text(text, data))));
 }
 
 export function renderCompletionReply(lead: Lead): string {

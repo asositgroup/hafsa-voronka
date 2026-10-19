@@ -86,6 +86,8 @@ export const users = pgTable(
   completedAt: timestamp("completed_at", { withTimezone: true }),
   unlockedAt: timestamp("unlocked_at", { withTimezone: true }),
   channelClickAt: timestamp("channel_click_at", { withTimezone: true }),
+  wroteAdminAt: timestamp("wrote_admin_at", { withTimezone: true }),
+  wroteAdminBy: bigint("wrote_admin_by", { mode: "number" }),
   botBlocked: boolean("bot_blocked").default(false).notNull(),
   videoId: bigint("video_id", { mode: "number" }).references(() => videos.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

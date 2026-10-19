@@ -57,7 +57,7 @@ describe.skipIf(!database.url)("Admin settings", () => {
   it("returns the default link TTL", async () => {
     const res = await app.request("/admin/settings", { headers: { cookie } });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ linkTtlHours: 72 });
+    expect(await res.json()).toEqual({ linkTtlHours: 24 });
   });
 
   it("rejects out-of-range and non-numeric values", async () => {

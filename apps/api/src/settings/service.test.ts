@@ -22,24 +22,24 @@ describe.skipIf(!testDbUrl)("Settings", () => {
     await closeDb();
   });
 
-  it("defaults the link TTL to 72 hours", async () => {
-    expect(await linkTtlHours()).toBe(72);
-  });
-
-  it("reads an override and refreshes after invalidation", async () => {
-    expect(await linkTtlHours()).toBe(72);
-    await db().insert(settings).values({ key: "LINK_TTL_HOURS", value: "24" });
-    expect(await linkTtlHours()).toBe(72);
-    invalidateSettings();
+  it("defaults the link TTL to 24 hours", async () => {
     expect(await linkTtlHours()).toBe(24);
   });
 
-  it("falls back to 72 for values that are not positive integers", async () => {
+  it("reads an override and refreshes after invalidation", async () => {
+    expect(await linkTtlHours()).toBe(24);
+    await db().insert(settings).values({ key: "LINK_TTL_HOURS", value: "72" });
+    expect(await linkTtlHours()).toBe(24);
+    invalidateSettings();
+    expect(await linkTtlHours()).toBe(72);
+  });
+
+  it("falls back to 24 for values that are not positive integers", async () => {
     for (const value of ["0", "-5", "abc", "1.5", ""]) {
       await db().delete(settings);
       await db().insert(settings).values({ key: "LINK_TTL_HOURS", value });
       invalidateSettings();
-      expect(await linkTtlHours()).toBe(72);
+      expect(await linkTtlHours()).toBe(24);
     }
   });
 });

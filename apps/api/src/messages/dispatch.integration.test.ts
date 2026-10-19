@@ -288,7 +288,7 @@ describe.skipIf(!testDbUrl)("Message dispatcher", () => {
   });
 
   it("ignores users who wrote to the admin", async () => {
-    const user = await makeUser({ channelClickAt: at(30) });
+    const user = await makeUser({ wroteAdminAt: at(30) });
     const run = await openRun(user.id);
     await closeRun(run.id, at(30), "wrote_admin");
     await makeTemplate();
@@ -477,6 +477,7 @@ describe.skipIf(!testDbUrl)("Message dispatcher", () => {
       expect(clicks[0].meta).toMatchObject({ sentMessageId: row.id, via: "url", button: 1, kind: "link" });
       const [unchanged] = await db().select().from(users).where(eq(users.id, user.id));
       expect(unchanged.channelClickAt).toBeNull();
+      expect(unchanged.wroteAdminAt).toBeNull();
     });
 
     it("treats an admin button click as writing to the admin", async () => {
@@ -486,6 +487,7 @@ describe.skipIf(!testDbUrl)("Message dispatcher", () => {
       expect(res.headers.get("location")?.startsWith("https://t.me/example")).toBe(true);
       const [after] = await db().select().from(users).where(eq(users.id, user.id));
       expect(after.channelClickAt).not.toBeNull();
+      expect(after.wroteAdminAt).not.toBeNull();
       const channelEvents = await db().select().from(events).where(eq(events.type, "channel_click"));
       expect(channelEvents).toHaveLength(1);
       const [closed] = await db().select().from(segmentRuns).where(eq(segmentRuns.id, run.id));

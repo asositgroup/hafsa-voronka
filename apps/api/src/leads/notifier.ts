@@ -91,7 +91,7 @@ export function leadSender(): LeadSender | undefined {
 
 export async function syncLeadCard(lead: Lead, user: CardUser | null, sender: LeadSender) {
   const text = renderLeadCard(lead, user);
-  const keyboard = renderLeadKeyboard(lead);
+  const keyboard = renderLeadKeyboard(lead, user);
   let messageId = lead.notifyMessageId;
   if (messageId === null) {
     messageId = await sender.send(text, { keyboard });

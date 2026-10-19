@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { closeDb, db } from "@/db";
-import { events, leads, users } from "@/db/schema";
+import { events, leads, segmentRuns, users } from "@/db/schema";
 import { runMigrations } from "@/db/migrate";
 import { setTestEnv } from "@/test/env";
 import type { LeadSender } from "./notifier";
@@ -298,5 +298,133 @@ describe.skipIf(!testDbUrl)("Landing leads", () => {
       [601, 602, 603].map((id) => applyLeadAction(lead.id, "claim", { id, name: `S${id}` })),
     );
     expect(results.filter((r) => r.ok)).toHaveLength(1);
+  });
+
+  describe("manual wrote-to-admin mark", () => {
+    async function linkedLead() {
+      const vid = visitorId();
+      const phone = randomPhone();
+      await post({ visitor_id: vid, name: "Mark", phone });
+      const [user] = await db()
+        .insert(users)
+        .values({
+          telegramId: Math.floor(Math.random() * 1e9) + 5_000_000_000,
+          name: "Mark",
+          phone,
+          phoneVerified: true,
+          visitorId: vid,
+          registeredAt: new Date(),
+        })
+        .returning();
+      await service.attachLeadToUser(user);
+      await db().insert(segmentRuns).values({ userId: user.id, segment: "A" });
+      const [lead] = await leadsFor(vid);
+      return { user, lead };
+    }
+
+    async function userRow(id: number) {
+      const [row] = await db().select().from(users).where(eq(users.id, id));
+      return row;
+    }
+
+    async function openRuns(userId: number) {
+      const runs = await db().select().from(segmentRuns).where(eq(segmentRuns.userId, userId));
+      return runs.filter((run) => run.endedAt === null);
+    }
+
+    it("lets any member mark it without claiming, ends the run and keeps channel_click_at empty", async () => {
+      const { applyLeadAction, leadActionReplies } = await import("./actions");
+      const { user, lead } = await linkedLead();
+      const ali = { id: 701, name: "Ali" };
+
+      expect(await applyLeadAction(lead.id, "wrote", ali)).toEqual({ ok: true, reply: leadActionReplies.wrote });
+
+      const marked = await userRow(user.id);
+      expect(marked.wroteAdminAt).not.toBeNull();
+      expect(marked.wroteAdminBy).toBe(701);
+      expect(marked.channelClickAt).toBeNull();
+      expect(await openRuns(user.id)).toHaveLength(0);
+      const [ended] = await db().select().from(segmentRuns).where(eq(segmentRuns.userId, user.id));
+      expect(ended.endReason).toBe("wrote_admin");
+      const [refreshed] = await leadsFor(lead.visitorId!);
+      expect(refreshed.notifyVersion).toBeGreaterThan(lead.notifyVersion);
+      expect(refreshed.outcome).toBeNull();
+    });
+
+    it("does nothing the second time and keeps the first marker", async () => {
+      const { applyLeadAction, leadActionReplies } = await import("./actions");
+      const { user, lead } = await linkedLead();
+
+      await applyLeadAction(lead.id, "wrote", { id: 702, name: "Vali" });
+      const first = await userRow(user.id);
+      expect(await applyLeadAction(lead.id, "wrote", { id: 703, name: "Ali" })).toEqual({
+        ok: false,
+        reply: leadActionReplies.alreadyWrote,
+      });
+      const second = await userRow(user.id);
+      expect(second.wroteAdminAt).toEqual(first.wroteAdminAt);
+      expect(second.wroteAdminBy).toBe(702);
+    });
+
+    it("refuses a lead without a user row", async () => {
+      const { applyLeadAction, leadActionReplies } = await import("./actions");
+      const vid = visitorId();
+      await post({ visitor_id: vid, name: "Web", phone: randomPhone() });
+      const [lead] = await leadsFor(vid);
+      expect(await applyLeadAction(lead.id, "wrote", { id: 704, name: "Ali" })).toEqual({
+        ok: false,
+        reply: leadActionReplies.noUser,
+      });
+      expect(await applyLeadAction(999_999_999, "wrote", { id: 704, name: "Ali" })).toEqual({
+        ok: false,
+        reply: leadActionReplies.notFound,
+      });
+    });
+
+    it("is set by a won outcome and stops the chain, but not by lost", async () => {
+      const { applyLeadAction } = await import("./actions");
+      const ali = { id: 705, name: "Ali" };
+
+      const won = await linkedLead();
+      await applyLeadAction(won.lead.id, "claim", ali);
+      await applyLeadAction(won.lead.id, "won", ali);
+      const wonUser = await userRow(won.user.id);
+      expect(wonUser.wroteAdminAt).not.toBeNull();
+      expect(wonUser.wroteAdminBy).toBe(705);
+      expect(await openRuns(won.user.id)).toHaveLength(0);
+
+      const lost = await linkedLead();
+      await applyLeadAction(lost.lead.id, "claim", ali);
+      await applyLeadAction(lost.lead.id, "lost", ali);
+      expect((await userRow(lost.user.id)).wroteAdminAt).toBeNull();
+      expect(await openRuns(lost.user.id)).toHaveLength(1);
+    });
+
+    it("keeps a manual mark when the user later clicks the admin button", async () => {
+      const { applyLeadAction } = await import("./actions");
+      const { recordChannelClick } = await import("@/funnel/channel");
+      const { user, lead } = await linkedLead();
+
+      await applyLeadAction(lead.id, "wrote", { id: 706, name: "Ali" });
+      const marked = await userRow(user.id);
+      await recordChannelClick(user, new Date(Date.now() + 60_000));
+      const after = await userRow(user.id);
+      expect(after.channelClickAt).not.toBeNull();
+      expect(after.wroteAdminAt).toEqual(marked.wroteAdminAt);
+      expect(after.wroteAdminBy).toBe(706);
+    });
+
+    it("records a click as both channel_click_at and wrote_admin_at without an actor", async () => {
+      const { recordChannelClick } = await import("@/funnel/channel");
+      const { user } = await linkedLead();
+      const at = new Date(Date.now() + 5_000);
+
+      await recordChannelClick(user, at);
+      const after = await userRow(user.id);
+      expect(after.channelClickAt).toEqual(at);
+      expect(after.wroteAdminAt).toEqual(at);
+      expect(after.wroteAdminBy).toBeNull();
+      expect(await openRuns(user.id)).toHaveLength(0);
+    });
   });
 });

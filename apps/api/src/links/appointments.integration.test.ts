@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { asc, eq } from "drizzle-orm";
 import type { Bot } from "grammy";
-import type { FunnelStatus, TemplateButton } from "@funnel/shared";
+import { type FunnelStatus, sessionResponseSchema, type TemplateButton } from "@funnel/shared";
 import { closeDb, db } from "@/db";
 import { runMigrations } from "@/db/migrate";
 import {
@@ -12,11 +12,13 @@ import {
   segmentRuns,
   sentMessages,
   users,
+  videos,
   watchAppointments,
   watchProgress,
 } from "@/db/schema";
+import { signInitData } from "@/telegram/initData";
 import { isolatedDatabase } from "@/test/isolatedDb";
-import { setTestEnv } from "@/test/env";
+import { setTestEnv, TEST_BOT_TOKEN } from "@/test/env";
 import { ensureActiveTestVideo } from "@/test/videos";
 
 const isolatedDb = isolatedDatabase("vf_appointments");
@@ -34,6 +36,7 @@ type Keyboard = { text: string; callback_data?: string; web_app?: { url: string 
 
 describe.skipIf(!isolatedDb.url)("«Keyinroq» time picker and appointments", () => {
   let testBot: Bot;
+  let app: ReturnType<typeof import("@/app").createApp>;
   let dispatchMessages: typeof import("@/messages/dispatch").dispatchMessages;
   let syncSegment: typeof import("@/funnel/segments").syncSegment;
   let acceptSecondChance: typeof import("@/links/service").acceptSecondChance;
@@ -72,6 +75,7 @@ describe.skipIf(!isolatedDb.url)("«Keyinroq» time picker and appointments", ()
     ({ acceptSecondChance } = await import("@/links/service"));
     ({ markWroteAdmin } = await import("@/funnel/channel"));
     ({ markBlocked } = await import("@/telegram/blocked"));
+    app = (await import("@/app")).createApp();
     await ensureActiveTestVideo();
   });
 
@@ -180,6 +184,33 @@ describe.skipIf(!isolatedDb.url)("«Keyinroq» time picker and appointments", ()
         },
       },
     } as never);
+  }
+
+  async function sessionOf(telegramId: number) {
+    const params = new URLSearchParams({
+      auth_date: String(Math.floor(Date.now() / 1000)),
+      user: JSON.stringify({ id: telegramId, first_name: "Ali" }),
+    });
+    params.set("hash", signInitData(params, TEST_BOT_TOKEN));
+    const res = await app.request("/app/session", {
+      method: "POST",
+      headers: { authorization: `tma ${params.toString()}`, "content-type": "application/json" },
+      body: JSON.stringify({ reason: "poll" }),
+    });
+    expect(res.status).toBe(200);
+    return sessionResponseSchema.parse(await res.json());
+  }
+
+  async function reopenForNoPriceUser() {
+    const user = await linkedUser({ expiresAt: at(24 * 60), maxPosition: 30 });
+    await afsus(1, "Afsus 1", noPrice);
+    const offer = await firstAfsus(user);
+    const expiry = at(24 * 60);
+    await tap(user.telegramId, `mt:l:s${offer.sentMessageId}`, expiry);
+    await tap(user.telegramId, "lt:q:m", expiry);
+    const chosen = at(22 * 60, expiry);
+    await tick(chosen);
+    return { user, chosen };
   }
 
   async function firstAfsus(user: { id: number; telegramId: number }) {
@@ -311,6 +342,42 @@ describe.skipIf(!isolatedDb.url)("«Keyinroq» time picker and appointments", ()
     await tick(at(62, chosen));
     expect(sends()).toHaveLength(1);
     expect((await db().select().from(events).where(eq(events.type, "later_reopened"))).length).toBe(1);
+  });
+
+  it("opens the short course video first when the appointment reopens the lesson for a user who never saw the price", async () => {
+    const video = await ensureActiveTestVideo();
+    await db()
+      .update(videos)
+      .set({ courseStartSec: 300, shortOfferVideoUrl: "https://video.example.com/short.mp4", shortOfferDuration: 90 })
+      .where(eq(videos.id, video.id));
+    const { user, chosen } = await reopenForNoPriceUser();
+
+    const grants = await grantsOf(user.id);
+    expect(grants.map((grant) => [grant.kind, grant.offerFirst])).toEqual([
+      ["initial", false],
+      ["scheduled", true],
+    ]);
+    vi.setSystemTime(at(5, chosen));
+    const body = await sessionOf(user.telegramId);
+    expect(body.offerFirst).toEqual({ url: "https://video.example.com/short.mp4", duration: 90 });
+    expect(body.startsAtCourse).toBe(false);
+  });
+
+  it("starts at the course start when the appointment reopens the lesson but the video has no short clip", async () => {
+    const video = await ensureActiveTestVideo();
+    await db()
+      .update(videos)
+      .set({ courseStartSec: 300, shortOfferVideoUrl: null, shortOfferDuration: null })
+      .where(eq(videos.id, video.id));
+    const { user, chosen } = await reopenForNoPriceUser();
+
+    const [, scheduled] = await grantsOf(user.id);
+    expect(scheduled.offerFirst).toBe(true);
+    vi.setSystemTime(at(5, chosen));
+    const body = await sessionOf(user.telegramId);
+    expect(body.offerFirst).toBeNull();
+    expect(body.startsAtCourse).toBe(true);
+    expect(body.startAt).toBe(300);
   });
 
   it("does not send the next «afsus» while an appointment is pending", async () => {

@@ -25,9 +25,9 @@ Legend: ✅ done · 🟡 partial · ❌ missing · ➖ not applicable
 |---|---|---|
 | «Afsus» message with Ha / Keyinroq | ✅ | At expiry the A/B chain ends and the «Qayta imkon» (D) run sends the afsus page (4d4baf0). The texts are written by an admin; none are seeded |
 | "Ha" reopens the link once for 24h | ✅ | One reopening per offer, restarts the chain with the night rules and keeps progress (4d4baf0) |
-| "Keyinroq" → choose a time (Bugun 20:00 / Ertaga 08:00 / Ertaga 20:00 / Boshqa vaqt: day + hour 07–22) | 🟡 | 6a pending: «Keyinroq» is a plain later button; the time picker is not built |
-| Store `tanlangan_vaqt`, status `qayta_imkon_kutilmoqda` | 🟡 | Afsus run and `qayta_imkon` statuses exist (4d4baf0); `tanlangan_vaqt` waits for 6a |
-| Reminder 1h before; at the chosen time a new link and a restart of the §1 chain | 🟡 | Restart of the chain after "Ha" works; the 1h-before reminder and the timed new link wait for 6a |
+| "Keyinroq" → choose a time (Bugun 20:00 / Ertaga 08:00 / Ertaga 20:00 / Boshqa vaqt: day + hour 07–22) | ✅ | Three quick slots plus day then hour (07–22), past slots hidden (e7dc16a) |
+| Store `tanlangan_vaqt`, status `qayta_imkon_kutilmoqda` | ✅ | Stored as a pending appointment; the afsus chain waits while it is pending (e7dc16a) |
+| Reminder 1h before; at the chosen time a new link and a restart of the §1 chain | ✅ | 1h-before reminder, then a new 24h link at the chosen time that restarts the chain; the reopen grant is offer-first for people who never saw the price (e7dc16a, f910800) |
 | Repeat at most once a day, 7 times over 7 days; 7-day «afsus» text bank, no repeats | ✅ | At most once a day, 7 times in 7 days, day-k text (4d4baf0) |
 
 ## §3. People who stopped before the sales part
@@ -42,7 +42,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing · ➖ not applicable
 | At most 7 messages in this chain and at most 4 per day | ✅ | Per-audience caps in Sozlamalar; B defaults to 4 per day, 7 total (5dcb166) |
 | Night messages move to 07:00–08:00 | ✅ | Now collapsed into one at 07:30 (c2ba852) |
 | Stops on narxni_kurdi / adminga_yozdi / bloklagan | ✅ | |
-| §3.8 different «afsus» text, and "Ha" first plays the short «Kurs haqida» video | 🟡 | Text variant for people who stopped before the price is done (4d4baf0); 6b pending: the short video is not played on "Ha" |
+| §3.8 different «afsus» text, and "Ha" first plays the short «Kurs haqida» video | ✅ | Text variant (4d4baf0); "Ha" and a timed reopen play the short clip first, falling back to the course start when the video has none (effcf0e, f910800) |
 | §3.9 metrics | ✅ | `/admin/reports` |
 
 ## §4. Saw the price but didn't write (progrev)
@@ -64,7 +64,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing · ➖ not applicable
 | On expiry, delete all reminders tied to that link | ✅ | Links are grants; that link's reminders are deleted at expiry (4d4baf0) |
 | Separate text bank per day; never repeat a text to the same person | ✅ | Day-k afsus text per second chance, no repeats (4d4baf0) |
 | Scheduler every minute; 403 marks the user blocked and stops | ✅ | |
-| `tanlangan_vaqt` stored | 🟡 | Waits for the 6a time picker |
+| `tanlangan_vaqt` stored | ✅ | `watch_appointments` (e7dc16a) |
 
 ## §6. Resume in the Mini App
 
@@ -92,21 +92,17 @@ Legend: ✅ done · 🟡 partial · ❌ missing · ➖ not applicable
 | §7.3 rules | ✅ | Telegram's 48h delete limit covered by the 47h sweep |
 | §8 Videos page, «Shu joyni belgilash», activate, archive | ✅ | Plus per-video unlock time and the player |
 | §8 Google Drive / YouTube links | 🟡 | Google Drive import is done (1aaaf81): `/admin/videos` copies a Drive file to R2 through the Drive API. YouTube links are not supported |
-| §8 short «Kurs haqida» video | 🟡 | Upload is built but hidden; nothing plays it yet (6b, see §3.8) |
+| §8 short «Kurs haqida» video | ✅ | Uploaded per video on `/admin/videos` and played first on a second chance (effcf0e) |
 | §8.2 replace the video from the bot (Test 1) | ✅ | Files over 20 MB need the local Bot API server, not yet tried on staging |
 | §9 reports and Excel | ✅ | |
 
 ## Where the full TZ contradicts what is built
 
-1. **Keyinroq**: the TZ wants a time picker (Bugun 20:00 / Ertaga 08:00 / Ertaga 20:00 / Boshqa vaqt); «Keyinroq» is still a plain later button (6a).
-2. **Short «Kurs haqida» video**: the TZ wants it played on "Ha" for people who stopped before the price; it is not played (6b).
-3. **The 5:00 status boundary**: the TZ fixes it at 5:00, but §8.3 forbids hardcoded times. Using the optional `asosiy_dars_boshlanishi` mark satisfies both.
-4. **Daily cap**: 4 per day for §3 in the TZ; the cap is a per-audience panel setting (B defaults to 4 per day, 7 total).
-5. **YouTube links** are not supported; only Drive import and direct upload.
+1. **The 5:00 status boundary**: the TZ fixes it at 5:00, but §8.3 forbids hardcoded times. Using the optional `asosiy_dars_boshlanishi` mark satisfies both.
+2. **Daily cap**: 4 per day for §3 in the TZ; the cap is a per-audience panel setting (B defaults to 4 per day, 7 total).
+3. **YouTube links** are not supported; only Drive import and direct upload.
 
-## Biggest gaps
+## Remaining
 
-1. 6a: the «Keyinroq» time picker with `tanlangan_vaqt`, the 1h-before reminder and the timed new link
-2. 6b: playing the short «Kurs haqida» video on "Ha" (§3.8)
-3. Acceptance: the whole TZ test list (including Test 6 against the production video URL) has not been run end-to-end in Telegram
-4. Content: the «Qayta imkon» afsus texts must be written by an admin; the night notice template must be created
+1. Phase 7 acceptance: the whole TZ test list (including Test 6 against the production video URL) has not been run on real devices and in Telegram end-to-end
+2. Content: admins must write the «Qayta imkon» afsus texts and create the night notice template. The new «Keyinroq» bot texts (picker, reminder, reopen) have defaults and can be edited in the bot texts page

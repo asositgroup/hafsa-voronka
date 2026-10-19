@@ -537,7 +537,10 @@ Execute the complete end-to-end user journey:
 - [ ] Load the starting reminder texts for segments A, B and C once: `pnpm --filter api seed:templates`. It only fills segments that have no templates yet, so rerunning is safe. Review and edit the texts in the constructor afterwards
 - [ ] Write the «Qayta imkon» (segment D) afsus texts, one per day for days 1 to 7, in the constructor before deploying. They are not seeded, and without them no afsus is sent
 - [ ] The first scheduler tick after deploy sends afsus 1 to everyone whose link expired in the last 7 days. Expect a burst; check the texts and the audience size first
-- [ ] Still pending and not part of this release: the «Keyinroq» time picker (6a) and the short «Kurs haqida» video on "Ha" (6b)
+- [ ] Migrations 0019 (`appointments`: «Keyinroq» time picker) and 0020 (`short_offer`: short clip columns and offer progress) also run at API startup; nothing to run by hand
+- [ ] Upload the short «Kurs haqida» clip for each video on `/admin/videos`. Without a clip, "Ha" and a timed reopen send people who stopped before the price straight to the course start
+- [ ] The new «Qayta imkon» bot texts («Keyinroq» picker, 1h reminder, reopen message) have defaults; review and edit them on the bot texts page if needed
+- [ ] Still pending and not part of this release: Phase 7 acceptance on real devices and the admins writing the afsus texts
 
 ---
 

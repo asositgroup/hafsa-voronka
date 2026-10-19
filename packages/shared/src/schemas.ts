@@ -14,6 +14,8 @@ export const sessionResponseSchema = z.object({
   name: z.string().nullable(),
   phoneSet: z.boolean(),
   completed: z.boolean(),
+  unlocked: z.boolean(),
+  unlockAt: z.number().nullable(),
   expired: z.boolean(),
   startAt: z.number(),
   progress: z.object({

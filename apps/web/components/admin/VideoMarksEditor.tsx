@@ -12,6 +12,7 @@ const fields = [
   { key: "introEndSec", label: copy.introEnd },
   { key: "courseStartSec", label: copy.courseStart },
   { key: "priceSec", label: copy.price },
+  { key: "unlockSec", label: copy.unlock },
 ] as const;
 
 type FieldKey = (typeof fields)[number]["key"];
@@ -30,6 +31,7 @@ export function VideoMarksEditor({ item, onItems }: VideoMarksEditorProps) {
     introEndSec: initialText(item.introEndSec),
     courseStartSec: initialText(item.courseStartSec),
     priceSec: initialText(item.priceSec),
+    unlockSec: initialText(item.unlockSec),
   });
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -47,7 +49,7 @@ export function VideoMarksEditor({ item, onItems }: VideoMarksEditorProps) {
   }
 
   async function save() {
-    const marks: Record<FieldKey, number | null> = { introEndSec: null, courseStartSec: null, priceSec: null };
+    const marks: Record<FieldKey, number | null> = { introEndSec: null, courseStartSec: null, priceSec: null, unlockSec: null };
     for (const { key } of fields) {
       const raw = text[key].trim();
       if (raw === "") continue;
@@ -88,7 +90,7 @@ export function VideoMarksEditor({ item, onItems }: VideoMarksEditorProps) {
         className="max-h-[320px] w-full rounded-[12px] bg-black"
       />
 
-      <div role="radiogroup" className="grid grid-cols-3 gap-1 rounded-[12px] bg-varaq p-1">
+      <div role="radiogroup" className="grid grid-cols-2 gap-1 rounded-[12px] bg-varaq p-1">
         {fields.map(({ key, label }) => (
           <button
             key={key}
@@ -126,6 +128,7 @@ export function VideoMarksEditor({ item, onItems }: VideoMarksEditorProps) {
                 onFocus={() => setSelected(key)}
                 className="h-11 rounded-[10px] border border-chegara/60 bg-white px-3 text-sm tabular-nums text-siyoh outline-none focus:border-siyoh focus:ring-2 focus:ring-siyoh/15"
               />
+              {key === "unlockSec" && <span className="text-[11px] text-qalam/80">{copy.unlockHint}</span>}
             </label>
             <button
               type="button"

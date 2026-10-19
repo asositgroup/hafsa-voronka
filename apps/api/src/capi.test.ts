@@ -24,6 +24,7 @@ function makeUser(overrides: Partial<User> = {}): User {
     linkGivenAt: null,
     linkExpiresAt: null,
     completedAt: null,
+    unlockedAt: null,
     channelClickAt: null,
     botBlocked: false,
     videoId: null,

@@ -41,6 +41,7 @@ export const videos = pgTable(
     introEndSec: integer("intro_end_sec"),
     courseStartSec: integer("course_start_sec"),
     priceSec: integer("price_sec"),
+    unlockSec: integer("unlock_sec"),
     shortOfferVideoUrl: text("short_offer_video_url"),
     isActive: boolean("is_active").default(false).notNull(),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
@@ -54,7 +55,8 @@ export const videos = pgTable(
         AND (${t.introEndSec} IS NULL OR (${t.introEndSec} >= 0 AND ${t.introEndSec} < COALESCE(${t.courseStartSec}, ${t.priceSec}, ${t.duration})))
         AND (${t.courseStartSec} IS NULL OR ${t.courseStartSec} > 0)
         AND (${t.courseStartSec} IS NULL OR ${t.priceSec} IS NULL OR ${t.courseStartSec} < ${t.priceSec})
-        AND (${t.priceSec} IS NULL OR ${t.priceSec} < ${t.duration})`,
+        AND (${t.priceSec} IS NULL OR ${t.priceSec} < ${t.duration})
+        AND (${t.unlockSec} IS NULL OR (${t.unlockSec} > 0 AND ${t.unlockSec} < ${t.duration}))`,
     ),
   ],
 );
@@ -82,6 +84,7 @@ export const users = pgTable(
   linkGivenAt: timestamp("link_given_at", { withTimezone: true }),
   linkExpiresAt: timestamp("link_expires_at", { withTimezone: true }),
   completedAt: timestamp("completed_at", { withTimezone: true }),
+  unlockedAt: timestamp("unlocked_at", { withTimezone: true }),
   channelClickAt: timestamp("channel_click_at", { withTimezone: true }),
   botBlocked: boolean("bot_blocked").default(false).notNull(),
   videoId: bigint("video_id", { mode: "number" }).references(() => videos.id),

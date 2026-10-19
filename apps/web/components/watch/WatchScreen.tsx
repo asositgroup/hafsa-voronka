@@ -38,6 +38,7 @@ export function WatchScreen() {
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isCompletedRef = useRef(session.completed);
+  const isUnlockedRef = useRef(session.unlocked);
   const playbackRateRef = useRef(1);
   const speedMenuRef = useRef<HTMLDivElement>(null);
 
@@ -45,8 +46,12 @@ export function WatchScreen() {
     isCompletedRef.current = session.completed;
   }, [session.completed]);
 
+  useEffect(() => {
+    isUnlockedRef.current = session.unlocked;
+  }, [session.unlocked]);
+
   const isSeekLocked = session.config.seekLock && !session.completed;
-  const isUnlocked = !session.config.gateProceed || session.completed;
+  const isUnlocked = !session.config.gateProceed || session.unlocked;
 
   const triggerToast = useCallback(() => {
     setToastVisible(true);
@@ -92,11 +97,18 @@ export function WatchScreen() {
           if (typeof data.remainingSecs === "number") {
             setUnlockAnchor({ remainingSecs: data.remainingSecs, position });
           }
-          if (data.completed && !isCompletedRef.current) {
+          const completedNow = data.completed && !isCompletedRef.current;
+          const unlockedNow = data.unlocked && !isUnlockedRef.current;
+          if (completedNow || unlockedNow) {
             hapticSuccess();
-            setSession({ ...session, completed: true });
-            const tg = getTelegramWebApp();
-            tg?.disableClosingConfirmation?.();
+            setSession({
+              ...session,
+              completed: session.completed || data.completed,
+              unlocked: session.unlocked || data.unlocked,
+            });
+          }
+          if (completedNow) {
+            getTelegramWebApp()?.disableClosingConfirmation?.();
           }
         }
       } catch {
@@ -218,10 +230,10 @@ export function WatchScreen() {
     resetControlsTimeout();
   };
 
-  const unlockRemainingSecs = Math.max(
-    0,
-    unlockAnchor.remainingSecs - Math.max(0, currentTime - unlockAnchor.position),
-  );
+  const unlockRemainingSecs =
+    session.unlockAt === null
+      ? Math.max(0, unlockAnchor.remainingSecs - Math.max(0, currentTime - unlockAnchor.position))
+      : Math.max(0, session.unlockAt - maxReached);
 
   const handlePlay = () => {
     const video = videoRef.current;

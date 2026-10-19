@@ -15,6 +15,7 @@ export type ProgressRequest = z.infer<typeof progressRequestSchema>;
 
 export const progressResponseSchema = z.object({
   completed: z.boolean(),
+  unlocked: z.boolean(),
   maxPosition: z.number(),
   remainingSecs: z.number(),
 });

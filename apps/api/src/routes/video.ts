@@ -33,6 +33,7 @@ videoRoutes.post("/progress", async (c) => {
 
   return c.json({
     completed: result.completed,
+    unlocked: result.unlocked,
     maxPosition: result.maxPosition,
     remainingSecs: result.remainingSecs,
   } satisfies ProgressResponse);

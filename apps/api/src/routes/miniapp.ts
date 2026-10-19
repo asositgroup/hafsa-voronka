@@ -9,6 +9,7 @@ import { logEvent, upsertUser } from "@/funnel/users";
 import { recordMessageClick } from "@/messages/clicks";
 import { videoForUser } from "@/videos/service";
 import { remainingWatchSecs } from "@/watch/credit";
+import { effectiveUnlockSec } from "@/watch/unlock";
 
 async function readJson(request: { json: () => Promise<unknown> }) {
   try {
@@ -54,6 +55,8 @@ miniappRoutes.post("/session", async (c) => {
     name: user.name,
     phoneSet: Boolean(user.phone),
     completed: user.completedAt !== null,
+    unlocked: user.unlockedAt !== null,
+    unlockAt: effectiveUnlockSec(video),
     expired,
     startAt: start === "offer" ? (video.courseStartSec ?? lastPosition) : lastPosition,
     progress: {

@@ -126,13 +126,20 @@ describe.skipIf(!testDbUrl)("Admin videos integration", () => {
     expect((await patch({ priceSec: 900 })).status).toBe(422);
     expect(await (await patch({ courseStartSec: 100, priceSec: 100 })).json()).toEqual({ error: "course_after_price" });
     expect(await (await patch({ priceSec: 500, introEndSec: 500 })).json()).toEqual({ error: "intro_after_course" });
+    expect(await (await patch({ unlockSec: 900 })).json()).toEqual({ error: "unlock_out_of_range" });
+    expect((await patch({ unlockSec: 900 })).status).toBe(422);
+    expect((await patch({ unlockSec: 0 })).status).toBe(422);
     expect((await patch({ introEndSec: -1 })).status).toBe(400);
     expect((await patch({ unknown: 1 })).status).toBe(400);
 
-    const ok = await patch({ introEndSec: 20, courseStartSec: 60, priceSec: 500 });
+    const ok = await patch({ introEndSec: 20, courseStartSec: 60, priceSec: 500, unlockSec: 300 });
     expect(ok.status).toBe(200);
     const [row] = await db().select().from(videos).where(eq(videos.id, video.id));
-    expect([row.introEndSec, row.courseStartSec, row.priceSec]).toEqual([20, 60, 500]);
+    expect([row.introEndSec, row.courseStartSec, row.priceSec, row.unlockSec]).toEqual([20, 60, 500, 300]);
+
+    expect((await patch({ unlockSec: null })).status).toBe(200);
+    const [cleared] = await db().select().from(videos).where(eq(videos.id, video.id));
+    expect(cleared.unlockSec).toBeNull();
 
     expect((await call("/999999999", { method: "PATCH", json: { title: "x" } })).status).toBe(404);
   });

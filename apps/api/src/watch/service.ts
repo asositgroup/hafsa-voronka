@@ -20,14 +20,28 @@ import {
   type WatchConfig,
   type WatchState,
 } from "./credit";
+import { effectiveUnlockSec } from "./unlock";
 
 export type ProgressResult =
-  | { ok: true; completed: boolean; maxPosition: number; remainingSecs: number }
+  | { ok: true; completed: boolean; unlocked: boolean; maxPosition: number; remainingSecs: number }
   | { ok: false; error: "not_registered" | "no_video" };
 
 export type EventResult =
   | { ok: true }
   | { ok: false; error: "not_found" };
+
+async function sendUnlockMessage(userId: number, telegramId: number) {
+  try {
+    const keyboard = new InlineKeyboard().url(await botText("channelButton"), env.CHANNEL_URL);
+    await sendBotText(bot().api, telegramId, "completion", {}, keyboard);
+  } catch (error) {
+    if (isBlockedError(error)) {
+      await markBlocked(userId).catch((e) => console.error("Segment sync failed:", e));
+    } else {
+      console.error("Failed to send bot completion message:", error);
+    }
+  }
+}
 
 export async function recordProgress(
   telegramId: number,
@@ -118,6 +132,22 @@ export async function recordProgress(
     );
   }
 
+  const unlockSec = effectiveUnlockSec(video);
+  const unlockReached =
+    !result.ignored &&
+    user.unlockedAt === null &&
+    (result.state.completed || (unlockSec !== null && result.state.maxPosition >= unlockSec));
+  if (unlockReached) {
+    const [unlockedUser] = await db()
+      .update(users)
+      .set({ unlockedAt: now })
+      .where(and(eq(users.id, user.id), isNull(users.unlockedAt)))
+      .returning();
+    if (unlockedUser && !user.botBlocked) {
+      await sendUnlockMessage(user.id, user.telegramId);
+    }
+  }
+
   if (result.completedNow) {
     const [updatedUser] = await db()
       .update(users)
@@ -141,23 +171,12 @@ export async function recordProgress(
       client,
     }).catch((error) => console.error("CAPI VideoComplete failed:", error));
 
-    if (!user.botBlocked) {
-      try {
-        const keyboard = new InlineKeyboard().url(await botText("channelButton"), env.CHANNEL_URL);
-        await sendBotText(bot().api, user.telegramId, "completion", {}, keyboard);
-      } catch (error) {
-        if (isBlockedError(error)) {
-          await markBlocked(user.id).catch((e) => console.error("Segment sync failed:", e));
-        } else {
-          console.error("Failed to send bot completion message:", error);
-        }
-      }
-    }
   }
 
   return {
     ok: true,
     completed: result.state.completed,
+    unlocked: user.unlockedAt !== null || unlockReached,
     maxPosition: result.state.maxPosition,
     remainingSecs: remainingWatchSecs(result.state.watchedSecs, result.state.completed, watchConfig),
   };

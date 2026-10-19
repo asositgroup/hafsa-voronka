@@ -10,6 +10,7 @@ export const videoMarkErrors = [
   "intro_after_course",
   "course_after_price",
   "price_after_duration",
+  "unlock_out_of_range",
 ] as const;
 export type VideoMarkError = (typeof videoMarkErrors)[number];
 
@@ -17,6 +18,7 @@ export type VideoMarks = {
   introEndSec?: number | null;
   courseStartSec?: number | null;
   priceSec?: number | null;
+  unlockSec?: number | null;
 };
 
 export function validateVideoMarks(
@@ -24,11 +26,12 @@ export function validateVideoMarks(
   duration: number,
   options: { requirePrice: boolean },
 ): VideoMarkError | "price_required" | null {
-  const { introEndSec, courseStartSec, priceSec } = marks;
-  const values = [introEndSec, courseStartSec, priceSec];
+  const { introEndSec, courseStartSec, priceSec, unlockSec } = marks;
+  const values = [introEndSec, courseStartSec, priceSec, unlockSec];
   if (values.some((value) => value != null && value < 0) || courseStartSec === 0) return "mark_negative";
   if (options.requirePrice && priceSec == null) return "price_required";
   if (priceSec != null && priceSec >= duration) return "price_after_duration";
+  if (unlockSec != null && (unlockSec <= 0 || unlockSec >= duration)) return "unlock_out_of_range";
   if (courseStartSec != null && priceSec != null && courseStartSec >= priceSec) return "course_after_price";
   if (introEndSec != null && introEndSec >= (courseStartSec ?? priceSec ?? duration)) {
     return "intro_after_course";
@@ -47,6 +50,7 @@ export const videoItemSchema = z.object({
   introEndSec: z.number().nullable(),
   courseStartSec: z.number().nullable(),
   priceSec: z.number().nullable(),
+  unlockSec: z.number().nullable(),
   shortOfferVideoUrl: z.string().nullable(),
   isActive: z.boolean(),
   archivedAt: z.string().nullable(),
@@ -80,6 +84,7 @@ export const videoUpdateSchema = z
     introEndSec: markSchema.optional(),
     courseStartSec: markSchema.optional(),
     priceSec: markSchema.optional(),
+    unlockSec: markSchema.optional(),
     shortOfferVideoUrl: urlSchema.nullable().optional(),
   })
   .strict();

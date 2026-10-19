@@ -63,6 +63,7 @@ export async function listAdminVideos(): Promise<AdminVideoItem[]> {
     introEndSec: video.introEndSec,
     courseStartSec: video.courseStartSec,
     priceSec: video.priceSec,
+    unlockSec: video.unlockSec,
     shortOfferVideoUrl: video.shortOfferVideoUrl,
     isActive: video.isActive,
     archivedAt: video.archivedAt?.toISOString() ?? null,
@@ -72,7 +73,7 @@ export async function listAdminVideos(): Promise<AdminVideoItem[]> {
 }
 
 export async function createVideo(
-  input: VideoInput & Partial<Pick<VideoPatch, "introEndSec" | "courseStartSec" | "priceSec">>,
+  input: VideoInput & Partial<Pick<VideoPatch, "introEndSec" | "courseStartSec" | "priceSec" | "unlockSec">>,
 ): Promise<VideoResult> {
   if (keyFromPublicUrl(input.fileUrl) === null || !hasPublicUrl(input.shortOfferVideoUrl)) {
     return { ok: false, code: "invalid_file_url" };
@@ -90,6 +91,7 @@ export async function createVideo(
       introEndSec: input.introEndSec ?? null,
       courseStartSec: input.courseStartSec ?? null,
       priceSec: input.priceSec ?? null,
+      unlockSec: input.unlockSec ?? null,
       shortOfferVideoUrl: input.shortOfferVideoUrl ?? null,
       isActive: false,
     })

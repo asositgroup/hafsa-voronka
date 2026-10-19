@@ -64,6 +64,17 @@ describe("validateVideoMarks", () => {
     expect(validateVideoMarks({ courseStartSec: 600, priceSec: 600 }, 900, open)).toBe("course_after_price");
   });
 
+  it("accepts an unlock point strictly inside the video regardless of other marks", () => {
+    expect(validateVideoMarks({ unlockSec: 10, courseStartSec: 60, priceSec: 600 }, 900, open)).toBeNull();
+    expect(validateVideoMarks({ unlockSec: 800, priceSec: 600 }, 900, open)).toBeNull();
+  });
+
+  it("rejects an unlock point at zero or at or after the duration", () => {
+    expect(validateVideoMarks({ unlockSec: 0 }, 900, open)).toBe("unlock_out_of_range");
+    expect(validateVideoMarks({ unlockSec: 900 }, 900, open)).toBe("unlock_out_of_range");
+    expect(validateVideoMarks({ unlockSec: -1 }, 900, open)).toBe("mark_negative");
+  });
+
   it("rejects intro end at or after the next mark", () => {
     expect(validateVideoMarks({ introEndSec: 60, courseStartSec: 60 }, 900, open)).toBe("intro_after_course");
     expect(validateVideoMarks({ introEndSec: 600, priceSec: 600 }, 900, open)).toBe("intro_after_course");

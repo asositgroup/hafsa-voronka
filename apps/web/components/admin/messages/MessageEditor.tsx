@@ -51,9 +51,12 @@ function errorText(code: string | undefined, variable?: string) {
 
 type Admin = { telegramId: number; label: string };
 
+export type MessagePreset = Pick<MessageTemplateInput, "text" | "timing">;
+
 type MessageEditorProps = {
   segment: FunnelSegment;
   item: MessageTemplate | null;
+  preset?: MessagePreset;
   admins: Admin[];
   mediaEnabled: boolean;
   prefillSupported: boolean;
@@ -65,6 +68,7 @@ type MessageEditorProps = {
 export function MessageEditor({
   segment,
   item,
+  preset,
   admins,
   mediaEnabled,
   prefillSupported,
@@ -86,9 +90,9 @@ export function MessageEditor({
       : {
           segment,
           day: 1,
-          text: "",
+          text: preset?.text ?? "",
           media: null,
-          timing: defaultTiming("after_entry", 1),
+          timing: preset?.timing ?? defaultTiming("after_entry", 1),
           buttons: [],
           isActive: true,
         },

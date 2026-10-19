@@ -9,6 +9,11 @@ export class StaleOrderError extends Error {
   }
 }
 
+export function isNightNoticeConflict(error: unknown): boolean {
+  const candidate = error as { constraint_name?: string; cause?: { constraint_name?: string } } | null;
+  return (candidate?.constraint_name ?? candidate?.cause?.constraint_name) === "message_templates_night_notice_idx";
+}
+
 type Executor = Pick<ReturnType<typeof db>, "select" | "insert" | "update">;
 
 export function toTemplate(row: MessageTemplateRow): MessageTemplate {
@@ -44,6 +49,15 @@ async function nextPosition(executor: Executor, segment: FunnelSegment, day: num
     .from(messageTemplates)
     .where(and(eq(messageTemplates.segment, segment), eq(messageTemplates.day, day), isNull(messageTemplates.deletedAt)));
   return Number(row.next);
+}
+
+export async function activeTemplateRows(segment: FunnelSegment) {
+  return db()
+    .select()
+    .from(messageTemplates)
+    .where(
+      and(eq(messageTemplates.segment, segment), eq(messageTemplates.isActive, true), isNull(messageTemplates.deletedAt)),
+    );
 }
 
 export async function listTemplates(segment: FunnelSegment) {

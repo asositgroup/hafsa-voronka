@@ -1,6 +1,7 @@
 "use client";
 
 import { type MessageTemplate, plainTextPreview, renderPlainText, SAMPLE_CONTEXT, variableValues } from "@funnel/shared";
+import { Badge } from "@/components/admin/ui/Badge";
 import { IconButton } from "@/components/admin/ui/IconButton";
 import { Switch } from "@/components/admin/ui/Switch";
 import { timelineLabel } from "@/components/admin/messages/TimingPicker";
@@ -39,6 +40,11 @@ export function MessageCard({ item, onEdit, onToggle, onMoveUp, onMoveDown }: Me
           {timelineLabel(item.timing)}
         </span>
         <span className={`flex min-w-0 flex-1 flex-col gap-1 ${item.isActive ? "" : "opacity-60"}`}>
+          {item.timing.type === "night_notice" && (
+            <span className="flex">
+              <Badge tone="attention">{copy.nightNotice.badge}</Badge>
+            </span>
+          )}
           <span className="line-clamp-2 text-sm text-siyoh">
             {renderPlainText(plainTextPreview(item.text, 140), sampleValues)}
           </span>

@@ -189,8 +189,8 @@ describe.skipIf(!testDbUrl)("Funnel Integration Tests", () => {
         { actionSource: "chat" },
       );
       expect(registered?.linkGivenAt).toEqual(registered?.registeredAt);
-      const ttlMs = registered!.linkExpiresAt!.getTime() - registered!.linkGivenAt!.getTime();
-      expect(ttlMs).toBe(24 * 3_600_000);
+      const { linkExpiryFor } = await import("./messages/plan");
+      expect(registered!.linkExpiresAt).toEqual(linkExpiryFor(registered!.linkGivenAt!, 24));
     });
 
     it("reports expired only after the deadline and while neither completed nor written to admin", async () => {

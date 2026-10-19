@@ -2,8 +2,11 @@
 
 import {
   dayForTiming,
+  isExpiryTiming,
   isNightMinute,
+  linkBoundSegments,
   MINUTES_PER_DAY,
+  NIGHT_NOTICE_MINUTE,
   TEMPLATE_DAYS,
   type FunnelSegment,
   type TemplateTiming,
@@ -21,6 +24,7 @@ const copy = adminUz.messages.editor;
 export function defaultTiming(type: TimingType, day: number): TemplateTiming {
   if (type === "after_entry") return { type, value: (day - 1) * MINUTES_PER_DAY + 60 };
   if (type === "day_time") return { type, value: 9 * 60 };
+  if (type === "night_notice") return { type, value: 0 };
   return { type, value: MINUTES_PER_DAY };
 }
 
@@ -43,11 +47,13 @@ export function formatDuration(totalMinutes: number): string {
 }
 
 export function timingLabel(timing: TemplateTiming): string {
+  if (timing.type === "night_notice") return timeString(NIGHT_NOTICE_MINUTE);
   if (timing.type === "day_time") return timeString(timing.value);
   return formatDuration(timing.value);
 }
 
 export function timelineLabel(timing: TemplateTiming): string {
+  if (timing.type === "night_notice") return timeString(NIGHT_NOTICE_MINUTE);
   if (timing.type === "day_time") return timeString(timing.value);
   if (timing.type === "after_entry") return `+${formatDuration(timing.value)}`;
   return `${formatDuration(timing.value)} ${copy.before}`;
@@ -70,7 +76,7 @@ export function timingSummary(day: number, timing: TemplateTiming, segment: Funn
     "{time}",
     timingLabel(timing),
   );
-  return timing.type === "before_expiry" ? timingText : `${dayText}: ${timingText}`;
+  return isExpiryTiming(timing.type) ? timingText : `${dayText}: ${timingText}`;
 }
 
 const dayOptions = Array.from({ length: TEMPLATE_DAYS }, (_, index) => ({
@@ -79,7 +85,9 @@ const dayOptions = Array.from({ length: TEMPLATE_DAYS }, (_, index) => ({
 }));
 
 function timingTypeOptions(segment: FunnelSegment) {
-  return timingTypes.map((type) => ({ value: type, label: typeLabel(type, segment) }));
+  return timingTypes
+    .filter((type) => type !== "night_notice" || linkBoundSegments.includes(segment))
+    .map((type) => ({ value: type, label: typeLabel(type, segment) }));
 }
 
 const MAX_ENTRY_MINUTES = TEMPLATE_DAYS * MINUTES_PER_DAY - 1;

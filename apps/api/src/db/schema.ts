@@ -283,8 +283,15 @@ export const messageTemplates = pgTable(
     check("message_templates_segment_values", sql`${t.segment} in ('A', 'B', 'C')`),
     check(
       "message_templates_timing_type_values",
-      sql`${t.timingType} in ('after_entry', 'day_time', 'before_expiry')`,
+      sql`${t.timingType} in ('after_entry', 'day_time', 'before_expiry', 'night_notice')`,
     ),
+    check(
+      "message_templates_night_notice_shape",
+      sql`${t.timingType} <> 'night_notice' or (${t.timingValue} = 0 and ${t.segment} in ('A', 'B'))`,
+    ),
+    uniqueIndex("message_templates_night_notice_idx")
+      .on(t.segment)
+      .where(sql`${t.timingType} = 'night_notice' and ${t.deletedAt} is null`),
     check("message_templates_media_pair", sql`(${t.mediaType} is null) = (${t.mediaFileId} is null)`),
     check(
       "message_templates_day_time_range",
@@ -311,6 +318,7 @@ export const sentMessages = pgTable(
       .notNull()
       .references(() => segmentRuns.id),
     dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
+    slot: text("slot").default("").notNull(),
     clickToken: uuid("click_token").defaultRandom().notNull().unique(),
     linkTargets: jsonb("link_targets").$type<SentLinkTarget[]>().default([]).notNull(),
     telegramMessageId: bigint("telegram_message_id", { mode: "number" }),
@@ -322,7 +330,7 @@ export const sentMessages = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
-    uniqueIndex("sent_messages_run_template_idx").on(t.segmentRunId, t.templateId),
+    uniqueIndex("sent_messages_run_template_slot_idx").on(t.segmentRunId, t.templateId, t.slot),
     index("sent_messages_user_sent_idx").on(t.userId, t.sentAt),
     index("sent_messages_undeleted_idx")
       .on(t.sentAt)

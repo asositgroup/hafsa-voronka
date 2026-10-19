@@ -8,16 +8,17 @@ import { bot } from "@/telegram/bot";
 import { isBlockedError, markBlocked } from "@/telegram/blocked";
 import { templateContextFor } from "./context";
 import { renderTemplate, type ButtonWrap } from "./render";
-import { toTemplate } from "./repo";
+import { activeTemplateRows, toTemplate } from "./repo";
 import {
   CHAIN_MS,
   DAY_MS,
-  type DueItem,
   nextPendingDue,
-  pendingSchedule,
   pickNext,
+  type PlanItem,
+  planChain,
+  segmentChainInput,
   tashkentDayStart,
-} from "./schedule";
+} from "./plan";
 import { sendRendered } from "./send";
 
 const DISPATCH_LOCK_KEY = 849204814;
@@ -45,11 +46,11 @@ type Candidate = {
   enteredAt: Date;
   telegramId: number;
   linkExpiresAt: Date | null;
-  sentTemplateIds: number[];
+  sentKeys: string[];
   sentToday: number;
 };
 
-type Pick = { candidate: Candidate; item: DueItem<MessageTemplateRow> };
+type Pick = { candidate: Candidate; item: PlanItem<MessageTemplateRow> };
 
 type DeletableRow = { id: number; telegramMessageId: number; sentAt: Date };
 
@@ -92,7 +93,7 @@ async function loadCandidates(now: Date, userId?: number): Promise<Candidate[]> 
       enteredAt: segmentRuns.enteredAt,
       telegramId: users.telegramId,
       linkExpiresAt: users.linkExpiresAt,
-      sentTemplateIds: sql<number[]>`coalesce(array_agg(${sentMessages.templateId}) filter (where ${sentMessages.id} is not null), '{}')::int[]`,
+      sentKeys: sql<string[]>`coalesce(array_agg(${sentMessages.templateId}::text || ':' || ${sentMessages.slot}) filter (where ${sentMessages.id} is not null), '{}')::text[]`,
       sentToday: sql<number>`(select count(*) from sent_messages c where c.user_id = ${segmentRuns.userId} and c.sent_at >= ${dayStart}::timestamptz)::int`,
     })
     .from(segmentRuns)
@@ -202,8 +203,8 @@ async function sendOne(api: Api, pick: Pick, now: Date, pace: Pace): Promise<Sen
   const nowIso = now.toISOString();
 
   const reserved = await db().execute<{ id: string; click_token: string }>(sql`
-    insert into sent_messages (user_id, template_id, segment_run_id, due_at, created_at)
-    select ${userId}, ${item.template.id}, ${runId}, ${item.dueAt.toISOString()}::timestamptz, ${nowIso}::timestamptz
+    insert into sent_messages (user_id, template_id, segment_run_id, slot, due_at, created_at)
+    select ${userId}, ${item.template.id}, ${runId}, ${item.slot}, ${item.sendAt.toISOString()}::timestamptz, ${nowIso}::timestamptz
     where exists (
         select 1 from segment_runs r join users u on u.id = r.user_id
         where r.id = ${runId} and r.ended_at is null and u.bot_blocked = false and u.wrote_admin_at is null
@@ -212,7 +213,7 @@ async function sendOne(api: Api, pick: Pick, now: Date, pace: Pace): Promise<Sen
         select 1 from message_templates t
         where t.id = ${item.template.id} and t.is_active and t.deleted_at is null
       )
-    on conflict (segment_run_id, template_id) do nothing
+    on conflict (segment_run_id, template_id, slot) do nothing
     returning id, click_token
   `);
   if (reserved.length === 0) return "skip";
@@ -275,6 +276,16 @@ async function sendOne(api: Api, pick: Pick, now: Date, pace: Pace): Promise<Sen
   }
 }
 
+function chainFor(candidate: Candidate, templates: MessageTemplateRow[]) {
+  return planChain(
+    segmentChainInput(templates, {
+      segment: candidate.segment,
+      anchorAt: candidate.enteredAt,
+      linkExpiresAt: candidate.linkExpiresAt,
+    }),
+  );
+}
+
 async function sendDue(api: Api, now: Date, pace: Pace) {
   if (now.getTime() < pausedUntil) return;
 
@@ -289,15 +300,11 @@ async function sendDue(api: Api, now: Date, pace: Pace) {
 
   const picks: Pick[] = [];
   for (const candidate of await loadCandidates(now)) {
-    const pending = pendingSchedule(
-      bySegment.get(candidate.segment) ?? [],
-      { enteredAt: candidate.enteredAt, linkExpiresAt: candidate.linkExpiresAt },
-      new Set(candidate.sentTemplateIds),
-    );
-    const item = pickNext(pending, now, candidate.sentToday);
+    const plan = chainFor(candidate, bySegment.get(candidate.segment) ?? []);
+    const item = pickNext(plan, new Set(candidate.sentKeys), now, candidate.sentToday);
     if (item) picks.push({ candidate, item });
   }
-  picks.sort((a, b) => a.item.dueAt.getTime() - b.item.dueAt.getTime());
+  picks.sort((a, b) => a.item.sendAt.getTime() - b.item.sendAt.getTime());
 
   for (const pick of picks.slice(0, MAX_USERS_PER_TICK)) {
     if ((await sendOne(api, pick, now, pace)) === "abort") return;
@@ -307,22 +314,8 @@ async function sendDue(api: Api, now: Date, pace: Pace) {
 async function nextDueForUser(userId: number, now: Date) {
   const [candidate] = await loadCandidates(now, userId);
   if (!candidate) return null;
-  const templates = await db()
-    .select()
-    .from(messageTemplates)
-    .where(
-      and(
-        eq(messageTemplates.isActive, true),
-        isNull(messageTemplates.deletedAt),
-        eq(messageTemplates.segment, candidate.segment),
-      ),
-    );
-  const pending = pendingSchedule(
-    templates,
-    { enteredAt: candidate.enteredAt, linkExpiresAt: candidate.linkExpiresAt },
-    new Set(candidate.sentTemplateIds),
-  );
-  return nextPendingDue(pending, now);
+  const templates = await activeTemplateRows(candidate.segment);
+  return nextPendingDue(chainFor(candidate, templates), new Set(candidate.sentKeys), now);
 }
 
 async function sweep(api: Api, now: Date, pace: Pace) {

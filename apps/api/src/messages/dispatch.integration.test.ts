@@ -104,6 +104,7 @@ describe.skipIf(!testDbUrl)("Message dispatcher", () => {
   });
 
   const at = (minutes: number, base = entry) => new Date(base.getTime() + minutes * MINUTE);
+  const localDate = (date: Date) => new Date(date.getTime() + 5 * HOUR).toISOString().slice(0, 10);
 
   const tick = (now: Date) => dispatchMessages({ api: testBot.api, now: () => now, gapMs: 0 });
 
@@ -244,27 +245,58 @@ describe.skipIf(!testDbUrl)("Message dispatcher", () => {
     expect(sends()).toHaveLength(11);
   });
 
-  it("holds night messages until 07:00", async () => {
+  it("collapses a night message into 07:30", async () => {
     await setup({ timingValue: 780 });
     await tick(at(810));
     expect(sends()).toHaveLength(0);
-    await tick(at(1259));
-    expect(sends()).toHaveLength(0);
     await tick(at(1260));
+    expect(sends()).toHaveLength(0);
+    await tick(at(1290));
     expect(sends()).toHaveLength(1);
+    const [row] = await rows();
+    expect(row.dueAt).toEqual(at(1290));
   });
 
-  it("carries a message due just before 23:00 to the next 07:00", async () => {
+  it("does not carry a message due just before 23:00 into the morning", async () => {
     await setup({ timingType: "day_time", timingValue: 22 * 60 + 59 });
     await tick(at(13 * 60));
     expect(sends()).toHaveLength(0);
     await tick(at(13 * 60 + 1));
-    expect(sends()).toHaveLength(0);
     await tick(at(21 * 60));
-    expect(sends()).toHaveLength(1);
-    const [row] = await rows();
-    expect(row.dueAt).toEqual(at(21 * 60));
+    await tick(at(21 * 60 + 30));
+    expect(sends()).toHaveLength(0);
   });
+
+  it("replays the TZ 10:00 row minute by minute", async () => {
+    const expiresAt = at(24 * 60);
+    const user = await makeUser({ linkGivenAt: entry, linkExpiresAt: expiresAt });
+    await openRun(user.id, "A");
+    for (const [position, hours] of [23, 21, 19, 17, 15, 10, 5, 4, 3, 2, 1].entries()) {
+      await makeTemplate({ position, text: `${hours}: {qolgan_vaqt} qoldi`, timingType: "before_expiry", timingValue: hours * 60 });
+    }
+    await makeTemplate({ position: 11, text: "Ertaga soat {link_tugash_soati} gacha", timingType: "night_notice", timingValue: 0 });
+
+    for (let minute = 0; minute <= 24 * 60 + 5; minute += 1) await tick(at(minute));
+
+    expect(sends().map((call) => call.payload.text)).toEqual([
+      "23: 23 soat qoldi",
+      "21: 21 soat qoldi",
+      "19: 19 soat qoldi",
+      "17: 17 soat qoldi",
+      "15: 15 soat qoldi",
+      "Ertaga soat 10:00 gacha",
+      "3: 3 soat qoldi",
+      "2: 2 soat qoldi",
+      "1: 1 soat qoldi",
+    ]);
+    const all = await rows();
+    expect(all.map((row) => row.sentAt!.getTime() - entry.getTime())).toEqual(
+      [1, 3, 5, 7, 9, 12, 21, 22, 23].map((hours) => hours * HOUR),
+    );
+    expect(all.map((row) => row.slot)).toEqual(["", "", "", "", "", localDate(expiresAt), "", "", ""]);
+    expect(deletes()).toHaveLength(8);
+    expect(all.filter((row) => row.deletedAt === null)).toHaveLength(1);
+  }, 120_000);
 
   it("sends the first message of the new segment and deletes the old one", async () => {
     const user = await makeUser();

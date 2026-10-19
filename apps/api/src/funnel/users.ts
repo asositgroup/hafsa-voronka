@@ -2,6 +2,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import type { EventType } from "@funnel/shared";
 import { events, users } from "@/db/schema";
+import { linkExpiryFor } from "@/messages/plan";
 import { linkTtlHours } from "@/settings/service";
 import { resolveAttribution } from "./attribution";
 
@@ -71,7 +72,7 @@ export async function markRegistered(
   fields: { name: string; phone: string; phoneVerified: boolean },
 ) {
   const now = new Date();
-  const linkExpiresAt = new Date(now.getTime() + (await linkTtlHours()) * 3_600_000);
+  const linkExpiresAt = linkExpiryFor(now, await linkTtlHours());
   const [updated] = await db()
     .update(users)
     .set({ ...fields, registeredAt: now, linkGivenAt: now, linkExpiresAt })

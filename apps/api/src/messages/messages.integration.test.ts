@@ -185,6 +185,80 @@ describe.skipIf(!testDbUrl)("Message constructor", () => {
     expect(await list()).toEqual([]);
   });
 
+  describe("night notice", () => {
+    const notice = { ...draft, text: "Ertaga soat {link_tugash_soati} gacha", timing: { type: "night_notice", value: 0 } };
+
+    it("allows one per linked segment", async () => {
+      const first = await create(notice);
+      const second = await send("", "POST", notice);
+      expect(second.status).toBe(409);
+      expect(await second.json()).toEqual({ error: "night_notice_exists" });
+      expect((await send("", "POST", { ...notice, segment: "B" })).status).toBe(201);
+
+      const plain = await create();
+      const moved = await send(`/${plain.id}`, "PUT", notice);
+      expect(moved.status).toBe(409);
+
+      expect((await request(`/${first.id}`, { method: "DELETE" })).status).toBe(200);
+      expect((await send(`/${plain.id}`, "PUT", notice)).status).toBe(200);
+    });
+
+    it("refuses segment C and a non-zero value", async () => {
+      const segmentC = await send("", "POST", { ...notice, segment: "C" });
+      expect(segmentC.status).toBe(422);
+      expect(await segmentC.json()).toEqual({ error: "linked_only" });
+      const valued = await send("", "POST", { ...notice, timing: { type: "night_notice", value: 5 } });
+      expect(valued.status).toBe(422);
+      expect(await valued.json()).toEqual({ error: "out_of_range" });
+    });
+  });
+
+  describe("schedule preview", () => {
+    const local = (value: string) => new Date(`${value}+05:00`).toISOString();
+
+    it("plans the TZ 10:00 row for the admin's own templates", async () => {
+      const ids = new Map<number, string>();
+      for (const hours of [23, 21, 19, 17, 15, 10, 5, 4, 3, 2, 1]) {
+        const created = await create({ timing: { type: "before_expiry", value: hours * 60 } });
+        ids.set(created.id, `${hours}h`);
+      }
+      const notice = await create({ text: "Ertaga soat {link_tugash_soati} gacha", timing: { type: "night_notice", value: 0 } });
+      ids.set(notice.id, "notice");
+      await create({ segment: "B", timing: { type: "before_expiry", value: 120 } });
+
+      const res = await send("/preview-schedule", "POST", { segment: "A", linkGivenAt: local("2026-10-19T10:00:00") });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        linkExpiresAt: string;
+        extended: boolean;
+        items: { templateId: number; at: string; kind: string; remaining: string }[];
+      };
+      expect(body.linkExpiresAt).toBe(local("2026-10-20T10:00:00"));
+      expect(body.extended).toBe(false);
+      expect(body.items.map((item) => [ids.get(item.templateId), item.at, item.kind, item.remaining])).toEqual([
+        ["23h", local("2026-10-19T11:00:00"), "regular", "23 soat"],
+        ["21h", local("2026-10-19T13:00:00"), "regular", "21 soat"],
+        ["19h", local("2026-10-19T15:00:00"), "regular", "19 soat"],
+        ["17h", local("2026-10-19T17:00:00"), "regular", "17 soat"],
+        ["15h", local("2026-10-19T19:00:00"), "regular", "15 soat"],
+        ["notice", local("2026-10-19T22:00:00"), "night_notice", "10:00"],
+        ["10h", local("2026-10-20T00:00:00"), "swallowed", "10 soat"],
+        ["5h", local("2026-10-20T05:00:00"), "swallowed", "5 soat"],
+        ["4h", local("2026-10-20T06:00:00"), "dropped", "4 soat"],
+        ["3h", local("2026-10-20T07:00:00"), "regular", "3 soat"],
+        ["2h", local("2026-10-20T08:00:00"), "regular", "2 soat"],
+        ["1h", local("2026-10-20T09:00:00"), "regular", "1 soat"],
+      ]);
+    });
+
+    it("reports an extended expiry and validates the request", async () => {
+      const res = await send("/preview-schedule", "POST", { segment: "A", linkGivenAt: local("2026-10-19T02:00:00") });
+      expect(await res.json()).toMatchObject({ linkExpiresAt: local("2026-10-20T09:00:00"), extended: true, items: [] });
+      expect((await send("/preview-schedule", "POST", { segment: "D", linkGivenAt: local("2026-10-19T02:00:00") })).status).toBe(400);
+      expect((await send("/preview-schedule", "POST", { segment: "A", linkGivenAt: "kecha" })).status).toBe(400);
+    });
+  });
+
   it("uploads media through the media chat and removes it there", async () => {
     const form = new FormData();
     form.append("file", new File([new Uint8Array([1, 2, 3])], "note.ogg", { type: "audio/ogg" }));

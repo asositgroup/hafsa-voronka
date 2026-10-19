@@ -1,8 +1,15 @@
 import { z } from "zod";
-import { funnelSegments } from "./funnel";
+import { type FunnelSegment, funnelSegments } from "./funnel";
 import { formatMmSs } from "./time";
 
-export const templateVariables = ["ism", "qolgan_vaqt", "toxtagan_joy", "qolgan_daqiqa", "link_tugash_vaqti"] as const;
+export const templateVariables = [
+  "ism",
+  "qolgan_vaqt",
+  "toxtagan_joy",
+  "qolgan_daqiqa",
+  "link_tugash_vaqti",
+  "link_tugash_soati",
+] as const;
 
 export type TemplateVariable = (typeof templateVariables)[number];
 
@@ -12,6 +19,7 @@ export const TEMPLATE_VARIABLE_MAX_LENGTH: Record<TemplateVariable, number> = {
   toxtagan_joy: 8,
   qolgan_daqiqa: 4,
   link_tugash_vaqti: 20,
+  link_tugash_soati: 5,
 };
 
 export const TEMPLATE_TEXT_LIMITS = {
@@ -23,6 +31,10 @@ export const TEMPLATE_DAYS = 7;
 export const MINUTES_PER_DAY = 1440;
 export const NIGHT = { start: 1380, end: 420 } as const;
 export const TASHKENT_OFFSET_MS = 5 * 60 * 60 * 1000;
+export const NIGHT_NOTICE_MINUTE = 22 * 60;
+export const MORNING_SEND_MINUTE = 7 * 60 + 30;
+export const EXTENDED_EXPIRY_MINUTE = 9 * 60;
+export const linkBoundSegments: readonly FunnelSegment[] = ["A", "B"];
 
 export type TemplateContext = {
   name: string | null;
@@ -79,11 +91,16 @@ function playbackPosition(sec: number): string {
   return `${hours}:${formatMmSs(rest)}`;
 }
 
-function tashkentDateTime(date: Date): string {
+function tashkentClock(date: Date): string {
   const local = new Date(date.getTime() + TASHKENT_OFFSET_MS);
   const hh = String(local.getUTCHours()).padStart(2, "0");
   const mm = String(local.getUTCMinutes()).padStart(2, "0");
-  return `${local.getUTCDate()}-${uzbekMonths[local.getUTCMonth()]}, ${hh}:${mm}`;
+  return `${hh}:${mm}`;
+}
+
+function tashkentDateTime(date: Date): string {
+  const local = new Date(date.getTime() + TASHKENT_OFFSET_MS);
+  return `${local.getUTCDate()}-${uzbekMonths[local.getUTCMonth()]}, ${tashkentClock(date)}`;
 }
 
 export function variableValues(ctx: TemplateContext): Record<TemplateVariable, string> {
@@ -95,6 +112,7 @@ export function variableValues(ctx: TemplateContext): Record<TemplateVariable, s
     qolgan_daqiqa:
       ctx.durationSec === null ? "" : String(Math.max(0, Math.ceil((ctx.durationSec - ctx.lastPositionSec) / 60))),
     link_tugash_vaqti: ctx.linkExpiresAt ? tashkentDateTime(ctx.linkExpiresAt) : "",
+    link_tugash_soati: ctx.linkExpiresAt ? tashkentClock(ctx.linkExpiresAt) : "",
   };
 }
 
@@ -368,13 +386,13 @@ export function validateTemplateText(text: string, hasMedia: boolean): TemplateT
   return null;
 }
 
-export const timingTypes = ["after_entry", "day_time", "before_expiry"] as const;
+export const timingTypes = ["after_entry", "day_time", "before_expiry", "night_notice"] as const;
 
 export type TimingType = (typeof timingTypes)[number];
 
 export type TemplateTiming = { type: TimingType; value: number };
 
-export type TimingError = "out_of_range" | "outside_day" | "night";
+export type TimingError = "out_of_range" | "outside_day" | "night" | "linked_only";
 
 export function isNightMinute(minuteOfDay: number): boolean {
   return minuteOfDay < NIGHT.end || minuteOfDay >= NIGHT.start;
@@ -392,6 +410,7 @@ export function validateTiming(day: number, timing: TemplateTiming): TimingError
     if (value < 0 || value >= MINUTES_PER_DAY) return "out_of_range";
     return isNightMinute(value) ? "night" : null;
   }
+  if (type === "night_notice") return value === 0 ? null : "out_of_range";
   return value >= 1 && value <= TEMPLATE_DAYS * MINUTES_PER_DAY ? null : "out_of_range";
 }
 
@@ -401,6 +420,10 @@ export function dayForTiming(timing: TemplateTiming, fallbackDay: number): numbe
   return 1;
 }
 
+export function isExpiryTiming(type: TimingType): boolean {
+  return type === "before_expiry" || type === "night_notice";
+}
+
 export const EXPIRY_TIMELINE_GROUP = "expiry" as const;
 
 export type TimelineGroupKey = number | typeof EXPIRY_TIMELINE_GROUP;
@@ -408,12 +431,13 @@ export type TimelineGroupKey = number | typeof EXPIRY_TIMELINE_GROUP;
 export type TimelineEntry = { day: number; timing: TemplateTiming; position: number; id: number };
 
 export function timelineGroupKey(entry: Pick<TimelineEntry, "day" | "timing">): TimelineGroupKey {
-  if (entry.timing.type === "before_expiry") return EXPIRY_TIMELINE_GROUP;
+  if (isExpiryTiming(entry.timing.type)) return EXPIRY_TIMELINE_GROUP;
   return dayForTiming(entry.timing, entry.day);
 }
 
 export function timelineSortKey(entry: Pick<TimelineEntry, "day" | "timing">): number {
   const { type, value } = entry.timing;
+  if (type === "night_notice") return -(TEMPLATE_DAYS * MINUTES_PER_DAY + 1);
   if (type === "before_expiry") return -value;
   if (type === "day_time") return (entry.day - 1) * MINUTES_PER_DAY + value;
   return value;
@@ -513,6 +537,9 @@ export function validateTemplateInput(input: MessageTemplateInput): TemplateVali
   if (textError) return { path: "text", ...textError };
   const timingError = validateTiming(input.day, input.timing);
   if (timingError) return { path: "timing", error: timingError };
+  if (input.timing.type === "night_notice" && !linkBoundSegments.includes(input.segment)) {
+    return { path: "timing", error: "linked_only" };
+  }
   return null;
 }
 
@@ -565,3 +592,30 @@ export const templateMediaUploadSchema = z.object({
   type: z.enum(templateMediaTypes),
   fileId: z.string().min(1),
 });
+
+export const schedulePreviewRequestSchema = z.object({
+  segment: z.enum(funnelSegments),
+  linkGivenAt: z.iso.datetime({ offset: true }),
+});
+
+export type SchedulePreviewRequest = z.infer<typeof schedulePreviewRequestSchema>;
+
+export const schedulePreviewKinds = ["regular", "collapsed", "night_notice", "swallowed", "dropped"] as const;
+
+export type SchedulePreviewKind = (typeof schedulePreviewKinds)[number];
+
+export const schedulePreviewSchema = z.object({
+  linkGivenAt: z.string(),
+  linkExpiresAt: z.string(),
+  extended: z.boolean(),
+  items: z.array(
+    z.object({
+      templateId: z.number().int(),
+      at: z.string(),
+      kind: z.enum(schedulePreviewKinds),
+      remaining: z.string(),
+    }),
+  ),
+});
+
+export type SchedulePreview = z.infer<typeof schedulePreviewSchema>;

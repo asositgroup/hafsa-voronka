@@ -526,7 +526,12 @@ Execute the complete end-to-end user journey:
 - [ ] R2 API token has write access and the five `R2_*` variables are set; the bucket CORS policy allows `PUT` from the admin origin (Section 3)
 - [ ] `ADMIN_TELEGRAM_IDS` is set to the admins allowed to replace the video from the bot
 - [ ] For uploads over 20 MB, complete the cutover in "Local Bot API Server" (Section 6)
-- [ ] `LINK_TTL_HOURS` is a panel setting, not an env variable: default 72, editable in the admin panel
+- [ ] Migrations 0014-0016 (`wrote_admin`, night rules, segment B targeting) also run at API startup; nothing to run by hand
+- [ ] `LINK_TTL_HOURS` is a panel setting, not an env variable. The code default is now 24h, but a production row saved earlier may still say 72: open Sozlamalar and set it to 24 explicitly
+- [ ] `MESSAGE_CAPS` is also a panel setting (Sozlamalar, per audience A/B/C: daily and total). Defaults: A and C 10 per day with no total, B 4 per day and 7 total. Review them before launch
+- [ ] The night notice (22:00 warning before the expiry night) is not seeded: an admin must create a message with the "night notice" timing in the messages constructor, otherwise no warning is sent. Use "Jadvalni sinash" to check the resulting schedule
+- [ ] Run TZ Test 6 (Range / 206) against the production video URL: `scripts/check-range.sh https://video.yourdomain.uz/lesson-1/master.mp4`. It prints `status=206 accept-ranges=bytes` and exits non-zero otherwise. Use the MP4 URL; for HLS check a `.ts` segment
+- [ ] Lead cards in the leads chat now have a «Yozdi» button; pressing it (or marking the lead "won") stops reminders for that person. Check it on one test lead
 
 ---
 
@@ -592,6 +597,7 @@ Comprehensive reference for all environment variables used by the API and Web ap
 | `SESSION_SECRET` | API (`apps/api`) | Optional | `openssl rand -base64 48` string | Secret key for signing admin session cookies (min 32 chars) |
 | `LEADS_CHAT_ID` | API (`apps/api`) | Optional | `-1001234567890` | Telegram chat id or `@channelname` that receives new-lead notifications |
 | `LEADS_THREAD_ID` | API (`apps/api`) | Optional | `5` | Topic (thread) id inside `LEADS_CHAT_ID` for lead notifications |
+| `LINK_TTL_HOURS` / `MESSAGE_CAPS` | Admin panel (Sozlamalar), stored in the `settings` table | Not env variables | `24` / per-audience caps | Link lifetime in hours (default 24, 1 to 720) and daily/total message caps per audience. Changing either needs no redeploy |
 | `MEDIA_CHAT_ID` | API (`apps/api`) | Optional | `-1001234567890` | Chat where the bot uploads photos and videos for editable bot messages. Defaults to `LEADS_CHAT_ID` (and its `LEADS_THREAD_ID` topic); the upload message is deleted right after Telegram returns the file ID |
 | `ADMIN_TELEGRAM_IDS` | API (`apps/api`) | Optional | `123456789,987654321` | Comma-separated Telegram user ids allowed to upload and activate videos from the bot |
 | `BOT_API_ROOT` | API (`apps/api`) | Optional | `http://telegram-bot-api:8081` | Self-hosted Bot API server. When unset the bot uses the cloud API and only files up to 20 MB work |

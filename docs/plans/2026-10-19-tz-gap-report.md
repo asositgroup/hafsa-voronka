@@ -8,16 +8,16 @@ Legend: ✅ done · 🟡 partial · ❌ missing · ➖ not applicable
 
 | Requirement | Status | Notes |
 |---|---|---|
-| Link expires after 24h | 🟡 | Expiry is built; the default is **72h**, editable in Sozlamalar |
+| Link expires after 24h | ✅ | Default is now 24h, editable in Sozlamalar (90b5203). Production may still hold 72 until saved |
 | Reminder schedule (1, 3, 5, 7, 9, 14, 19, 20–23h) | 🟡 | Can be built in the constructor as "before expiry" messages; the TZ texts are not entered |
 | `[X] soat` remaining time | ✅ | `{qolgan_vaqt}` |
 | Counted back from expiry, recalculated if expiry changes | ✅ | before_expiry is computed live from `link_expires_at` |
 | Stops when the video is opened | ✅ | User moves to segment B |
-| §1.1 rule 2: expiry falling at night is extended to 09:00 | ❌ | |
-| §1.1 rule 3: night reminders collapse into **one** message at 07:30 with the real remaining time | ❌ | Each night reminder moves to 07:00 separately |
-| §1.1 rule 4: drop the moved message if another is due within 1h | ❌ | |
-| §1.1 rule 5: one 22:00 evening warning when the night swallows ≥2 reminders | ❌ | |
-| §1.1 rule 6: someone registering at night gets nothing before 07:30 | 🟡 | We hold until 07:00 |
+| §1.1 rule 2: expiry falling at night is extended to 09:00 | ✅ | c2ba852 |
+| §1.1 rule 3: night reminders collapse into **one** message at 07:30 with the real remaining time | ✅ | c2ba852 |
+| §1.1 rule 4: drop the moved message if another is due within 1h | ✅ | c2ba852 |
+| §1.1 rule 5: one 22:00 evening warning when the night swallows ≥2 reminders | ✅ | c2ba852; the night notice template must be created by an admin |
+| §1.1 rule 6: someone registering at night gets nothing before 07:30 | ✅ | c2ba852 |
 
 ## §2. After expiry: the «afsus» second-chance flow
 
@@ -35,12 +35,12 @@ Legend: ✅ done · 🟡 partial · ❌ missing · ➖ not applicable
 | Requirement | Status | Notes |
 |---|---|---|
 | Time marks per video, none hardcoded | ✅ | course start, price, optional intro end |
-| Statuses `ko'rishni_boshladi` … `narxni_kurdi` | 🟡 | **The boundary differs**: the TZ splits `ko'rishni_boshladi` / `dars_yarmida` at **5:00**; we use the midpoint between intro end and course start |
-| §3.4 a different text depending on where they stopped (0–5 / 5–15 / 15–price) | ❌ | Segment B is one list for all three sub-statuses |
+| Statuses `ko'rishni_boshladi` … `narxni_kurdi` | ✅ | The lesson start mark (default 5:00) now drives the boundary (5dcb166) |
+| §3.4 a different text depending on where they stopped (0–5 / 5–15 / 15–price) | ✅ | Segment B templates target stop points with the «Kimga» filter (5dcb166) |
 | Buttons: Davom ettirish / Faqat kurs haqidagi qism / Narx va shartlarni ko'rish | ✅ | `resume` / `offer` |
-| §3.6 timings counted **from when they stopped** | 🟡 | We count from when they first opened the video (entering B); "next morning 08:00" and "N hours before expiry" do work |
-| At most 7 messages in this chain and at most 4 per day | 🟡 | Single global cap of 10 per day |
-| Night messages move to 07:00–08:00 | ✅ | Moved to 07:00 |
+| §3.6 timings counted **from when they stopped** | ✅ | Counted from the last progress beat; nothing sent while watching (5dcb166) |
+| At most 7 messages in this chain and at most 4 per day | ✅ | Per-audience caps in Sozlamalar; B defaults to 4 per day, 7 total (5dcb166) |
+| Night messages move to 07:00–08:00 | ✅ | Now collapsed into one at 07:30 (c2ba852) |
 | Stops on narxni_kurdi / adminga_yozdi / bloklagan | ✅ | |
 | §3.8 different «afsus» text, and "Ha" first plays the short «Kurs haqida» video | ❌ | This is what the short offer video is for; its upload is built but hidden and nothing plays it |
 | §3.9 metrics | ✅ | `/admin/reports` |
@@ -51,7 +51,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing · ➖ not applicable
 |---|---|---|
 | Messages at 10–15 min / 3h / next day / 2–3 days | ✅ | Segment C in the constructor; the TZ texts are not entered |
 | "Adminga yozish" with pre-filled text | ✅ | Needs `CHANNEL_URL` to be a `t.me/username` link |
-| Admin marks "yozdi" by hand so progrev stops | ❌ | Only the button click counts; the lead card's Won/Lost buttons don't stop the chain |
+| Admin marks "yozdi" by hand so progrev stops | ✅ | «Yozdi» lead-card button and "won" both stop reminders (90b5203) |
 
 ## §5. Statuses and storage
 
@@ -71,17 +71,17 @@ Legend: ✅ done · 🟡 partial · ❌ missing · ➖ not applicable
 | Requirement | Status | Notes |
 |---|---|---|
 | Server stores lastPosition / maxPosition and resumes from them | ✅ | |
-| Range / 206 | ✅ | R2; Test 6 not yet run against prod |
-| iOS: set the position again on `canplay` / first `play`, check again after 0.5s | ❌ | Only set on `loadedmetadata` |
-| Progress tick every 5s | 🟡 | Every 10s |
-| Save on close (`pagehide`, Telegram `close`) | 🟡 | Only on `visibilitychange` |
-| `Cache-Control: no-store` on `/app/session` | ❌ | |
+| Range / 206 | ✅ | R2; `scripts/check-range.sh` added (1c34aa1); Test 6 still to be run against prod |
+| iOS: set the position again on `canplay` / first `play`, check again after 0.5s | ✅ | 1c34aa1 |
+| Progress tick every 5s | ✅ | 1c34aa1 |
+| Save on close (`pagehide`, Telegram `close`) | ✅ | 1c34aa1 |
+| `Cache-Control: no-store` on `/app/session` | ✅ | 90b5203 |
 | Anti-cheat: maxPosition can only grow with elapsed time | ✅ | Credit cap of elapsed × 2 × 1.1 + 2s |
-| Backup copy in CloudStorage / localStorage | ❌ | |
-| «Siz 5:12 da to'xtagan edingiz» screen with Davom ettirish (5s back) / Boshidan | ❌ | Silently resumes at the last position |
+| Backup copy in CloudStorage / localStorage | ✅ | 1c34aa1 |
+| «Siz 5:12 da to'xtagan edingiz» screen with Davom ettirish (5s back) / Boshidan | ✅ | Resume overlay (1c34aa1) |
 | Seek lock, toast, watched part shown in a different colour | 🟡 | Lock and toast exist; the bar colouring is not verified |
 | Speeds 1× / 1.25× / 1.5× / 2× | 🟡 | A speed menu exists; the exact rates are not verified |
-| Seek lock comes off **after the price point** as well | 🟡 | Only after completion |
+| Seek lock comes off **after the price point** as well | ✅ | 1c34aa1 |
 | startapp resume / offer | ✅ | |
 
 ## §7–9. Constructor, video replacement, reports

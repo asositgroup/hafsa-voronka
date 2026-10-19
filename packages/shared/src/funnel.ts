@@ -70,3 +70,27 @@ export function offerVariantOf(statuses: readonly FunnelStatus[] | null): OfferV
 export const offerAnswers = ["again", "later"] as const;
 
 export type OfferAnswer = (typeof offerAnswers)[number];
+
+export const appointmentPurposes = ["reopen", "remind"] as const;
+
+export type AppointmentPurpose = (typeof appointmentPurposes)[number];
+
+export const LATER_FIRST_HOUR = 7;
+
+export const LATER_LAST_HOUR = 22;
+
+export const LATER_PRE_REMINDER_MINUTES = 60;
+
+export const laterQuickSlots = {
+  tonight: { dayOffset: 0, hour: 20 },
+  tomorrowMorning: { dayOffset: 1, hour: 8 },
+  tomorrowEvening: { dayOffset: 1, hour: 20 },
+} as const;
+
+export type LaterQuickSlot = keyof typeof laterQuickSlots;
+
+export const laterQuickSlotKeys = Object.keys(laterQuickSlots) as LaterQuickSlot[];
+
+export const laterDayOffsets = [0, 1, 2] as const;
+
+export type LaterDayOffset = (typeof laterDayOffsets)[number];

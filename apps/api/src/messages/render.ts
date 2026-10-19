@@ -10,7 +10,7 @@ import {
   variableValues,
 } from "@funnel/shared";
 import { env } from "@/env";
-import { watchAppUrl } from "@/telegram/bot";
+import { watchAppUrl } from "@/telegram/watchUrl";
 
 export type TemplateContent = {
   text: string;

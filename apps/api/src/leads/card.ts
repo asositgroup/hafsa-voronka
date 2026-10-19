@@ -8,7 +8,12 @@ export type CardUser = Pick<
   "telegramId" | "username" | "phone" | "phoneVerified" | "registeredAt" | "completedAt" | "wroteAdminAt" | "wroteAdminBy"
 > & { watchedPercent?: number; secondChance?: SecondChanceSummary };
 
-export type SecondChanceSummary = { offered: number; answer: OfferAnswer | null; exhausted: boolean };
+export type SecondChanceSummary = {
+  offered: number;
+  answer: OfferAnswer | null;
+  exhausted: boolean;
+  appointmentAt?: Date | null;
+};
 
 const PROGRESS_CELLS = 10;
 
@@ -95,6 +100,9 @@ export function renderLeadCard(lead: Lead, user: CardUser | null | undefined): s
 
   const secondChance = registered?.secondChance && secondChanceLine(registered.secondChance);
   if (secondChance) lines.push(secondChance);
+  if (registered?.secondChance?.appointmentAt) {
+    lines.push(`⏰ Tanlangan vaqt: ${tashkent(registered.secondChance.appointmentAt)}`);
+  }
 
   if (user?.wroteAdminAt) lines.push(wroteAdminLine(lead, user.wroteAdminAt, user.wroteAdminBy));
   if (lead.assigneeTelegramId !== null) lines.push(`👨‍💼 Mas'ul: ${assigneeLabel(lead)}`);

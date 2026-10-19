@@ -26,7 +26,12 @@ import { adminUz } from "@/lib/i18n/admin";
 const copy = adminUz.botTexts;
 const messagesCopy = adminUz.messages.editor;
 const acceptedTypes = [...BOT_MEDIA_MIME_TYPES.photo, ...BOT_MEDIA_MIME_TYPES.video].join(",");
-const placeholderSamples: Record<string, string> = { name: "Aziza" };
+const placeholderSamples: Record<string, string> = {
+  name: "Aziza",
+  soat: "20:00",
+  vaqt: "Ertaga 08:00",
+  link_tugash_vaqti: "21-oktabr, 10:00",
+};
 const mediaIcons = { photo: PhotoIcon, video: VideoIcon };
 
 type Busy = "save" | "reset" | "upload" | "remove" | null;

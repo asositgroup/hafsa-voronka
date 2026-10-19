@@ -27,9 +27,31 @@ export const botMessageKeys = [
   "completion",
   "fallback",
   "laterAck",
+  "laterAsk",
+  "laterPickDay",
+  "laterPickHour",
+  "laterConfirmed",
+  "laterTooLate",
+  "reopenPreReminder",
+  "reopenNow",
+  "remindNow",
+  "offerClosed",
 ] as const;
 
-export const botButtonKeys = ["shareContactButton", "watchButton", "channelButton"] as const;
+export const botButtonKeys = [
+  "shareContactButton",
+  "watchButton",
+  "channelButton",
+  "laterTonight",
+  "laterTomorrowMorning",
+  "laterTomorrowEvening",
+  "laterOther",
+  "dayToday",
+  "dayTomorrow",
+  "dayAfterTomorrow",
+  "reopenWatchButton",
+  "remindWatchButton",
+] as const;
 
 export const botTextKeys = [...botMessageKeys, ...botButtonKeys] as const;
 
@@ -51,9 +73,27 @@ export const botTextDefinitions: Record<BotTextKey, { kind: BotTextKind; placeho
   completion: { kind: "message", placeholders: [] },
   fallback: { kind: "message", placeholders: [] },
   laterAck: { kind: "message", placeholders: [] },
+  laterAsk: { kind: "message", placeholders: [] },
+  laterPickDay: { kind: "message", placeholders: [] },
+  laterPickHour: { kind: "message", placeholders: [] },
+  laterConfirmed: { kind: "message", placeholders: ["vaqt"] },
+  laterTooLate: { kind: "message", placeholders: ["link_tugash_vaqti"] },
+  reopenPreReminder: { kind: "message", placeholders: [] },
+  reopenNow: { kind: "message", placeholders: [] },
+  remindNow: { kind: "message", placeholders: [] },
+  offerClosed: { kind: "message", placeholders: [] },
   shareContactButton: { kind: "button", placeholders: [] },
   watchButton: { kind: "button", placeholders: [] },
   channelButton: { kind: "button", placeholders: [] },
+  laterTonight: { kind: "button", placeholders: ["soat"] },
+  laterTomorrowMorning: { kind: "button", placeholders: ["soat"] },
+  laterTomorrowEvening: { kind: "button", placeholders: ["soat"] },
+  laterOther: { kind: "button", placeholders: [] },
+  dayToday: { kind: "button", placeholders: [] },
+  dayTomorrow: { kind: "button", placeholders: [] },
+  dayAfterTomorrow: { kind: "button", placeholders: [] },
+  reopenWatchButton: { kind: "button", placeholders: [] },
+  remindWatchButton: { kind: "button", placeholders: [] },
 };
 
 export const BOT_PLACEHOLDER_MAX_LENGTH = 64;

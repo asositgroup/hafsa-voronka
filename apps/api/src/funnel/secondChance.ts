@@ -10,7 +10,7 @@ import {
 import { DAY_MS, GRACE_MS, HOUR_MS, isSameTashkentDay, MINUTE_MS, outOfNight, tashkentDayStart } from "@/messages/plan";
 import type { LinkState } from "./status";
 
-export type OfferRecord = { occasion: number; dueAt: Date; answer: OfferAnswer | null };
+export type OfferRecord = { occasion: number; dueAt: Date; answer: OfferAnswer | null; reopened?: boolean };
 
 export type OfferContext = {
   history: OfferRecord[];
@@ -45,7 +45,7 @@ export function nextOffer(context: OfferContext, now: Date): OfferStep {
     base = expiresAt;
   } else {
     if (context.pendingAppointment) return { kind: "wait" };
-    base = last.answer === "again" ? expiresAt : new Date(last.dueAt.getTime() + INTERVAL_MS);
+    base = last.answer === "again" || last.reopened ? expiresAt : new Date(last.dueAt.getTime() + INTERVAL_MS);
   }
   const occasion = (last?.occasion ?? 0) + 1;
 

@@ -2,6 +2,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { type FunnelSegment, linkBoundSegments } from "@funnel/shared";
 import { db } from "@/db";
 import { linkGrants, segmentRuns, users, videos, watchProgress } from "@/db/schema";
+import { cancelPendingAppointments, pendingAppointmentOf } from "@/links/appointmentStore";
 import { offerHistory } from "@/links/offers";
 import { linkStateFor } from "./secondChance";
 import { endReasonFor, type LinkState, NO_VIDEO_MARKS, segmentFor, statusFor } from "./status";
@@ -10,7 +11,8 @@ type Executor = Pick<ReturnType<typeof db>, "select">;
 
 async function linkStateOf(executor: Executor, userId: number, expiresAt: Date | null, now: Date): Promise<LinkState> {
   if (expiresAt === null || expiresAt.getTime() > now.getTime()) return "live";
-  return linkStateFor({ history: await offerHistory(executor, userId), expiresAt }, now);
+  const pendingAppointment = (await pendingAppointmentOf(executor, userId)) !== null;
+  return linkStateFor({ history: await offerHistory(executor, userId), expiresAt, pendingAppointment }, now);
 }
 
 async function snapshot(executor: Executor, userId: number, now: Date) {
@@ -66,6 +68,9 @@ export async function syncSegment(userId: number, now = new Date()): Promise<voi
         .update(segmentRuns)
         .set({ endedAt: now, endReason: current.endReason(current.open.segment) })
         .where(eq(segmentRuns.id, current.open.id));
+    }
+    if (current.open?.segment === "D" || current.target === null) {
+      await cancelPendingAppointments(tx, userId, now, current.target === null ? undefined : ["reopen"]);
     }
     if (current.target !== null) {
       await tx.insert(segmentRuns).values({ userId, segment: current.target, enteredAt: now, attempt: current.attempt });

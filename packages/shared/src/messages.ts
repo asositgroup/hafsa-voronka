@@ -151,14 +151,14 @@ function playbackPosition(sec: number): string {
   return `${hours}:${formatMmSs(rest)}`;
 }
 
-function tashkentClock(date: Date): string {
+export function tashkentClock(date: Date): string {
   const local = new Date(date.getTime() + TASHKENT_OFFSET_MS);
   const hh = String(local.getUTCHours()).padStart(2, "0");
   const mm = String(local.getUTCMinutes()).padStart(2, "0");
   return `${hh}:${mm}`;
 }
 
-function tashkentDateTime(date: Date): string {
+export function tashkentDateTime(date: Date): string {
   const local = new Date(date.getTime() + TASHKENT_OFFSET_MS);
   return `${local.getUTCDate()}-${uzbekMonths[local.getUTCMonth()]}, ${tashkentClock(date)}`;
 }

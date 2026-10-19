@@ -414,7 +414,7 @@ describe.skipIf(!isolatedDb.url)("Second chance after the link expires", () => {
     await tick(expiry);
     const [offer] = await offersOf(user.id);
     await tap(user.telegramId, `mt:l:s${offer.sentMessageId}`);
-    expect(sends().at(-1)?.payload).toMatchObject({ text: "Mayli, qulay vaqtda ko'rib chiqing. Dars sizni kutmoqda 🌿" });
+    expect(String(sends().at(-1)?.payload.text)).toContain("Qachon ko'rishingiz qulay?");
     const [answered] = await offersOf(user.id);
     expect(answered.answer).toBe("later");
     expect((await db().select().from(events).where(eq(events.type, "second_chance_later"))).length).toBe(1);

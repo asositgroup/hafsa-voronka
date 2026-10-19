@@ -17,6 +17,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import {
+  appointmentPurposes,
   driveImportErrors,
   driveImportStatuses,
   eventTypes,
@@ -441,3 +442,34 @@ export const secondChanceOffers = pgTable(
 );
 
 export type SecondChanceOffer = typeof secondChanceOffers.$inferSelect;
+
+export const watchAppointments = pgTable(
+  "watch_appointments",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    userId: bigint("user_id", { mode: "number" })
+      .notNull()
+      .references(() => users.id),
+    offerId: bigint("offer_id", { mode: "number" }).references(() => secondChanceOffers.id),
+    purpose: text("purpose", { enum: appointmentPurposes }).notNull(),
+    chosenAt: timestamp("chosen_at", { withTimezone: true }).notNull(),
+    preRemindAt: timestamp("pre_remind_at", { withTimezone: true }),
+    preSentMessageId: bigint("pre_sent_message_id", { mode: "number" }).references(() => sentMessages.id),
+    firedAt: timestamp("fired_at", { withTimezone: true }),
+    firedMessageId: bigint("fired_message_id", { mode: "number" }).references(() => sentMessages.id),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("watch_appointments_one_pending_idx")
+      .on(t.userId)
+      .where(sql`${t.firedAt} is null and ${t.cancelledAt} is null`),
+    index("watch_appointments_due_idx")
+      .on(t.chosenAt)
+      .where(sql`${t.firedAt} is null and ${t.cancelledAt} is null`),
+    check("watch_appointments_offer_shape", sql`(${t.purpose} = 'reopen') = (${t.offerId} is not null)`),
+    check("watch_appointments_closed_once", sql`${t.firedAt} is null or ${t.cancelledAt} is null`),
+  ],
+);
+
+export type WatchAppointment = typeof watchAppointments.$inferSelect;

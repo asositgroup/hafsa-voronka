@@ -164,7 +164,7 @@ function TriggerBubble({ trigger }: { trigger: ChatTrigger }) {
   if (trigger.kind === "note") {
     return (
       <p className="m-0 self-center rounded-full bg-siyoh/15 px-3 py-1 text-center text-[12px] font-medium text-siyoh">
-        {copy.systemNote}
+        {copy.notes[trigger.note ?? "buttonReady"]}
       </p>
     );
   }

@@ -409,12 +409,12 @@ describe.skipIf(!testDbUrl)("Message constructor", () => {
       await db().insert(users).values({ telegramId: REMINDER_USER_ID, firstName: "Reminder" }).onConflictDoNothing();
     });
 
-    it("answers old when-menu buttons with the editable later acknowledgement", async () => {
+    it("answers old when-menu buttons with the editable closed text for unregistered users", async () => {
       await tap(REMINDER_USER_ID, "mt:w:s1");
       expect(calls.map((call) => call.method)).toEqual(["answerCallbackQuery", "sendMessage"]);
       expect(calls[1].payload).toMatchObject({
         chat_id: REMINDER_USER_ID,
-        text: "Mayli, qulay vaqtda ko'rib chiqing. Dars sizni kutmoqda 🌿",
+        text: "Bu tugma eskirgan 🙂 Darsga qaytish uchun /start bosing.",
       });
       expect((await reminderEvents()).map((event) => event.type)).toEqual(["reminder_later"]);
     });
@@ -430,7 +430,7 @@ describe.skipIf(!testDbUrl)("Message constructor", () => {
       expect((await reminderEvents()).some((event) => event.type === "reminder_later")).toBe(true);
     });
 
-    it("answers test buttons without logging anything", async () => {
+    it("answers test buttons with the later acknowledgement without logging anything", async () => {
       const before = (await reminderEvents()).length;
       await tap(REMINDER_USER_ID, "mt:w:t0");
       await tap(REMINDER_USER_ID, "mt:wa:t0:b");

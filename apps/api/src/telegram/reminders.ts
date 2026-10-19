@@ -2,28 +2,37 @@ import { Composer } from "grammy";
 import { findByTelegramId, logEvent } from "@/funnel/users";
 import { answerLater } from "@/links/service";
 import { recordMessageClick } from "@/messages/clicks";
+import { askWhen, laterComposer } from "@/telegram/later";
 import { sendBotText } from "@/telegram/texts";
 
-async function recordLater(telegramId: number, ref: string, op: string) {
-  if (!ref.startsWith("s")) return;
-  const user = await findByTelegramId(telegramId);
-  if (!user) return;
+async function recordLater(userId: number, visitorId: string | null, ref: string, op: string) {
   const sentId = Number(ref.slice(1));
-  if (await answerLater(user.id, sentId)) {
-    await recordMessageClick(sentId, user.id, "callback", { op });
+  if (await answerLater(userId, sentId)) {
+    await recordMessageClick(sentId, userId, "callback", { op });
     return;
   }
-  await logEvent("reminder_later", { userId: user.id, visitorId: user.visitorId, meta: { ref, choice: null } });
-  if (op !== "wa") await recordMessageClick(sentId, user.id, "callback", { op });
+  await logEvent("reminder_later", { userId, visitorId, meta: { ref, choice: null } });
+  if (op !== "wa") await recordMessageClick(sentId, userId, "callback", { op });
 }
 
 export const reminderComposer = new Composer();
+
+reminderComposer.use(laterComposer);
 
 reminderComposer.callbackQuery(/^mt:(w|wa|l):([ts]\d+)(?::([bek]))?$/, async (ctx) => {
   const [, op, ref] = ctx.match;
   const chatId = ctx.chat?.id;
   await ctx.answerCallbackQuery();
   if (!chatId) return;
-  await sendBotText(ctx.api, chatId, "laterAck");
-  await recordLater(ctx.from.id, ref, op);
+  if (ref.startsWith("t")) {
+    await sendBotText(ctx.api, chatId, "laterAck");
+    return;
+  }
+  const user = await findByTelegramId(ctx.from.id);
+  if (!user) {
+    await sendBotText(ctx.api, chatId, "offerClosed");
+    return;
+  }
+  await recordLater(user.id, user.visitorId, ref, op);
+  await askWhen(ctx.api, chatId, user);
 });

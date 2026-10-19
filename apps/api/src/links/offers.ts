@@ -1,4 +1,4 @@
-import { asc, eq, inArray } from "drizzle-orm";
+import { asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { secondChanceOffers } from "@/db/schema";
 import type { OfferRecord } from "@/funnel/secondChance";
@@ -10,6 +10,7 @@ const offerColumns = {
   occasion: secondChanceOffers.occasion,
   dueAt: secondChanceOffers.dueAt,
   answer: secondChanceOffers.answer,
+  reopened: sql<boolean>`${secondChanceOffers.grantedLinkId} is not null`,
 };
 
 export async function offerHistory(executor: Executor, userId: number): Promise<OfferRecord[]> {

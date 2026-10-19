@@ -31,9 +31,28 @@ export const defaultBotTexts: Record<BotTextKey, string> = {
     "Barakalla! 🎉 Darsni ko'rib chiqdingiz. Bu arab tilini o'rganishdagi eng muhim qadam: to'g'ri boshlash.\n\nEndi bilganlaringizni amalda qo'llash vaqti. Arab tilini Hafsa ustoza bilan davom ettirmoqchimisiz yoki savollaringiz bormi? Adminga yozing, sizga batafsil ma'lumot beradi 👇",
   fallback: "Video darsni ko'rish uchun pastdagi tugmani bosing 👇",
   laterAck: "Mayli, qulay vaqtda ko'rib chiqing. Dars sizni kutmoqda 🌿",
+  laterAsk: "Yaxshi! Qachon ko'rishingiz qulay? 🕐\n\nShu vaqtda darsni siz uchun qayta ochib, eslatib qo'yaman 👇",
+  laterPickDay: "Qaysi kuni ko'rishingiz qulay? 📅",
+  laterPickHour: "Soat nechada? Toshkent vaqti bilan 🕐",
+  laterConfirmed: "Zo'r! 🙌 {vaqt} — darsingizni ochib, eslatib qo'yaman ✅",
+  laterTooLate:
+    "Dars {link_tugash_vaqti} da o'chadi, shuning uchun bundan keyin qulay vaqt qolmadi 😔\n\nHoziroq ko'rib oling, 17 daqiqa yetarli 👇",
+  reopenPreReminder: "1 soatdan keyin bonus darsingiz ochiladi, choy tayyorlab qo'ying 🙂",
+  reopenNow: "Bonus darsingiz yana ochildi! 🎁\n\nLink 24 soat amal qiladi. Tayyor bo'lsangiz, boshlang 👇",
+  remindNow: "Eslatib qo'ydim, dars sizni kutmoqda! ⏰\n\nTayyor bo'lsangiz, davom eting 👇",
+  offerClosed: "Bu tugma eskirgan 🙂 Darsga qaytish uchun /start bosing.",
   shareContactButton: "📱 Raqamni yuborish",
   watchButton: "▶️ Bepul darsni ko'rish",
   channelButton: "✍️ Adminga yozish",
+  laterTonight: "🌙 Bugun kechqurun ({soat})",
+  laterTomorrowMorning: "🌅 Ertaga ertalab ({soat})",
+  laterTomorrowEvening: "🌙 Ertaga kechqurun ({soat})",
+  laterOther: "🕐 Boshqa vaqt",
+  dayToday: "Bugun",
+  dayTomorrow: "Ertaga",
+  dayAfterTomorrow: "Indinga",
+  reopenWatchButton: "▶️ Darsni boshlash",
+  remindWatchButton: "▶️ Darsni davom ettirish",
 };
 
 type ReplyMarkup = InlineKeyboardMarkup | ReplyKeyboardMarkup | ReplyKeyboardRemove | ForceReply;

@@ -1,5 +1,5 @@
 import { Bot, type Context, InlineKeyboard, Keyboard } from "grammy";
-import { normalizeContactPhone, type StartMode } from "@funnel/shared";
+import { normalizeContactPhone } from "@funnel/shared";
 import type { User } from "@/db/schema";
 import { env } from "@/env";
 import { completeRegistration, nameFromTelegram } from "@/funnel/registration";
@@ -18,11 +18,8 @@ import { findMatchingWebLead } from "@/leads/service";
 import { markBlockedByTelegramId } from "@/telegram/blocked";
 import { adminVideoComposer } from "@/telegram/admin-video/handlers";
 import { reminderComposer } from "@/telegram/reminders";
+import { watchAppUrl } from "@/telegram/watchUrl";
 import { botText, sendBotText } from "@/telegram/texts";
-
-export function watchAppUrl(start?: StartMode) {
-  return `${env.WEB_URL}/app${start ? `?start=${start}` : ""}`;
-}
 
 async function watchKeyboard(completed: boolean) {
   const keyboard = new InlineKeyboard().webApp(await botText("watchButton"), watchAppUrl());

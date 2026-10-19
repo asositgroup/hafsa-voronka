@@ -8,6 +8,7 @@ import { logEvent } from "@/funnel/users";
 import { refreshUserLeadCards } from "@/leads/service";
 import { linkExpiryFor } from "@/messages/plan";
 import { linkTtlHours } from "@/settings/service";
+import { cancelPendingAppointments } from "./appointmentStore";
 import { offerHistory } from "./offers";
 
 type Tx = Parameters<Parameters<ReturnType<typeof db>["transaction"]>[0]>[0];
@@ -83,6 +84,7 @@ export async function acceptSecondChance(userId: number, now = new Date()): Prom
       .update(secondChanceOffers)
       .set({ answer: "again", answeredAt: now, grantedLinkId: grant.id })
       .where(eq(secondChanceOffers.id, offer.id));
+    await cancelPendingAppointments(tx, userId, now, ["reopen"]);
     return "granted";
   });
 

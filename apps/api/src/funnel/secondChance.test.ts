@@ -60,6 +60,22 @@ describe("nextOffer", () => {
     expect(step).toEqual({ kind: "wait" });
   });
 
+  it("after a «Keyinroq» appointment reopened the link the next occasion is due when that link expires", () => {
+    const granted = local("2026-10-22T08:00:00");
+    const history = [{ ...offer(1, expiry, "later"), reopened: true }];
+    expect(nextOffer({ history, expiresAt: granted }, local("2026-10-22T07:59:00"))).toEqual({ kind: "live" });
+    expect(nextOffer({ history, expiresAt: granted }, granted)).toEqual({ kind: "due", occasion: 2, dueAt: granted });
+  });
+
+  it("keeps the daily cadence for a «Keyinroq» that never reopened the link", () => {
+    const history = [offer(1, expiry, "later")];
+    expect(nextOffer({ history, expiresAt: expiry }, local("2026-10-21T10:00:00"))).toEqual({
+      kind: "due",
+      occasion: 2,
+      dueAt: local("2026-10-21T10:00:00"),
+    });
+  });
+
   it("after «Ha» the next occasion is due when the granted link expires", () => {
     const granted = local("2026-10-21T11:15:00");
     const history = [offer(1, expiry, "again")];

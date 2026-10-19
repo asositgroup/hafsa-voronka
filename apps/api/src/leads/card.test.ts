@@ -230,6 +230,22 @@ describe("renderLeadCard second chance line", () => {
     expect(done).toContain("🔁 Qayta imkon: 7/7 · imkon tugadi");
   });
 
+  it("shows the chosen time while an appointment is pending", () => {
+    const appointmentAt = new Date("2026-10-21T03:00:00Z");
+    const card = renderLeadCard(linked, {
+      ...user,
+      secondChance: { offered: 1, answer: "later", exhausted: false, appointmentAt },
+    });
+    expect(card).toContain("🔁 Qayta imkon: 1/7 · «Keyinroq» bosdi");
+    expect(card).toContain("⏰ Tanlangan vaqt: 2026-10-21 08:00 (Toshkent)");
+    const remind = renderLeadCard(linked, {
+      ...user,
+      secondChance: { offered: 0, answer: null, exhausted: false, appointmentAt },
+    });
+    expect(remind).toContain("⏰ Tanlangan vaqt: 2026-10-21 08:00 (Toshkent)");
+    expect(remind).not.toContain("🔁");
+  });
+
   it("shows nothing before the first second chance", () => {
     expect(renderLeadCard(linked, { ...user, secondChance: { offered: 0, answer: null, exhausted: false } })).not.toContain(
       "Qayta imkon",

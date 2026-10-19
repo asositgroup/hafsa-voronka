@@ -19,6 +19,9 @@ export const eventTypes = [
   "second_chance_offer",
   "second_chance_again",
   "second_chance_later",
+  "later_scheduled",
+  "later_reopened",
+  "later_reminded",
 ] as const;
 
 export type EventType = (typeof eventTypes)[number];

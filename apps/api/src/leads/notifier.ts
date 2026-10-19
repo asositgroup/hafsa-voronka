@@ -117,6 +117,7 @@ async function flushPending(sender: LeadSender) {
       offered: sql<number>`(select count(*) from second_chance_offers o where o.user_id = ${leads.userId} and o.sent_message_id is not null)::int`,
       lastAnswer: sql<OfferAnswer | null>`(select o.answer from second_chance_offers o where o.user_id = ${leads.userId} and o.sent_message_id is not null order by o.occasion desc limit 1)`,
       exhausted: sql<boolean>`exists (select 1 from segment_runs r where r.user_id = ${leads.userId} and r.end_reason = 'offers_exhausted')`,
+      appointmentAt: sql<Date | null>`(select a.chosen_at from watch_appointments a where a.user_id = ${leads.userId} and a.fired_at is null and a.cancelled_at is null limit 1)`,
     })
     .from(leads)
     .leftJoin(users, eq(users.id, leads.userId))
@@ -132,12 +133,17 @@ async function flushPending(sender: LeadSender) {
     .orderBy(asc(leads.id))
     .limit(BATCH_SIZE);
 
-  for (const { lead, user, maxPosition, duration, offered, lastAnswer, exhausted } of pending) {
+  for (const { lead, user, maxPosition, duration, offered, lastAnswer, exhausted, appointmentAt } of pending) {
     try {
       const cardUser = user && {
         ...user,
         watchedPercent: watchedPercent(maxPosition ?? 0, duration ?? 0),
-        secondChance: { offered, answer: lastAnswer, exhausted },
+        secondChance: {
+          offered,
+          answer: lastAnswer,
+          exhausted,
+          appointmentAt: appointmentAt && new Date(appointmentAt),
+        },
       };
       await syncLeadCard(lead, cardUser, sender);
       await db()

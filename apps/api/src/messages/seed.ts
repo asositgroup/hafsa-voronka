@@ -2,6 +2,7 @@ import { and, count, eq, isNull } from "drizzle-orm";
 import {
   type FunnelSegment,
   type FunnelStatus,
+  SECOND_CHANCE_SEGMENT,
   type MessageTemplateInput,
   type TemplateButton,
   type TemplateTiming,
@@ -16,6 +17,8 @@ type SeedTemplate = {
   buttons: TemplateButton[];
   statuses?: FunnelStatus[];
 };
+
+export type SeedSegment = Exclude<FunnelSegment, typeof SECOND_CHANCE_SEGMENT>;
 
 const MINUTES_PER_HOUR = 60;
 
@@ -200,13 +203,13 @@ const segmentC: SeedTemplate[] = [
   },
 ];
 
-export const seedTemplates: Record<FunnelSegment, SeedTemplate[]> = {
+export const seedTemplates: Record<SeedSegment, SeedTemplate[]> = {
   A: segmentA,
   B: segmentB,
   C: segmentC,
 };
 
-export function seedInputs(segment: FunnelSegment): MessageTemplateInput[] {
+export function seedInputs(segment: SeedSegment): MessageTemplateInput[] {
   return seedTemplates[segment].map((template) => ({
     segment,
     day: template.day,
@@ -216,10 +219,11 @@ export function seedInputs(segment: FunnelSegment): MessageTemplateInput[] {
     buttons: template.buttons,
     isActive: true,
     statuses: template.statuses ?? null,
+    attempts: null,
   }));
 }
 
-async function seedSegment(segment: FunnelSegment) {
+async function seedSegment(segment: SeedSegment) {
   return db().transaction(async (tx) => {
     const [existing] = await tx
       .select({ total: count() })
@@ -247,6 +251,6 @@ async function seedSegment(segment: FunnelSegment) {
   });
 }
 
-export async function seedStartingTemplates(): Promise<Record<FunnelSegment, number>> {
+export async function seedStartingTemplates(): Promise<Record<SeedSegment, number>> {
   return { A: await seedSegment("A"), B: await seedSegment("B"), C: await seedSegment("C") };
 }

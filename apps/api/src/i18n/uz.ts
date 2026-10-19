@@ -8,11 +8,11 @@ export const uz = {
       no: "Yo'q",
       activate: "Faol qilish",
       retry: "Qayta urinish",
-      confirm: "Ushbu videoni yangi dars sifatida qo'shamizmi?\n\n{name}\nHajmi: {size} MB\nDavomiyligi: {duration}",
+      confirm: "Shu videoni asosiy bonus dars qilaymi?\n\n{name}\nHajmi: {size} MB\nDavomiyligi: {duration}",
       durationUnknown: "noma'lum",
       askDuration: "Video davomiyligini kiriting (MM:SS), masalan 17:30",
-      askCourse: "Kurs boshlanadigan vaqtni kiriting (MM:SS), masalan 05:00",
-      askPrice: "Narx ko'rsatiladigan vaqtni kiriting (MM:SS), masalan 15:00",
+      askCourse: "Kurs haqidagi qism nechanchi daqiqada boshlanadi? (MM:SS, masalan 15:00)",
+      askPrice: "Narx nechanchi daqiqada aytiladi? (MM:SS, masalan 18:22)",
       summary:
         "Tayyor:\nDavomiyligi: {duration}\nKurs boshlanishi: {course}\nNarx: {price}\nYuklash: {upload}\n\nFaol qilamizmi?",
       uploadState: {

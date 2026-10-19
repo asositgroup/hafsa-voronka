@@ -39,10 +39,36 @@ const schema = z
       .string()
       .regex(/^(-?\d+|@[A-Za-z0-9_]{5,32})$/, "MEDIA_CHAT_ID must be a numeric chat id or @channelname")
       .optional(),
+    R2_ACCOUNT_ID: z.string().min(1).optional(),
+    R2_BUCKET: z.string().min(1).optional(),
+    R2_ACCESS_KEY_ID: z.string().min(1).optional(),
+    R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+    R2_PUBLIC_BASE_URL: z
+      .url()
+      .transform((value) => value.replace(/\/+$/, ""))
+      .optional(),
     ADMIN_PASSWORD_HASH: z.string().optional(),
     SESSION_SECRET: z.string().min(32).optional(),
   })
   .superRefine((data, ctx) => {
+    const r2Keys = [
+      "R2_ACCOUNT_ID",
+      "R2_BUCKET",
+      "R2_ACCESS_KEY_ID",
+      "R2_SECRET_ACCESS_KEY",
+      "R2_PUBLIC_BASE_URL",
+    ] as const;
+    if (r2Keys.some((key) => data[key])) {
+      for (const key of r2Keys) {
+        if (!data[key]) {
+          ctx.addIssue({
+            code: "custom",
+            message: `${key} is required when any R2 variable is set`,
+            path: [key],
+          });
+        }
+      }
+    }
     if (data.SHEETS_ENABLED) {
       if (!data.GOOGLE_SA_EMAIL) {
         ctx.addIssue({

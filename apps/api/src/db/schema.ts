@@ -34,7 +34,11 @@ export const videos = pgTable(
     uniqueIndex("videos_one_active_idx").on(t.isActive).where(sql`${t.isActive}`),
     check(
       "videos_marks_order",
-      sql`${t.duration} > 0 AND (${t.courseStartSec} IS NULL OR ${t.priceSec} IS NULL OR ${t.courseStartSec} < ${t.priceSec}) AND (${t.priceSec} IS NULL OR ${t.priceSec} < ${t.duration})`,
+      sql`${t.duration} > 0
+        AND (${t.introEndSec} IS NULL OR (${t.introEndSec} >= 0 AND ${t.introEndSec} < COALESCE(${t.courseStartSec}, ${t.priceSec}, ${t.duration})))
+        AND (${t.courseStartSec} IS NULL OR ${t.courseStartSec} > 0)
+        AND (${t.courseStartSec} IS NULL OR ${t.priceSec} IS NULL OR ${t.courseStartSec} < ${t.priceSec})
+        AND (${t.priceSec} IS NULL OR ${t.priceSec} < ${t.duration})`,
     ),
   ],
 );

@@ -30,3 +30,5 @@ export * from "./admin";
 export * from "./lead";
 export * from "./botTexts";
 export * from "./funnel";
+export * from "./time";
+export * from "./adminVideos";

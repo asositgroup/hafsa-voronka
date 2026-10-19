@@ -108,7 +108,7 @@ Video chunks and posters are immutable. Configure aggressive edge caching:
 
 ### CORS Policy
 
-The video player fetches HLS segments (`.ts`) and metadata via XHR/fetch, which requires CORS headers. Under bucket Settings -> CORS Policy, enter:
+The video player fetches HLS segments (`.ts`) and metadata via XHR/fetch, and the admin Videos page uploads parts straight from the browser with `PUT`, which requires CORS headers. `AllowedOrigins` must include the origin that serves `/admin`, and `ETag` must stay in `ExposeHeaders` so the browser can read part checksums. Under bucket Settings -> CORS Policy, enter:
 
 ```json
 [
@@ -120,7 +120,8 @@ The video player fetches HLS segments (`.ts`) and metadata via XHR/fetch, which 
     ],
     "AllowedMethods": [
       "GET",
-      "HEAD"
+      "HEAD",
+      "PUT"
     ],
     "AllowedHeaders": [
       "*"
@@ -134,6 +135,14 @@ The video player fetches HLS segments (`.ts`) and metadata via XHR/fetch, which 
   }
 ]
 ```
+
+### Lifecycle Rule
+
+Under bucket Settings -> Object lifecycle rules, add "Abort incomplete multipart uploads after 1 day" so cancelled or interrupted admin uploads do not keep using storage.
+
+### Admin Video Uploads
+
+The admin Videos page (`/admin/videos`) uploads mp4 files to this bucket. Create an R2 API token with Object Read & Write permission on the bucket and set `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and `R2_PUBLIC_BASE_URL` (`https://video.yourdomain.uz`) on the API. Set all five or none; without them the page works but uploading is disabled.
 
 ### rclone Remote Configuration
 
@@ -548,6 +557,11 @@ Comprehensive reference for all environment variables used by the API and Web ap
 | `ADMIN_PASSWORD_HASH` | API (`apps/api`) | Optional | `$2a$10$...` | Hash generated via `pnpm --filter @funnel/api hash-password` |
 | `SESSION_SECRET` | API (`apps/api`) | Optional | `openssl rand -base64 48` string | Secret key for signing admin session cookies (min 32 chars) |
 | `MEDIA_CHAT_ID` | API (`apps/api`) | Optional | `-1001234567890` | Chat where the bot uploads photos and videos for editable bot messages. Defaults to `LEADS_CHAT_ID` (and its `LEADS_THREAD_ID` topic); the upload message is deleted right after Telegram returns the file ID |
+| `R2_ACCOUNT_ID` | API (`apps/api`) | Optional, all five `R2_*` variables together | `0123456789abcdef0123456789abcdef` | Cloudflare account ID used for the R2 S3 endpoint |
+| `R2_BUCKET` | API (`apps/api`) | Optional, all five `R2_*` variables together | `funnel-video` | R2 bucket that stores uploaded videos |
+| `R2_ACCESS_KEY_ID` | API (`apps/api`) | Optional, all five `R2_*` variables together | `<access key id>` | R2 API token (Object Read & Write on the bucket) key ID |
+| `R2_SECRET_ACCESS_KEY` | API (`apps/api`) | Optional, all five `R2_*` variables together | `<secret access key>` | R2 API token secret |
+| `R2_PUBLIC_BASE_URL` | API (`apps/api`) | Optional, all five `R2_*` variables together | `https://video.yourdomain.uz` | Public base URL of the bucket custom domain; uploaded video URLs are built from it |
 | `NEXT_PUBLIC_API_URL` | Web (`apps/web`) | Required | `https://api.yourdomain.uz` | Public API URL accessible from browser/Mini App |
 | `NEXT_PUBLIC_BOT_USERNAME` | Web (`apps/web`) | Required | `your_bot` | Telegram bot username (without @) for deep linking |
 | `NEXT_PUBLIC_APP_URL` | Web (`apps/web`) | Required | `https://hafsa.azeemov.uz` | Public site URL; makes the link-preview (OG) image URL absolute |

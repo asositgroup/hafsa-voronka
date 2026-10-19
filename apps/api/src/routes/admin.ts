@@ -26,12 +26,14 @@ import {
 import { clientIp } from "@/http/clientIp";
 import { consumeRateLimit } from "@/http/rateLimit";
 import { adminBotTextRoutes } from "@/routes/adminBotTexts";
+import { adminVideoRoutes } from "@/routes/adminVideos";
 
 export const adminRoutes = new Hono();
 
 adminRoutes.use("*", requireAdminConfig);
 
 adminRoutes.route("/bot-texts", adminBotTextRoutes);
+adminRoutes.route("/videos", adminVideoRoutes);
 
 adminRoutes.post("/login", async (c) => {
   const ip = clientIp(c);

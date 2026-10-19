@@ -17,6 +17,7 @@
   "dependencies": {
     "@funnel/shared": "workspace:*",
     "@hono/node-server": "^2.1.4",
+    "aws4fetch": "1.0.20",
     "drizzle-orm": "^0.45.4",
     "google-auth-library": "^11.2.0",
     "grammy": "^1.46.0",

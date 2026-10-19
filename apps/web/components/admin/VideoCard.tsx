@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { type AdminVideoItem, formatMmSs } from "@funnel/shared";
+import { ArchiveIcon, TrashIcon } from "@/components/icons";
 import { AdminVideoPlayer, type VideoMarker } from "@/components/admin/AdminVideoPlayer";
 import { ShortOfferVideo } from "@/components/admin/ShortOfferVideo";
 import { VideoMarksEditor } from "@/components/admin/VideoMarksEditor";
@@ -130,11 +131,17 @@ export function VideoCard({ item, uploadsEnabled, onItems }: VideoCardProps) {
               variant="ghost"
               disabled={busy !== null}
               loading={busy === "archive"}
+              icon={<ArchiveIcon className="h-4 w-4" />}
               onClick={() => void run("archive", () => (archived ? unarchiveVideo(item.id) : archiveVideo(item.id)))}
             >
               {archived ? copy.unarchive : copy.archive}
             </Button>
-            <Button variant="dangerGhost" disabled={busy !== null} onClick={() => setConfirmOpen(true)}>
+            <Button
+              variant="dangerGhost"
+              disabled={busy !== null}
+              icon={<TrashIcon className="h-4 w-4" />}
+              onClick={() => setConfirmOpen(true)}
+            >
               {copy.delete}
             </Button>
           </>

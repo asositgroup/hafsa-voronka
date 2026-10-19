@@ -12,10 +12,12 @@ import {
   users,
   watchProgress,
 } from "@/db/schema";
+import { isolatedDatabase } from "@/test/isolatedDb";
 import { ensureActiveTestVideo } from "@/test/videos";
 import { hashPassword } from "./auth";
 
-const testDbUrl = process.env.TEST_DATABASE_URL;
+const isolatedDb = isolatedDatabase("vf_admin");
+const testDbUrl = isolatedDb.url;
 const TEST_PASSWORD = "test-admin-password-2026";
 const SESSION_SECRET = "supersecret-session-secret-key-32chars!!";
 
@@ -25,6 +27,7 @@ describe.skipIf(!testDbUrl)("Admin Integration Tests", () => {
   let adminSessionCookie: string;
 
   beforeAll(async () => {
+    await isolatedDb.create();
     testPasswordHash = await hashPassword(TEST_PASSWORD);
 
     Object.assign(process.env, {
@@ -54,6 +57,7 @@ describe.skipIf(!testDbUrl)("Admin Integration Tests", () => {
 
   afterAll(async () => {
     await closeDb();
+    await isolatedDb.drop();
   });
 
   it("returns 503 when admin credentials or secret are missing", async () => {

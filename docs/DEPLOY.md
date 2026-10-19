@@ -518,6 +518,16 @@ Execute the complete end-to-end user journey:
 - [ ] Stats funnel numbers match a manual count from one test run
 - [ ] Admin page requires login; CSV export works
 
+### Release Checklist for This Branch (Messages, Videos, Reports)
+
+- [ ] Migrations 0006-0011 run automatically at API startup; nothing to run by hand
+- [ ] Keep `VIDEO_URL` and `VIDEO_DURATION_SEC` set on the first deploy: they seed the initial active video
+- [ ] In `/admin/videos`, set the `course_start` and `price` marks on the seeded video (without a price mark it cannot be activated)
+- [ ] R2 API token has write access and the five `R2_*` variables are set; the bucket CORS policy allows `PUT` from the admin origin (Section 3)
+- [ ] `ADMIN_TELEGRAM_IDS` is set to the admins allowed to replace the video from the bot
+- [ ] For uploads over 20 MB, complete the cutover in "Local Bot API Server" (Section 6)
+- [ ] `LINK_TTL_HOURS` is a panel setting, not an env variable: default 72, editable in the admin panel
+
 ---
 
 ## 12. Disaster Recovery & Rollback Runbook
@@ -580,6 +590,8 @@ Comprehensive reference for all environment variables used by the API and Web ap
 | `FB_TEST_EVENT_CODE` | API (`apps/api`) | Optional | `TEST12345` | Meta test code for server-side event verification |
 | `ADMIN_PASSWORD_HASH` | API (`apps/api`) | Optional | `$2a$10$...` | Hash generated via `pnpm --filter @funnel/api hash-password` |
 | `SESSION_SECRET` | API (`apps/api`) | Optional | `openssl rand -base64 48` string | Secret key for signing admin session cookies (min 32 chars) |
+| `LEADS_CHAT_ID` | API (`apps/api`) | Optional | `-1001234567890` | Telegram chat id or `@channelname` that receives new-lead notifications |
+| `LEADS_THREAD_ID` | API (`apps/api`) | Optional | `5` | Topic (thread) id inside `LEADS_CHAT_ID` for lead notifications |
 | `MEDIA_CHAT_ID` | API (`apps/api`) | Optional | `-1001234567890` | Chat where the bot uploads photos and videos for editable bot messages. Defaults to `LEADS_CHAT_ID` (and its `LEADS_THREAD_ID` topic); the upload message is deleted right after Telegram returns the file ID |
 | `ADMIN_TELEGRAM_IDS` | API (`apps/api`) | Optional | `123456789,987654321` | Comma-separated Telegram user ids allowed to upload and activate videos from the bot |
 | `BOT_API_ROOT` | API (`apps/api`) | Optional | `http://telegram-bot-api:8081` | Self-hosted Bot API server. When unset the bot uses the cloud API and only files up to 20 MB work |

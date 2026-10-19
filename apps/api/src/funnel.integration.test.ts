@@ -5,9 +5,11 @@ import { closeDb, db } from "./db";
 import { events, users, watchProgress } from "./db/schema";
 import { runMigrations } from "./db/migrate";
 import { signInitData } from "./telegram/initData";
+import { isolatedDatabase } from "./test/isolatedDb";
 import { createTestVideo, ensureActiveTestVideo } from "./test/videos";
 
-const testDbUrl = process.env.TEST_DATABASE_URL;
+const isolatedDb = isolatedDatabase("vf_funnel");
+const testDbUrl = isolatedDb.url;
 const BOT_TOKEN = "123456:TEST-token";
 
 describe.skipIf(!testDbUrl)("Funnel Integration Tests", () => {
@@ -15,6 +17,7 @@ describe.skipIf(!testDbUrl)("Funnel Integration Tests", () => {
   let activeVideo: Awaited<ReturnType<typeof ensureActiveTestVideo>>;
 
   beforeAll(async () => {
+    await isolatedDb.create();
     Object.assign(process.env, {
       BOT_TOKEN,
       BOT_USERNAME: "test_bot",
@@ -34,6 +37,7 @@ describe.skipIf(!testDbUrl)("Funnel Integration Tests", () => {
 
   afterAll(async () => {
     await closeDb();
+    await isolatedDb.drop();
   });
 
   function makeAuthHeader(userId: number, startParam?: string) {

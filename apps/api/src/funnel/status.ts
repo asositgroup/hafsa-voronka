@@ -8,10 +8,11 @@ export const NO_VIDEO_MARKS = { duration: 1, introEndSec: null, courseStartSec: 
 export function statusFor(
   progress: StatusProgress | undefined,
   video: Pick<Video, "duration" | "introEndSec" | "courseStartSec" | "priceSec">,
-  user: Pick<User, "registeredAt" | "wroteAdminAt">,
+  user: Pick<User, "registeredAt" | "wroteAdminAt" | "offerWatchedAt">,
 ): FunnelStatus | null {
   if (user.registeredAt === null) return null;
   if (user.wroteAdminAt !== null) return "adminga_yozdi";
+  if (user.offerWatchedAt !== null) return "narxni_kurdi";
   if (!progress || (progress.startedAt === null && progress.maxPosition === 0)) return "link_berildi";
 
   const position = progress.maxPosition;

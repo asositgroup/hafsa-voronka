@@ -15,6 +15,7 @@ export type VideoInput = {
   fileUrl: string;
   duration: number;
   shortOfferVideoUrl?: string | null;
+  shortOfferDuration?: number | null;
 };
 export type VideoPatch = z.infer<typeof videoUpdateSchema>;
 export type VideoFailure =
@@ -65,6 +66,7 @@ export async function listAdminVideos(): Promise<AdminVideoItem[]> {
     priceSec: video.priceSec,
     unlockSec: video.unlockSec,
     shortOfferVideoUrl: video.shortOfferVideoUrl,
+    shortOfferDuration: video.shortOfferDuration,
     isActive: video.isActive,
     archivedAt: video.archivedAt?.toISOString() ?? null,
     createdAt: video.createdAt.toISOString(),
@@ -93,6 +95,7 @@ export async function createVideo(
       priceSec: input.priceSec ?? null,
       unlockSec: input.unlockSec ?? null,
       shortOfferVideoUrl: input.shortOfferVideoUrl ?? null,
+      shortOfferDuration: input.shortOfferVideoUrl ? (input.shortOfferDuration ?? null) : null,
       isActive: false,
     })
     .returning();
@@ -105,6 +108,7 @@ export async function updateVideo(id: number, patch: VideoPatch): Promise<VideoR
   if (!hasPublicUrl(patch.shortOfferVideoUrl)) return { ok: false, code: "invalid_file_url" };
 
   const changes = Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined)) as VideoPatch;
+  if (changes.shortOfferVideoUrl === null) changes.shortOfferDuration = null;
   const merged = { ...row, ...changes };
   const markError = validateVideoMarks(merged, row.duration, { requirePrice: row.isActive });
   if (markError) return { ok: false, code: markError };
@@ -112,6 +116,9 @@ export async function updateVideo(id: number, patch: VideoPatch): Promise<VideoR
   if (Object.keys(changes).length === 0) return { ok: true, video: row };
 
   const [video] = await db().update(videos).set(changes).where(eq(videos.id, id)).returning();
+  if (row.shortOfferVideoUrl && row.shortOfferVideoUrl !== video.shortOfferVideoUrl) {
+    await removeStoredFiles([row.shortOfferVideoUrl]);
+  }
   return { ok: true, video };
 }
 

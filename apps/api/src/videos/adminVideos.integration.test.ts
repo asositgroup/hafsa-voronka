@@ -203,6 +203,29 @@ describe.skipIf(!testDbUrl)("Admin videos integration", () => {
     expect(deleted).toEqual(["videos/test-gone/main.mp4", "videos/test-gone/offer.mp4"]);
   });
 
+  it("stores the short clip with its duration and clears both when it is removed", async () => {
+    const video = await make();
+    const offerUrl = `${PUBLIC_BASE}/videos/test-offer/offer.mp4`;
+
+    const withoutDuration = await call(`/${video.id}`, { method: "PATCH", json: { shortOfferVideoUrl: offerUrl } });
+    expect(withoutDuration.status).toBe(400);
+
+    const added = await call(`/${video.id}`, {
+      method: "PATCH",
+      json: { shortOfferVideoUrl: offerUrl, shortOfferDuration: 75 },
+    });
+    expect(added.status).toBe(200);
+    const [stored] = await db().select().from(videos).where(eq(videos.id, video.id));
+    expect(stored).toMatchObject({ shortOfferVideoUrl: offerUrl, shortOfferDuration: 75 });
+
+    deleted.length = 0;
+    const removed = await call(`/${video.id}`, { method: "PATCH", json: { shortOfferVideoUrl: null } });
+    expect(removed.status).toBe(200);
+    const [cleared] = await db().select().from(videos).where(eq(videos.id, video.id));
+    expect(cleared).toMatchObject({ shortOfferVideoUrl: null, shortOfferDuration: null });
+    expect(deleted).toEqual(["videos/test-offer/offer.mp4"]);
+  });
+
   it("lists user counts", async () => {
     const video = await make();
     await db().insert(users).values({ telegramId: Date.now() * 10 + 3, firstName: "C", videoId: video.id });

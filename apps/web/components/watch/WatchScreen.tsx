@@ -9,6 +9,7 @@ import { attachVideoSource } from "@/lib/video/hls";
 import { formatTime } from "@/lib/video/format";
 import {
   isSeekLocked as computeSeekLocked,
+  effectiveStartMode,
   mergeResume,
   resumeTarget,
   shouldSendClosingBeat,
@@ -42,7 +43,7 @@ export function WatchScreen() {
   const [toastVisible, setToastVisible] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [speedMenuOpen, setSpeedMenuOpen] = useState(false);
-  const [startMode] = useState(() => readStartMode());
+  const [startMode] = useState(() => effectiveStartMode(readStartMode(), session.startsAtCourse));
   const [resumeFrom, setResumeFrom] = useState(() =>
     mergeResume(
       {

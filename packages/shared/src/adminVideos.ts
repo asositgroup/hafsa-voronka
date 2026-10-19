@@ -62,6 +62,7 @@ export const videoItemSchema = z.object({
   priceSec: z.number().nullable(),
   unlockSec: z.number().nullable(),
   shortOfferVideoUrl: z.string().nullable(),
+  shortOfferDuration: z.number().nullable(),
   isActive: z.boolean(),
   archivedAt: z.string().nullable(),
   createdAt: z.string(),
@@ -84,6 +85,7 @@ export const videoCreateSchema = z.object({
   fileUrl: urlSchema,
   duration: z.number().int().positive(),
   shortOfferVideoUrl: urlSchema.nullish(),
+  shortOfferDuration: z.number().int().positive().nullish(),
 });
 
 export type VideoCreate = z.infer<typeof videoCreateSchema>;
@@ -96,8 +98,12 @@ export const videoUpdateSchema = z
     priceSec: markSchema.optional(),
     unlockSec: markSchema.optional(),
     shortOfferVideoUrl: urlSchema.nullable().optional(),
+    shortOfferDuration: z.number().int().positive().nullable().optional(),
   })
-  .strict();
+  .strict()
+  .refine((patch) => typeof patch.shortOfferVideoUrl !== "string" || typeof patch.shortOfferDuration === "number", {
+    path: ["shortOfferDuration"],
+  });
 
 export type VideoUpdate = z.infer<typeof videoUpdateSchema>;
 

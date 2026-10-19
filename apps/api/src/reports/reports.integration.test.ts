@@ -78,7 +78,7 @@ describe.skipIf(!testDbUrl)("Admin reports", () => {
   }
 
   async function seedVideoCohort() {
-    v1 = await createTestVideo({ title: "V1", duration: 1800, courseStartSec: 600, priceSec: 1200 });
+    v1 = await createTestVideo({ title: "V1", duration: 1800, courseStartSec: 600, priceSec: 1200, shortOfferVideoUrl: "https://video.example.com/offer.mp4", shortOfferDuration: 60 });
     v2 = await createTestVideo({ title: "V2", duration: 1800 });
     await db().update(videos).set({ archivedAt: LINK_GIVEN }).where(eq(videos.id, v2.id));
 
@@ -93,7 +93,7 @@ describe.skipIf(!testDbUrl)("Admin reports", () => {
     const course = await seedUser({ videoId: v1.id });
     await seedProgress(course.id, { maxPosition: 700, startedAt: hoursAfter(1), lastBeatAt: hoursAfter(3) });
 
-    const price = await seedUser({ videoId: v1.id, channelClickAt: hoursAfter(5) });
+    const price = await seedUser({ videoId: v1.id, channelClickAt: hoursAfter(5), offerWatchedAt: hoursAfter(4) });
     await seedProgress(price.id, { maxPosition: 1300, startedAt: hoursAfter(1), lastBeatAt: hoursAfter(4) });
 
     const watchingNow = await seedUser({ videoId: v1.id });
@@ -210,6 +210,7 @@ describe.skipIf(!testDbUrl)("Admin reports", () => {
       leftEarly: 2,
       reachedCourse: 2,
       reachedPrice: 1,
+      offerWatched: 1,
       wroteAdmin: 1,
     });
     expect(row(v2.id)).toEqual({
@@ -222,6 +223,7 @@ describe.skipIf(!testDbUrl)("Admin reports", () => {
       leftEarly: 0,
       reachedCourse: null,
       reachedPrice: null,
+      offerWatched: null,
       wroteAdmin: 0,
     });
   });

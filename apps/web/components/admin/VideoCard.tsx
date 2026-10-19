@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { type AdminVideoItem, formatMmSs } from "@funnel/shared";
 import { AdminVideoPlayer, type VideoMarker } from "@/components/admin/AdminVideoPlayer";
+import { ShortOfferVideo } from "@/components/admin/ShortOfferVideo";
 import { VideoMarksEditor } from "@/components/admin/VideoMarksEditor";
 import { Badge } from "@/components/admin/ui/Badge";
 import { Button } from "@/components/admin/ui/Button";
@@ -16,22 +17,18 @@ import {
   deleteVideo,
   unarchiveVideo,
 } from "@/lib/admin/videos";
+import { videoFailureMessage } from "@/lib/admin/videoErrors";
 import { adminUz } from "@/lib/i18n/admin";
 
 const copy = adminUz.videos.card;
-const errors = adminUz.videos.errors;
 
 type Busy = "activate" | "archive" | "delete" | null;
 
 type VideoCardProps = {
   item: AdminVideoItem;
+  uploadsEnabled: boolean;
   onItems: (items: AdminVideoItem[], uploadsEnabled: boolean) => void;
 };
-
-function failureMessage(result: Extract<VideosResult, { ok: false }>) {
-  if (result.error === "video_in_use") return errors.video_in_use.replace("{count}", String(result.userCount ?? 0));
-  return errors[result.error as keyof typeof errors] ?? errors.generic;
-}
 
 function MarksTimeline({ item }: { item: AdminVideoItem }) {
   const marks = [
@@ -58,7 +55,7 @@ function MarksTimeline({ item }: { item: AdminVideoItem }) {
   );
 }
 
-export function VideoCard({ item, onItems }: VideoCardProps) {
+export function VideoCard({ item, uploadsEnabled, onItems }: VideoCardProps) {
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState<string | null>(null);
   const [marksOpen, setMarksOpen] = useState(false);
@@ -80,7 +77,7 @@ export function VideoCard({ item, onItems }: VideoCardProps) {
     setBusy(null);
     setConfirmOpen(false);
     if (!result.ok) {
-      setError(failureMessage(result));
+      setError(videoFailureMessage(result));
       return;
     }
     onItems(result.items, result.uploadsEnabled);
@@ -105,6 +102,8 @@ export function VideoCard({ item, onItems }: VideoCardProps) {
       <MarksTimeline item={item} />
 
       <AdminVideoPlayer src={item.fileUrl} markers={markers} />
+
+      <ShortOfferVideo item={item} uploadsEnabled={uploadsEnabled} onItems={onItems} onError={setError} />
 
       {needsPrice && !item.isActive && !archived && <p className="m-0 text-[13px] text-qalam">{copy.needsPrice}</p>}
 

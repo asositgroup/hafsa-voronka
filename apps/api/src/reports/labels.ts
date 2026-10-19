@@ -13,6 +13,7 @@ export const reportLabels = {
     leftEarly: "5 daqiqada chiqdi",
     reachedCourse: "Kurs qismiga yetdi",
     reachedPrice: "Narxga yetdi",
+    offerWatched: "Qisqa video ko‘rildi",
     wroteAdmin: "Adminga yozdi",
     percent: "%",
   },

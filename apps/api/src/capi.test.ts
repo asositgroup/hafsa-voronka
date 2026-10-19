@@ -27,6 +27,8 @@ function makeUser(overrides: Partial<User> = {}): User {
     completedAt: null,
     unlockedAt: null,
     channelClickAt: null,
+    offerStartedAt: null,
+    offerWatchedAt: null,
     wroteAdminAt: null,
     wroteAdminBy: null,
     botBlocked: false,

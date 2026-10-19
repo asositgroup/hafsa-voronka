@@ -21,6 +21,8 @@ export const sessionResponseSchema = z.object({
   expired: z.boolean(),
   secondChance: z.boolean(),
   startAt: z.number(),
+  startsAtCourse: z.boolean(),
+  offerFirst: z.object({ url: z.string(), duration: z.number() }).nullable(),
   progress: z.object({
     lastPosition: z.number(),
     maxPosition: z.number(),

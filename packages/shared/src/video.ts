@@ -22,6 +22,10 @@ export const progressResponseSchema = z.object({
 
 export type ProgressResponse = z.infer<typeof progressResponseSchema>;
 
+export const offerProgressResponseSchema = z.object({ completed: z.boolean() });
+
+export type OfferProgressResponse = z.infer<typeof offerProgressResponseSchema>;
+
 export const videoEventTypes = ["video_start", "channel_click"] as const;
 export type VideoEventType = (typeof videoEventTypes)[number];
 

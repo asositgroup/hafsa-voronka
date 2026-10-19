@@ -16,6 +16,7 @@ export const eventTypes = [
   "reminder_later",
   "message_click",
   "price_reached",
+  "offer_video_complete",
   "second_chance_offer",
   "second_chance_again",
   "second_chance_later",

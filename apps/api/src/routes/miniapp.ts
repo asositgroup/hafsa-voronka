@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { sessionRequestSchema, type SessionResponse } from "@funnel/shared";
 import type { AppEnv } from "@/auth";
 import { db } from "@/db";
-import { watchProgress } from "@/db/schema";
+import { linkGrants, watchProgress } from "@/db/schema";
 import { env } from "@/env";
 import { NO_VIDEO_MARKS, statusFor } from "@/funnel/status";
 import { logEvent, upsertUser } from "@/funnel/users";
@@ -11,6 +11,7 @@ import { acceptSecondChance, openOffer } from "@/links/service";
 import { recordMessageClick } from "@/messages/clicks";
 import { videoForUser } from "@/videos/service";
 import { remainingWatchSecs } from "@/watch/credit";
+import { startPlanFor } from "@/watch/offerVideo";
 import { effectiveUnlockSec } from "@/watch/unlock";
 
 async function readJson(request: { json: () => Promise<unknown> }) {
@@ -50,7 +51,18 @@ miniappRoutes.post("/session", async (c) => {
     .where(eq(watchProgress.userId, user.id))
     .limit(1);
 
+  const [grant] =
+    user.linkId === null
+      ? []
+      : await db().select({ offerFirst: linkGrants.offerFirst }).from(linkGrants).where(eq(linkGrants.id, user.linkId)).limit(1);
   const lastPosition = progress?.lastPosition ?? 0;
+  const plan = startPlanFor({
+    grantOfferFirst: grant?.offerFirst ?? false,
+    offerWatchedAt: user.offerWatchedAt,
+    video,
+    lastPosition,
+    start,
+  });
   const status = statusFor(progress, video ?? NO_VIDEO_MARKS, user);
   const expired =
     user.registeredAt !== null &&
@@ -72,7 +84,9 @@ miniappRoutes.post("/session", async (c) => {
     priceSec: video.priceSec,
     expired,
     secondChance,
-    startAt: start === "offer" ? (video.courseStartSec ?? lastPosition) : lastPosition,
+    startAt: plan.startAt,
+    startsAtCourse: plan.startsAtCourse,
+    offerFirst: plan.offerFirst,
     progress: {
       lastPosition,
       maxPosition: progress?.maxPosition ?? 0,

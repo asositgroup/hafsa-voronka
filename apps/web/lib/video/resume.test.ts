@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  effectiveStartMode,
   isSeekBlocked,
   isSeekLocked,
   mergeResume,
@@ -111,5 +112,17 @@ describe("shouldSendClosingBeat", () => {
     expect(shouldSendClosingBeat(null, 5000)).toBe(true);
     expect(shouldSendClosingBeat(5000, 5500)).toBe(false);
     expect(shouldSendClosingBeat(5000, 6000)).toBe(true);
+  });
+});
+
+describe("effectiveStartMode", () => {
+  it("jumps to the course start whenever the session says so", () => {
+    expect(effectiveStartMode("again", true)).toBe("offer");
+    expect(effectiveStartMode(undefined, true)).toBe("offer");
+  });
+
+  it("keeps the link start mode otherwise", () => {
+    expect(effectiveStartMode("again", false)).toBe("again");
+    expect(effectiveStartMode(undefined, false)).toBeUndefined();
   });
 });

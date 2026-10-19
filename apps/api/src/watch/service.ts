@@ -3,7 +3,7 @@ import { InlineKeyboard } from "grammy";
 import type { EventType } from "@funnel/shared";
 import { type CapiClient, sendCapiEvent } from "@/capi";
 import { db } from "@/db";
-import { users, watchProgress } from "@/db/schema";
+import { linkGrants, users, watchProgress } from "@/db/schema";
 import { env } from "@/env";
 import { recordChannelClick } from "@/funnel/channel";
 import { syncSegment } from "@/funnel/segments";
@@ -20,6 +20,7 @@ import {
   type WatchConfig,
   type WatchState,
 } from "./credit";
+import { isOfferComplete } from "./offerVideo";
 import { effectiveUnlockSec } from "./unlock";
 
 export type ProgressResult =
@@ -206,4 +207,67 @@ export async function recordVideoEvent(
   }
 
   return { ok: true };
+}
+
+export type OfferProgressResult =
+  | { ok: true; completed: boolean }
+  | { ok: false; error: "not_registered" | "no_offer_video" };
+
+export async function recordOfferProgress(
+  telegramId: number,
+  beat: WatchBeat,
+  now: Date = new Date(),
+): Promise<OfferProgressResult> {
+  const user = await findByTelegramId(telegramId);
+  if (!user || user.registeredAt === null) {
+    return { ok: false, error: "not_registered" };
+  }
+
+  const video = await videoForUser(user);
+  const duration = video?.shortOfferVideoUrl ? video.shortOfferDuration : null;
+  if (duration === null || duration === undefined || user.linkId === null) {
+    return { ok: false, error: "no_offer_video" };
+  }
+  const [grant] = await db()
+    .select({ offerFirst: linkGrants.offerFirst })
+    .from(linkGrants)
+    .where(eq(linkGrants.id, user.linkId))
+    .limit(1);
+  if (!grant?.offerFirst) {
+    return { ok: false, error: "no_offer_video" };
+  }
+  if (user.offerWatchedAt !== null) {
+    return { ok: true, completed: true };
+  }
+
+  let startedAt = user.offerStartedAt;
+  if (startedAt === null && beat.event === "play") {
+    await db()
+      .update(users)
+      .set({ offerStartedAt: now })
+      .where(and(eq(users.id, user.id), isNull(users.offerStartedAt)));
+    startedAt = now;
+  }
+
+  if (!isOfferComplete({ position: beat.position, duration, startedAt, now })) {
+    return { ok: true, completed: false };
+  }
+
+  const [watched] = await db()
+    .update(users)
+    .set({ offerWatchedAt: now, unlockedAt: user.unlockedAt ?? now })
+    .where(and(eq(users.id, user.id), isNull(users.offerWatchedAt)))
+    .returning({ id: users.id });
+  if (watched) {
+    await logEvent("offer_video_complete", {
+      userId: user.id,
+      visitorId: user.visitorId,
+      meta: { videoId: video!.id },
+    });
+    await syncSegment(user.id, now).catch((error) => console.error("Segment sync failed:", error));
+    await refreshUserLeadCards(user.id).catch((error) =>
+      console.error("Lead offer video update failed:", error),
+    );
+  }
+  return { ok: true, completed: true };
 }

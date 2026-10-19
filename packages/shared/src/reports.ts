@@ -22,6 +22,7 @@ export const videoReportRowSchema = z.object({
   leftEarly: z.number(),
   reachedCourse: z.number().nullable(),
   reachedPrice: z.number().nullable(),
+  offerWatched: z.number().nullable(),
   wroteAdmin: z.number(),
 });
 

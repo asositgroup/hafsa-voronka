@@ -73,7 +73,7 @@ export default function AdminVideosPage() {
   const otherItems = items?.filter((item) => !item.isActive && item.archivedAt === null) ?? [];
   const archivedItems = items?.filter((item) => !item.isActive && item.archivedAt !== null) ?? [];
 
-  const card = (item: AdminVideoItem) => <VideoCard key={item.id} item={item} onItems={onResult} />;
+  const card = (item: AdminVideoItem) => <VideoCard key={item.id} item={item} uploadsEnabled={uploadsEnabled} onItems={onResult} />;
 
   return (
     <Page>

@@ -54,6 +54,8 @@ export async function buildReportWorkbook(report: AdminReportResponse): Promise<
       header(v.percent),
       header(v.reachedPrice),
       header(v.percent),
+      header(v.offerWatched),
+      header(v.percent),
       header(v.wroteAdmin),
       header(v.percent),
     ],
@@ -65,6 +67,7 @@ export async function buildReportWorkbook(report: AdminReportResponse): Promise<
       ...countWithPercent(row.leftEarly, row.given),
       ...countWithPercent(row.reachedCourse, row.given),
       ...countWithPercent(row.reachedPrice, row.given),
+      ...countWithPercent(row.offerWatched, row.given),
       ...countWithPercent(row.wroteAdmin, row.given),
     ]),
   ];
@@ -107,7 +110,7 @@ export async function buildReportWorkbook(report: AdminReportResponse): Promise<
       {
         sheet: reportLabels.videoSheet,
         data: videoData,
-        columns: [{ width: 28 }, { width: 10 }, ...Array.from({ length: 11 }, () => ({ width: 14 }))],
+        columns: [{ width: 28 }, { width: 10 }, ...Array.from({ length: 13 }, () => ({ width: 14 }))],
         stickyRowsCount: 2,
       },
       {

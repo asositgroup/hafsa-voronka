@@ -1,3 +1,5 @@
+import type { StartMode } from "@funnel/shared";
+
 export const RESUME_OVERLAY_MIN_SECS = 30;
 export const RESUME_REWIND_SECS = 5;
 export const REAPPLY_TOLERANCE_SECS = 2;
@@ -56,4 +58,8 @@ export function isSeekBlocked(target: number, maxReached: number, locked: boolea
 
 export function shouldSendClosingBeat(lastSentAt: number | null, now: number) {
   return lastSentAt === null || now - lastSentAt >= CLOSING_BEAT_DEDUPE_MS;
+}
+
+export function effectiveStartMode(urlMode: StartMode | undefined, startsAtCourse: boolean): StartMode | undefined {
+  return startsAtCourse ? "offer" : urlMode;
 }

@@ -140,6 +140,7 @@ async function loadCandidates(now: Date, userId?: number): Promise<Candidate[]> 
       linkExpiresAt: users.linkExpiresAt,
       registeredAt: users.registeredAt,
       wroteAdminAt: users.wroteAdminAt,
+      offerWatchedAt: users.offerWatchedAt,
       maxPosition: watchProgress.maxPosition,
       startedAt: watchProgress.startedAt,
       lastBeatAt: watchProgress.lastBeatAt,

@@ -4,7 +4,7 @@ import { endReasonFor, segmentFor, statusFor } from "./status";
 
 type Marks = { duration: number; introEndSec: number | null; courseStartSec: number | null; priceSec: number | null };
 
-const registered = { registeredAt: new Date(1), wroteAdminAt: null as Date | null };
+const registered = { registeredAt: new Date(1), wroteAdminAt: null as Date | null, offerWatchedAt: null as Date | null };
 const fullMarks: Marks = { duration: 1000, introEndSec: 100, courseStartSec: 700, priceSec: 900 };
 const noMarks: Marks = { duration: 1000, introEndSec: null, courseStartSec: null, priceSec: null };
 
@@ -14,13 +14,20 @@ function progress(maxPosition: number, started = true) {
 
 describe("statusFor", () => {
   it("is null for an unregistered user", () => {
-    expect(statusFor(progress(500), fullMarks, { registeredAt: null, wroteAdminAt: null })).toBeNull();
+    expect(statusFor(progress(500), fullMarks, { ...registered, registeredAt: null })).toBeNull();
   });
 
   it("is adminga_yozdi once the user wrote to admin, even past the price mark", () => {
-    const user = { registeredAt: new Date(1), wroteAdminAt: new Date(3) };
+    const user = { ...registered, wroteAdminAt: new Date(3) };
     expect(statusFor(progress(950), fullMarks, user)).toBe("adminga_yozdi");
     expect(statusFor(undefined, fullMarks, user)).toBe("adminga_yozdi");
+  });
+
+  it("is narxni_kurdi once the short course video was watched, without any main video progress", () => {
+    const user = { ...registered, offerWatchedAt: new Date(4) };
+    expect(statusFor(undefined, fullMarks, user)).toBe("narxni_kurdi");
+    expect(statusFor(progress(10), fullMarks, user)).toBe("narxni_kurdi");
+    expect(statusFor(progress(10), fullMarks, { ...user, wroteAdminAt: new Date(5) })).toBe("adminga_yozdi");
   });
 
   it("is link_berildi without progress or before any play", () => {

@@ -27,6 +27,7 @@ const columns: StatColumn<VideoReportRow>[] = [
   { key: "leftEarly", label: copy.videos.leftEarly, align: "right", render: (row) => <MetricValue count={row.leftEarly} base={row.given} /> },
   { key: "reachedCourse", label: copy.videos.reachedCourse, align: "right", render: (row) => <MetricValue count={row.reachedCourse} base={row.given} /> },
   { key: "reachedPrice", label: copy.videos.reachedPrice, align: "right", render: (row) => <MetricValue count={row.reachedPrice} base={row.given} /> },
+  { key: "offerWatched", label: copy.videos.offerWatched, align: "right", render: (row) => <MetricValue count={row.offerWatched} base={row.given} /> },
   { key: "wroteAdmin", label: copy.videos.wroteAdmin, align: "right", render: (row) => <MetricValue count={row.wroteAdmin} base={row.given} /> },
 ];
 

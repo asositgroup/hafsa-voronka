@@ -26,11 +26,13 @@ export async function getVideoReport({ from, to }: DateRange): Promise<VideoRepo
     left_early: string | number;
     reached_course: string | number;
     reached_price: string | number;
+    has_offer_video: boolean;
+    offer_watched: string | number;
     wrote_admin: string | number;
   }>(sql`
     SELECT
       v.id, v.title, v.is_active, (v.archived_at IS NOT NULL) AS archived,
-      v.course_start_sec, v.price_sec,
+      v.course_start_sec, v.price_sec, (v.short_offer_video_url IS NOT NULL) AS has_offer_video,
       count(*) AS given,
       count(*) FILTER (WHERE ao.last_open_at IS NOT NULL OR wp.started_at IS NOT NULL) AS opened,
       count(*) FILTER (WHERE (ao.last_open_at IS NOT NULL OR wp.started_at IS NOT NULL)
@@ -38,6 +40,7 @@ export async function getVideoReport({ from, to }: DateRange): Promise<VideoRepo
         AND greatest(wp.last_beat_at, ao.last_open_at, wp.started_at) < now() - interval '30 minutes') AS left_early,
       count(*) FILTER (WHERE v.course_start_sec IS NOT NULL AND coalesce(wp.max_position, 0) >= v.course_start_sec) AS reached_course,
       count(*) FILTER (WHERE v.price_sec IS NOT NULL AND coalesce(wp.max_position, 0) >= v.price_sec) AS reached_price,
+      count(*) FILTER (WHERE u.offer_watched_at IS NOT NULL) AS offer_watched,
       count(*) FILTER (WHERE u.channel_click_at IS NOT NULL) AS wrote_admin
     FROM users u
     JOIN videos v ON v.id = u.video_id
@@ -64,6 +67,7 @@ export async function getVideoReport({ from, to }: DateRange): Promise<VideoRepo
     leftEarly: Number(row.left_early),
     reachedCourse: row.course_start_sec === null ? null : Number(row.reached_course),
     reachedPrice: row.price_sec === null ? null : Number(row.reached_price),
+    offerWatched: row.has_offer_video ? Number(row.offer_watched) : null,
     wroteAdmin: Number(row.wrote_admin),
   }));
 }

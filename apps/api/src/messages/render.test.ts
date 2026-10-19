@@ -37,7 +37,7 @@ describe("renderTemplate", () => {
       { kind: "offer", text: "Taklif" },
       { kind: "admin", text: "Yozish", prefill: "Salom, men {ism}" },
       { kind: "link", text: "Ochish", url: "https://x.uz/a" },
-      { kind: "when_menu", text: "Qachon ko'rasiz?" },
+      { kind: "again", text: "Ha, ko'raman" },
       { kind: "later", text: "Keyinroq" },
     ]);
     expect(rendered.reply_markup?.inline_keyboard).toEqual([
@@ -45,16 +45,16 @@ describe("renderTemplate", () => {
       [{ text: "Taklif", web_app: { url: "https://example.com/app?start=offer" } }],
       [{ text: "Yozish", url: "https://t.me/hafsa_admin?text=Salom%2C+men+Aziza" }],
       [{ text: "Ochish", url: "https://x.uz/a" }],
-      [{ text: "Qachon ko'rasiz?", callback_data: "mt:w:s42" }],
+      [{ text: "Ha, ko'raman", web_app: { url: "https://example.com/app?start=again" } }],
       [{ text: "Keyinroq", callback_data: "mt:l:s42" }],
     ]);
   });
 
   it("keeps callback data within Telegram's limit", () => {
-    const rendered = render([{ kind: "when_menu", text: "Q" }], { ref: "s9223372036854775807" });
+    const rendered = render([{ kind: "later", text: "Q" }], { ref: "s9223372036854775807" });
     const data = (rendered.reply_markup?.inline_keyboard[0][0] as { callback_data: string }).callback_data;
-    expect(new TextEncoder().encode(`mt:wa:s9223372036854775807:b`).length).toBeLessThan(64);
-    expect(data).toBe("mt:w:s9223372036854775807");
+    expect(new TextEncoder().encode(data).length).toBeLessThan(64);
+    expect(data).toBe("mt:l:s9223372036854775807");
   });
 
   it("wraps url and web app buttons only when asked", () => {

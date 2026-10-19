@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { AdminReportResponse } from "@funnel/shared";
 import { DateRangeFilter } from "@/components/admin/DateRangeFilter";
 import { MessageReportTable } from "@/components/admin/reports/MessageReportTable";
+import { SecondChanceReport } from "@/components/admin/reports/SecondChanceReport";
 import { VideoReportTable } from "@/components/admin/reports/VideoReportTable";
 import { buttonClass } from "@/components/admin/ui/Button";
 import { Page, PageHeader } from "@/components/admin/ui/Page";
@@ -96,6 +97,7 @@ function AdminReportsContent() {
         <>
           <VideoReportTable rows={report.videos} />
           <MessageReportTable rows={report.messages} />
+          <SecondChanceReport data={report.secondChance} />
         </>
       )}
     </Page>

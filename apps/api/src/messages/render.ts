@@ -45,7 +45,8 @@ function renderButton(
 ) {
   switch (button.kind) {
     case "resume":
-    case "offer": {
+    case "offer":
+    case "again": {
       const url = watchAppUrl(button.kind);
       return { text: button.text, web_app: { url: wrap ? wrap.webApp(url, index) : url } };
     }
@@ -55,8 +56,6 @@ function renderButton(
     }
     case "link":
       return { text: button.text, url: wrap ? wrap.url(button.url, index) : button.url };
-    case "when_menu":
-      return { text: button.text, callback_data: `mt:w:${ref}` };
     case "later":
       return { text: button.text, callback_data: `mt:l:${ref}` };
   }

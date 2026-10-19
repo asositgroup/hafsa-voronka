@@ -1,4 +1,5 @@
 import {
+  type AnyPgColumn,
   bigint,
   bigserial,
   boolean,
@@ -19,6 +20,9 @@ import {
   eventTypes,
   funnelSegments,
   type FunnelStatus,
+  linkGrantKinds,
+  offerAnswers,
+  offerVariants,
   segmentEndReasons,
   type TemplateButton,
   templateMediaTypes,
@@ -90,6 +94,7 @@ export const users = pgTable(
   wroteAdminAt: timestamp("wrote_admin_at", { withTimezone: true }),
   wroteAdminBy: bigint("wrote_admin_by", { mode: "number" }),
   botBlocked: boolean("bot_blocked").default(false).notNull(),
+  linkId: bigint("link_id", { mode: "number" }).references((): AnyPgColumn => linkGrants.id),
   videoId: bigint("video_id", { mode: "number" }).references(() => videos.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -98,6 +103,29 @@ export const users = pgTable(
     index("users_video_id_idx").on(t.videoId),
   ],
 );
+
+export const linkGrants = pgTable(
+  "link_grants",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    userId: bigint("user_id", { mode: "number" })
+      .notNull()
+      .references((): AnyPgColumn => users.id),
+    attempt: smallint("attempt").notNull(),
+    kind: text("kind", { enum: linkGrantKinds }).notNull(),
+    offerFirst: boolean("offer_first").default(false).notNull(),
+    givenAt: timestamp("given_at", { withTimezone: true }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("link_grants_user_attempt_idx").on(t.userId, t.attempt),
+    index("link_grants_expires_at_idx").on(t.expiresAt),
+    check("link_grants_attempt_range", sql`${t.attempt} >= 1`),
+  ],
+);
+
+export type LinkGrant = typeof linkGrants.$inferSelect;
 
 export const segmentRuns = pgTable(
   "segment_runs",
@@ -110,6 +138,7 @@ export const segmentRuns = pgTable(
     enteredAt: timestamp("entered_at", { withTimezone: true }).defaultNow().notNull(),
     endedAt: timestamp("ended_at", { withTimezone: true }),
     endReason: text("end_reason", { enum: segmentEndReasons }),
+    attempt: smallint("attempt").default(1).notNull(),
   },
   (t) => [
     uniqueIndex("segment_runs_one_open_idx").on(t.userId).where(sql`${t.endedAt} is null`),
@@ -272,6 +301,7 @@ export const messageTemplates = pgTable(
     timingValue: integer("timing_value").notNull(),
     buttons: jsonb("buttons").$type<TemplateButton[]>().default([]).notNull(),
     statuses: text("statuses").array().$type<FunnelStatus[]>(),
+    attempts: smallint("attempts").array().$type<number[]>(),
     isActive: boolean("is_active").default(true).notNull(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -282,10 +312,21 @@ export const messageTemplates = pgTable(
       .on(t.segment, t.day, t.position)
       .where(sql`${t.deletedAt} is null`),
     check("message_templates_day_range", sql`${t.day} between 1 and 7`),
-    check("message_templates_segment_values", sql`${t.segment} in ('A', 'B', 'C')`),
+    check("message_templates_segment_values", sql`${t.segment} in ('A', 'B', 'C', 'D')`),
     check(
       "message_templates_timing_type_values",
-      sql`${t.timingType} in ('after_entry', 'day_time', 'before_expiry', 'night_notice')`,
+      sql`${t.timingType} in ('after_entry', 'day_time', 'before_expiry', 'night_notice', 'occasion')`,
+    ),
+    check(
+      "message_templates_occasion_shape",
+      sql`(${t.timingType} = 'occasion') = (${t.segment} = 'D') and (${t.timingType} <> 'occasion' or (${t.timingValue} = 0 and ${t.statuses} is not null))`,
+    ),
+    uniqueIndex("message_templates_occasion_slot_idx")
+      .on(t.day, t.statuses)
+      .where(sql`${t.segment} = 'D' and ${t.deletedAt} is null`),
+    check(
+      "message_templates_attempts_values",
+      sql`${t.attempts} is null or (cardinality(${t.attempts}) > 0 and ${t.attempts} <@ array[1, 2, 3, 4, 5, 6, 7, 8]::smallint[] and ${t.segment} in ('A', 'B'))`,
     ),
     check(
       "message_templates_night_notice_shape",
@@ -317,9 +358,9 @@ export const sentMessages = pgTable(
     userId: bigint("user_id", { mode: "number" })
       .notNull()
       .references(() => users.id),
-    templateId: bigint("template_id", { mode: "number" })
-      .notNull()
-      .references(() => messageTemplates.id),
+    templateId: bigint("template_id", { mode: "number" }).references(() => messageTemplates.id),
+    botTextKey: text("bot_text_key"),
+    linkId: bigint("link_id", { mode: "number" }).references(() => linkGrants.id),
     segmentRunId: bigint("segment_run_id", { mode: "number" })
       .notNull()
       .references(() => segmentRuns.id),
@@ -342,7 +383,39 @@ export const sentMessages = pgTable(
       .on(t.sentAt)
       .where(sql`${t.sentAt} is not null and ${t.deletedAt} is null and ${t.deleteError} is null`),
     index("sent_messages_template_idx").on(t.templateId),
+    index("sent_messages_link_idx").on(t.linkId),
+    check("sent_messages_source", sql`(${t.templateId} is null) <> (${t.botTextKey} is null)`),
   ],
 );
 
 export type SentMessage = typeof sentMessages.$inferSelect;
+
+export const secondChanceOffers = pgTable(
+  "second_chance_offers",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    userId: bigint("user_id", { mode: "number" })
+      .notNull()
+      .references(() => users.id),
+    occasion: smallint("occasion").notNull(),
+    variant: text("variant", { enum: offerVariants }).notNull(),
+    expiredLinkId: bigint("expired_link_id", { mode: "number" })
+      .notNull()
+      .references(() => linkGrants.id),
+    dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
+    sentMessageId: bigint("sent_message_id", { mode: "number" }).references(() => sentMessages.id),
+    skipped: boolean("skipped").default(false).notNull(),
+    answer: text("answer", { enum: offerAnswers }),
+    answeredAt: timestamp("answered_at", { withTimezone: true }),
+    grantedLinkId: bigint("granted_link_id", { mode: "number" }).references(() => linkGrants.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("second_chance_offers_user_occasion_idx").on(t.userId, t.occasion),
+    index("second_chance_offers_sent_message_idx").on(t.sentMessageId),
+    check("second_chance_offers_occasion_range", sql`${t.occasion} between 1 and 7`),
+    check("second_chance_offers_answer_pair", sql`(${t.answer} is null) = (${t.answeredAt} is null)`),
+  ],
+);
+
+export type SecondChanceOffer = typeof secondChanceOffers.$inferSelect;

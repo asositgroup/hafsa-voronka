@@ -19,6 +19,7 @@ export const sessionResponseSchema = z.object({
   videoId: z.number(),
   priceSec: z.number().nullable(),
   expired: z.boolean(),
+  secondChance: z.boolean(),
   startAt: z.number(),
   progress: z.object({
     lastPosition: z.number(),

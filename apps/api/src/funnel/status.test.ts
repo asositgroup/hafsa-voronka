@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { funnelStatuses, type FunnelStatus } from "@funnel/shared";
-import { segmentFor, statusFor } from "./status";
+import { endReasonFor, segmentFor, statusFor } from "./status";
 
 type Marks = { duration: number; introEndSec: number | null; courseStartSec: number | null; priceSec: number | null };
 
@@ -91,5 +91,34 @@ describe("segmentFor", () => {
     };
     for (const status of funnelStatuses) expect(segmentFor(status)).toBe(expected[status]);
     expect(segmentFor(null)).toBeNull();
+  });
+
+  it("moves A and B to the second chance once the link expires, and out of the funnel once offers are used up", () => {
+    expect(segmentFor("link_berildi", "expired")).toBe("D");
+    expect(segmentFor("dars_yarmida", "expired")).toBe("D");
+    expect(segmentFor("link_berildi", "exhausted")).toBeNull();
+    expect(segmentFor("sotuvda_toxtadi", "exhausted")).toBeNull();
+  });
+
+  it("keeps C regardless of the link", () => {
+    expect(segmentFor("narxni_kurdi", "expired")).toBe("C");
+    expect(segmentFor("narxni_kurdi", "exhausted")).toBe("C");
+    expect(segmentFor("adminga_yozdi", "expired")).toBeNull();
+  });
+});
+
+describe("endReasonFor", () => {
+  const user = { botBlocked: false, wroteAdmin: false };
+
+  it("names each transition", () => {
+    expect(endReasonFor("A", "B", user)).toBe("advanced");
+    expect(endReasonFor("A", "D", user)).toBe("expired");
+    expect(endReasonFor("B", "D", user)).toBe("expired");
+    expect(endReasonFor("D", "A", user)).toBe("relinked");
+    expect(endReasonFor("D", "B", user)).toBe("relinked");
+    expect(endReasonFor("A", "A", user)).toBe("relinked");
+    expect(endReasonFor("D", null, user)).toBe("offers_exhausted");
+    expect(endReasonFor("D", null, { botBlocked: false, wroteAdmin: true })).toBe("wrote_admin");
+    expect(endReasonFor("A", null, { botBlocked: true, wroteAdmin: true })).toBe("bot_blocked");
   });
 });

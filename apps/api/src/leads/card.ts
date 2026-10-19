@@ -1,11 +1,14 @@
 import { InlineKeyboard } from "grammy";
+import { type OfferAnswer, SECOND_CHANCE_OCCASIONS } from "@funnel/shared";
 import type { Lead, User } from "@/db/schema";
 import { formatTashkentDate } from "@/sheets";
 
 export type CardUser = Pick<
   User,
   "telegramId" | "username" | "phone" | "phoneVerified" | "registeredAt" | "completedAt" | "wroteAdminAt" | "wroteAdminBy"
-> & { watchedPercent?: number };
+> & { watchedPercent?: number; secondChance?: SecondChanceSummary };
+
+export type SecondChanceSummary = { offered: number; answer: OfferAnswer | null; exhausted: boolean };
 
 const PROGRESS_CELLS = 10;
 
@@ -32,6 +35,18 @@ function utmLine(lead: Lead) {
 function telegramLine(user: CardUser) {
   const handle = user.username ? `@${user.username.replace(/^@/, "")}` : "username yo'q";
   return `💬 ${handle} · ID ${user.telegramId}`;
+}
+
+function secondChanceLine({ offered, answer, exhausted }: SecondChanceSummary) {
+  if (offered === 0) return undefined;
+  const state = exhausted
+    ? "imkon tugadi"
+    : answer === "again"
+      ? "«Ha» bosdi"
+      : answer === "later"
+        ? "«Keyinroq» bosdi"
+        : "javob kutilmoqda";
+  return `🔁 Qayta imkon: ${offered}/${SECOND_CHANCE_OCCASIONS} · ${state}`;
 }
 
 function wroteAdminLine(lead: Lead, at: Date, by: number | null) {
@@ -77,6 +92,9 @@ export function renderLeadCard(lead: Lead, user: CardUser | null | undefined): s
   if (lead.source === "web" && !registered) lines.push("🔗 Telegram: hali botga kirmagan");
   if (registered?.completedAt) lines.push("🎬 Videoni ko'rib bo'ldi");
   else if (registered) lines.push(progressLine(registered.watchedPercent));
+
+  const secondChance = registered?.secondChance && secondChanceLine(registered.secondChance);
+  if (secondChance) lines.push(secondChance);
 
   if (user?.wroteAdminAt) lines.push(wroteAdminLine(lead, user.wroteAdminAt, user.wroteAdminBy));
   if (lead.assigneeTelegramId !== null) lines.push(`👨‍💼 Mas'ul: ${assigneeLabel(lead)}`);

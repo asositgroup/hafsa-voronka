@@ -26,6 +26,7 @@ export const botMessageKeys = [
   "watchPrompt",
   "completion",
   "fallback",
+  "laterAck",
 ] as const;
 
 export const botButtonKeys = ["shareContactButton", "watchButton", "channelButton"] as const;
@@ -49,6 +50,7 @@ export const botTextDefinitions: Record<BotTextKey, { kind: BotTextKind; placeho
   watchPrompt: { kind: "message", placeholders: [] },
   completion: { kind: "message", placeholders: [] },
   fallback: { kind: "message", placeholders: [] },
+  laterAck: { kind: "message", placeholders: [] },
   shareContactButton: { kind: "button", placeholders: [] },
   watchButton: { kind: "button", placeholders: [] },
   channelButton: { kind: "button", placeholders: [] },

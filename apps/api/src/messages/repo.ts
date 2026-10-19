@@ -1,5 +1,11 @@
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
-import { type FunnelSegment, type MessageTemplate, type MessageTemplateInput, normalizeStatuses } from "@funnel/shared";
+import {
+  type FunnelSegment,
+  type MessageTemplate,
+  type MessageTemplateInput,
+  normalizeAttempts,
+  normalizeStatuses,
+} from "@funnel/shared";
 import { db } from "@/db";
 import { type MessageTemplateRow, messageTemplates } from "@/db/schema";
 
@@ -9,9 +15,18 @@ export class StaleOrderError extends Error {
   }
 }
 
-export function isNightNoticeConflict(error: unknown): boolean {
+function constraintOf(error: unknown): string | undefined {
   const candidate = error as { constraint_name?: string; cause?: { constraint_name?: string } } | null;
-  return (candidate?.constraint_name ?? candidate?.cause?.constraint_name) === "message_templates_night_notice_idx";
+  return candidate?.constraint_name ?? candidate?.cause?.constraint_name;
+}
+
+export type TemplateConflict = "night_notice_exists" | "occasion_exists";
+
+export function templateConflict(error: unknown): TemplateConflict | null {
+  const constraint = constraintOf(error);
+  if (constraint === "message_templates_night_notice_idx") return "night_notice_exists";
+  if (constraint === "message_templates_occasion_slot_idx") return "occasion_exists";
+  return null;
 }
 
 type Executor = Pick<ReturnType<typeof db>, "select" | "insert" | "update">;
@@ -28,6 +43,7 @@ export function toTemplate(row: MessageTemplateRow): MessageTemplate {
     buttons: row.buttons,
     isActive: row.isActive,
     statuses: row.statuses,
+    attempts: row.attempts,
     updatedAt: row.updatedAt.toISOString(),
   };
 }
@@ -42,6 +58,7 @@ function columns(input: MessageTemplateInput) {
     buttons: input.buttons,
     isActive: input.isActive,
     statuses: normalizeStatuses(input.segment, input.statuses),
+    attempts: normalizeAttempts(input.segment, input.attempts),
   };
 }
 

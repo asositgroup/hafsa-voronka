@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
-  type FunnelSegment,
-  funnelSegments,
+  chainSegments,
   MESSAGE_DAILY_CEILING,
   MESSAGE_TOTAL_MAX,
   type MessageCaps,
@@ -23,10 +22,12 @@ type Phase = "idle" | "saving" | "saved" | "error";
 
 type CapText = { daily: string; total: string };
 
-type CapsText = Record<FunnelSegment, CapText>;
+type CappedSegment = keyof MessageCaps;
+
+type CapsText = Record<CappedSegment, CapText>;
 
 function toText(caps: MessageCaps): CapsText {
-  const entry = (segment: FunnelSegment): CapText => ({
+  const entry = (segment: CappedSegment): CapText => ({
     daily: String(caps[segment].daily),
     total: caps[segment].total === null ? "" : String(caps[segment].total),
   });
@@ -34,7 +35,7 @@ function toText(caps: MessageCaps): CapsText {
 }
 
 function parseCaps(text: CapsText): MessageCaps | null {
-  const entry = (segment: FunnelSegment) => ({
+  const entry = (segment: CappedSegment) => ({
     daily: Number(text[segment].daily),
     total: text[segment].total.trim() === "" ? null : Number(text[segment].total),
   });
@@ -59,7 +60,7 @@ export function MessageCapsCard() {
     };
   }, []);
 
-  function change(segment: FunnelSegment, key: keyof CapText, value: string) {
+  function change(segment: CappedSegment, key: keyof CapText, value: string) {
     setText((current) => (current ? { ...current, [segment]: { ...current[segment], [key]: value } } : current));
     setInvalid(false);
     setPhase("idle");
@@ -81,7 +82,7 @@ export function MessageCapsCard() {
   return (
     <Section title={copy.caps.title} description={copy.caps.description}>
       <div className="flex flex-col gap-4">
-        {funnelSegments.map((segment) => (
+        {chainSegments.map((segment) => (
           <fieldset key={segment} className="m-0 flex min-w-0 flex-col gap-2 border-0 p-0">
             <legend className="mb-2 p-0 text-sm font-semibold text-siyoh">{adminUz.segments[segment].label}</legend>
             <div className="grid grid-cols-2 gap-3 sm:max-w-md">

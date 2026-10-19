@@ -37,7 +37,7 @@ export function AudienceTabs({ value, counts, onChange }: AudienceTabsProps) {
       <div
         role="tablist"
         aria-labelledby="audience-title"
-        className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:grid md:grid-cols-3 md:overflow-visible md:px-0 md:pb-0"
+        className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:grid md:grid-cols-4 md:overflow-visible md:px-0 md:pb-0"
       >
         {funnelSegments.map((segment, index) => {
           const selected = segment === value;

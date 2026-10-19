@@ -215,3 +215,24 @@ describe("renderLeadKeyboard", () => {
     ]);
   });
 });
+
+describe("renderLeadCard second chance line", () => {
+  const linked: Lead = { ...webLead, userId: 5 };
+
+  it("shows how many second chances went out and the latest answer", () => {
+    const waiting = renderLeadCard(linked, { ...user, secondChance: { offered: 2, answer: null, exhausted: false } });
+    expect(waiting).toContain("🔁 Qayta imkon: 2/7 · javob kutilmoqda");
+    const again = renderLeadCard(linked, { ...user, secondChance: { offered: 1, answer: "again", exhausted: false } });
+    expect(again).toContain("🔁 Qayta imkon: 1/7 · «Ha» bosdi");
+    const later = renderLeadCard(linked, { ...user, secondChance: { offered: 3, answer: "later", exhausted: false } });
+    expect(later).toContain("🔁 Qayta imkon: 3/7 · «Keyinroq» bosdi");
+    const done = renderLeadCard(linked, { ...user, secondChance: { offered: 7, answer: null, exhausted: true } });
+    expect(done).toContain("🔁 Qayta imkon: 7/7 · imkon tugadi");
+  });
+
+  it("shows nothing before the first second chance", () => {
+    expect(renderLeadCard(linked, { ...user, secondChance: { offered: 0, answer: null, exhausted: false } })).not.toContain(
+      "Qayta imkon",
+    );
+  });
+});

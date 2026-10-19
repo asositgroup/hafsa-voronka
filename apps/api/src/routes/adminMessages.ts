@@ -28,12 +28,13 @@ import {
   activeTemplateRows,
   createTemplate,
   findTemplate,
-  isNightNoticeConflict,
   listTemplates,
   reorder,
   setActive,
   softDelete,
   StaleOrderError,
+  type TemplateConflict,
+  templateConflict,
   updateTemplate,
 } from "@/messages/repo";
 import { sendRendered } from "@/messages/send";
@@ -80,11 +81,14 @@ function remainingAt(now: Date, linkExpiresAt: Date) {
   return variableValues({ name: null, firstName: null, lastPositionSec: 0, durationSec: null, linkExpiresAt, now });
 }
 
-async function saveTemplate<T>(save: () => Promise<T>): Promise<{ ok: true; value: T } | { ok: false }> {
+async function saveTemplate<T>(
+  save: () => Promise<T>,
+): Promise<{ ok: true; value: T } | { ok: false; error: TemplateConflict }> {
   try {
     return { ok: true, value: await save() };
   } catch (error) {
-    if (isNightNoticeConflict(error)) return { ok: false };
+    const conflict = templateConflict(error);
+    if (conflict) return { ok: false, error: conflict };
     throw error;
   }
 }
@@ -107,7 +111,7 @@ adminMessageRoutes.post("/", async (c) => {
   const invalid = invalidInput(body.data);
   if (invalid) return c.json(invalid, 422);
   const created = await saveTemplate(() => createTemplate(body.data));
-  return created.ok ? c.json(created.value, 201) : c.json({ error: "night_notice_exists" }, 409);
+  return created.ok ? c.json(created.value, 201) : c.json({ error: created.error }, 409);
 });
 
 adminMessageRoutes.post("/preview-schedule", async (c) => {
@@ -206,7 +210,7 @@ adminMessageRoutes.put("/:id{[0-9]+}", async (c) => {
   const invalid = invalidInput(body.data);
   if (invalid) return c.json(invalid, 422);
   const updated = await saveTemplate(() => updateTemplate(Number(c.req.param("id")), body.data));
-  if (!updated.ok) return c.json({ error: "night_notice_exists" }, 409);
+  if (!updated.ok) return c.json({ error: updated.error }, 409);
   return updated.value ? c.json(updated.value) : c.json({ error: "not_found" }, 404);
 });
 

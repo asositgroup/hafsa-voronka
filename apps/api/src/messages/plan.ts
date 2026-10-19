@@ -11,6 +11,7 @@ import {
   type SegmentCap,
   TASHKENT_OFFSET_MS,
   TEMPLATE_DAYS,
+  templatesForAttempt,
   type TimingType,
 } from "@funnel/shared";
 
@@ -32,6 +33,7 @@ export type ScheduleTemplate = {
   timingType: TimingType;
   timingValue: number;
   statuses?: readonly FunnelStatus[] | null;
+  attempts?: readonly number[] | null;
 };
 
 export type WatchSnapshot = { lastBeatAt: Date | null; playing: boolean };
@@ -83,6 +85,15 @@ function nightMorningOf(date: Date): number | null {
   if (minute >= NIGHT.start) return tashkentDayStart(date).getTime() + DAY_MS;
   if (minute < NIGHT.end) return tashkentDayStart(date).getTime();
   return null;
+}
+
+export function outOfNight(date: Date): Date {
+  const morning = nightMorningOf(date);
+  return morning === null ? date : new Date(morning + MORNING_SEND_MINUTE * MINUTE_MS);
+}
+
+export function isSameTashkentDay(a: Date, b: Date): boolean {
+  return tashkentDayStart(a).getTime() === tashkentDayStart(b).getTime();
 }
 
 function tashkentDate(dayStart: number): string {
@@ -218,11 +229,13 @@ export function segmentChainInput<T extends ScheduleTemplate>(
     linkExpiresAt: Date | null;
     status?: FunnelStatus | null;
     watch?: WatchSnapshot | null;
+    attempt?: number;
   },
 ): PlanInput<T> {
-  const audience = run.status === undefined ? templates : templatesForStatus(templates, run.status);
+  const forLink = run.attempt === undefined ? templates : templatesForAttempt(templates, run.attempt);
+  const audience = run.status === undefined ? forLink : templatesForStatus(forLink, run.status);
   return {
-    templates: audience.filter((template) => template.timingType !== "night_notice"),
+    templates: audience.filter((template) => template.timingType !== "night_notice" && template.timingType !== "occasion"),
     anchorAt: chainAnchor(run, run.watch ?? null),
     enteredAt: run.enteredAt,
     linkExpiresAt: run.linkExpiresAt,

@@ -6,6 +6,7 @@ import {
   type AdminReportResponse,
   type FunnelSegment,
   type MessageReportRow,
+  type SecondChanceReport,
   type VideoReportRow,
 } from "@funnel/shared";
 import { db } from "@/db";
@@ -41,13 +42,14 @@ export async function getVideoReport({ from, to }: DateRange): Promise<VideoRepo
     FROM users u
     JOIN videos v ON v.id = u.video_id
     LEFT JOIN watch_progress wp ON wp.user_id = u.id
+    LEFT JOIN link_grants first_link ON first_link.user_id = u.id AND first_link.attempt = 1
     LEFT JOIN LATERAL (
       SELECT max(e.created_at) AS last_open_at FROM events e
       WHERE e.user_id = u.id AND e.type = 'app_open'
     ) ao ON true
-    WHERE u.link_given_at IS NOT NULL
-      AND (u.link_given_at AT TIME ZONE 'Asia/Tashkent')::date >= ${from}::date
-      AND (u.link_given_at AT TIME ZONE 'Asia/Tashkent')::date <= ${to}::date
+    WHERE coalesce(first_link.given_at, u.link_given_at) IS NOT NULL
+      AND (coalesce(first_link.given_at, u.link_given_at) AT TIME ZONE 'Asia/Tashkent')::date >= ${from}::date
+      AND (coalesce(first_link.given_at, u.link_given_at) AT TIME ZONE 'Asia/Tashkent')::date <= ${to}::date
     GROUP BY v.id
     ORDER BY v.is_active DESC, v.created_at DESC
   `);
@@ -89,7 +91,7 @@ export async function getMessageReport({ from, to }: DateRange): Promise<Message
                     WHERE n.user_id = sm.user_id AND n.sent_at > sm.sent_at), 'infinity'::timestamptz)
         ) AS window_end
       FROM sent_messages sm
-      WHERE sm.telegram_message_id IS NOT NULL AND sm.sent_at IS NOT NULL
+      WHERE sm.template_id IS NOT NULL AND sm.telegram_message_id IS NOT NULL AND sm.sent_at IS NOT NULL
         AND (sm.sent_at AT TIME ZONE 'Asia/Tashkent')::date >= ${from}::date
         AND (sm.sent_at AT TIME ZONE 'Asia/Tashkent')::date <= ${to}::date
     ),
@@ -135,7 +137,46 @@ export async function getMessageReport({ from, to }: DateRange): Promise<Message
   });
 }
 
+export async function getSecondChanceReport({ from, to }: DateRange): Promise<SecondChanceReport> {
+  const [row] = await db().execute<{
+    offered: string | number;
+    again: string | number;
+    later: string | number;
+    reopened: string | number;
+    reached_price: string | number;
+  }>(sql`
+    SELECT
+      count(*) AS offered,
+      count(*) FILTER (WHERE o.answer = 'again') AS again,
+      count(*) FILTER (WHERE o.answer = 'later' OR EXISTS (
+        SELECT 1 FROM events e WHERE e.type = 'second_chance_later' AND e.user_id = o.user_id
+          AND (e.meta->>'offerId')::bigint = o.id
+      )) AS later,
+      count(*) FILTER (WHERE g.id IS NOT NULL) AS reopened,
+      count(*) FILTER (WHERE g.id IS NOT NULL AND EXISTS (
+        SELECT 1 FROM events e WHERE e.type = 'price_reached' AND e.user_id = o.user_id AND e.created_at >= g.given_at
+      )) AS reached_price
+    FROM second_chance_offers o
+    JOIN sent_messages sm ON sm.id = o.sent_message_id
+    LEFT JOIN link_grants g ON g.id = o.granted_link_id
+    WHERE sm.sent_at IS NOT NULL
+      AND (sm.sent_at AT TIME ZONE 'Asia/Tashkent')::date >= ${from}::date
+      AND (sm.sent_at AT TIME ZONE 'Asia/Tashkent')::date <= ${to}::date
+  `);
+  return {
+    offered: Number(row?.offered ?? 0),
+    again: Number(row?.again ?? 0),
+    later: Number(row?.later ?? 0),
+    reopened: Number(row?.reopened ?? 0),
+    reachedPrice: Number(row?.reached_price ?? 0),
+  };
+}
+
 export async function getReport(range: DateRange): Promise<AdminReportResponse> {
-  const [videos, messages] = await Promise.all([getVideoReport(range), getMessageReport(range)]);
-  return { from: range.from, to: range.to, videos, messages };
+  const [videos, messages, secondChance] = await Promise.all([
+    getVideoReport(range),
+    getMessageReport(range),
+    getSecondChanceReport(range),
+  ]);
+  return { from: range.from, to: range.to, videos, messages, secondChance };
 }

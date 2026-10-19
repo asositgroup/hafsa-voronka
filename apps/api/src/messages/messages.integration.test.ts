@@ -108,7 +108,7 @@ describe.skipIf(!testDbUrl)("Message constructor", () => {
   const create = async (overrides: Record<string, unknown> = {}) => {
     const res = await send("", "POST", { ...draft, ...overrides });
     expect(res.status).toBe(201);
-    return (await res.json()) as { id: number; position: number };
+    return (await res.json()) as { id: number; position: number; attempts: number[] | null };
   };
 
   const list = async (segment = "A") => {
@@ -212,6 +212,48 @@ describe.skipIf(!testDbUrl)("Message constructor", () => {
     expect(body.videoMarks).toEqual({ introEndSec: 300, courseStartSec: 600, priceSec: 800 });
   });
 
+  describe("second chance pages", () => {
+    const page = {
+      ...draft,
+      segment: "D",
+      day: 2,
+      timing: { type: "occasion", value: 0 },
+      statuses: ["link_berildi"],
+      buttons: [
+        { kind: "again", text: "Ha, ko'raman" },
+        { kind: "later", text: "Keyinroq, ko'raman" },
+      ],
+    };
+
+    it("keeps one page per occasion and variant", async () => {
+      const first = await create(page);
+      expect(first).toMatchObject({ segment: "D", day: 2, statuses: ["link_berildi"], attempts: null });
+      const duplicate = await send("", "POST", page);
+      expect(duplicate.status).toBe(409);
+      expect(await duplicate.json()).toEqual({ error: "occasion_exists" });
+      const variant = await send("", "POST", { ...page, statuses: ["dars_yarmida", "korishni_boshladi", "sotuvda_toxtadi"] });
+      expect(variant.status).toBe(201);
+      expect((await variant.json()).statuses).toEqual(["korishni_boshladi", "dars_yarmida", "sotuvda_toxtadi"]);
+      const body = await (await request("?segment=D")).json();
+      expect(body.items).toHaveLength(2);
+    });
+
+    it("rejects chain buttons on a page and «Ha» in a chain", async () => {
+      const wrong = await send("", "POST", { ...page, buttons: [{ kind: "resume", text: "Davom" }] });
+      expect(wrong.status).toBe(422);
+      expect(await wrong.json()).toEqual({ error: "button_not_allowed" });
+    });
+  });
+
+  it("stores the link attempts a chain text is meant for", async () => {
+    const saved = await create({ ...draft, attempts: [2, 1] });
+    expect(saved.attempts).toEqual([1, 2]);
+    const everyone = await create({ ...draft, attempts: [1, 2, 3, 4, 5, 6, 7, 8] });
+    expect(everyone.attempts).toBeNull();
+    const inC = await send("", "POST", { ...draft, segment: "C", attempts: [1] });
+    expect(await inC.json()).toEqual({ error: "attempts_invalid" });
+  });
+
   describe("night notice", () => {
     const notice = { ...draft, text: "Ertaga soat {link_tugash_soati} gacha", timing: { type: "night_notice", value: 0 } };
 
@@ -313,7 +355,7 @@ describe.skipIf(!testDbUrl)("Message constructor", () => {
         .values({ telegramId: ADMIN_ID, firstName: "A<b>&", name: null })
         .onConflictDoUpdate({ target: users.telegramId, set: { firstName: "A<b>&", name: null } });
       const res = await send("/test", "POST", {
-        draft: { ...draft, buttons: [{ kind: "when_menu", text: "Qachon ko'rasiz?" }] },
+        draft: { ...draft, buttons: [{ kind: "later", text: "Keyinroq" }] },
         adminTelegramId: ADMIN_ID,
       });
       expect(res.status).toBe(200);
@@ -325,7 +367,7 @@ describe.skipIf(!testDbUrl)("Message constructor", () => {
             text: "Salom, <b>A&lt;b&gt;&amp;</b>!",
             parse_mode: "HTML",
             link_preview_options: { is_disabled: true },
-            reply_markup: { inline_keyboard: [[{ text: "Qachon ko'rasiz?", callback_data: "mt:w:t0" }]] },
+            reply_markup: { inline_keyboard: [[{ text: "Keyinroq", callback_data: "mt:l:t0" }]] },
           }),
         },
       ]);
@@ -367,29 +409,19 @@ describe.skipIf(!testDbUrl)("Message constructor", () => {
       await db().insert(users).values({ telegramId: REMINDER_USER_ID, firstName: "Reminder" }).onConflictDoNothing();
     });
 
-    it("opens the when menu without touching the original message", async () => {
+    it("answers old when-menu buttons with the editable later acknowledgement", async () => {
       await tap(REMINDER_USER_ID, "mt:w:s1");
       expect(calls.map((call) => call.method)).toEqual(["answerCallbackQuery", "sendMessage"]);
       expect(calls[1].payload).toMatchObject({
         chat_id: REMINDER_USER_ID,
-        text: "Qachon ko'rasiz?",
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "Bugun", callback_data: "mt:wa:s1:b" }],
-            [{ text: "Ertaga", callback_data: "mt:wa:s1:e" }],
-            [{ text: "Keyinroq", callback_data: "mt:wa:s1:k" }],
-          ],
-        },
+        text: "Mayli, qulay vaqtda ko'rib chiqing. Dars sizni kutmoqda 🌿",
       });
-      expect((await reminderEvents()).map((event) => event.type)).toEqual(["reminder_when_open"]);
+      expect((await reminderEvents()).map((event) => event.type)).toEqual(["reminder_later"]);
     });
 
-    it("edits the menu into an acknowledgement and logs the choice", async () => {
+    it("answers a stale when-menu choice the same way", async () => {
       await tap(REMINDER_USER_ID, "mt:wa:s1:e");
-      expect(calls.map((call) => call.method)).toEqual(["answerCallbackQuery", "editMessageText"]);
-      expect(calls[1].payload).toMatchObject({ reply_markup: { inline_keyboard: [] } });
-      const answer = (await reminderEvents()).find((event) => event.type === "reminder_when_answer");
-      expect(answer?.meta).toEqual({ ref: "s1", choice: "e" });
+      expect(calls.map((call) => call.method)).toEqual(["answerCallbackQuery", "sendMessage"]);
     });
 
     it("acknowledges later and logs it", async () => {

@@ -24,7 +24,7 @@ const copy = adminUz.messages.editor;
 export function defaultTiming(type: TimingType, day: number): TemplateTiming {
   if (type === "after_entry") return { type, value: (day - 1) * MINUTES_PER_DAY + 60 };
   if (type === "day_time") return { type, value: 9 * 60 };
-  if (type === "night_notice") return { type, value: 0 };
+  if (type === "night_notice" || type === "occasion") return { type, value: 0 };
   return { type, value: MINUTES_PER_DAY };
 }
 
@@ -53,6 +53,7 @@ export function timingLabel(timing: TemplateTiming): string {
 }
 
 export function timelineLabel(timing: TemplateTiming): string {
+  if (timing.type === "occasion") return "";
   if (timing.type === "night_notice") return timeString(NIGHT_NOTICE_MINUTE);
   if (timing.type === "day_time") return timeString(timing.value);
   if (timing.type === "after_entry") return `+${formatDuration(timing.value)}`;
@@ -86,7 +87,7 @@ const dayOptions = Array.from({ length: TEMPLATE_DAYS }, (_, index) => ({
 
 function timingTypeOptions(segment: FunnelSegment) {
   return timingTypes
-    .filter((type) => type !== "night_notice" || linkBoundSegments.includes(segment))
+    .filter((type) => type !== "occasion" && (type !== "night_notice" || linkBoundSegments.includes(segment)))
     .map((type) => ({ value: type, label: typeLabel(type, segment) }));
 }
 

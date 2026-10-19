@@ -578,8 +578,8 @@ describe.skipIf(!testDbUrl)("Message dispatcher", () => {
       } as never);
     }
 
-    it("marks the click from callback buttons but not from the answer", async () => {
-      const context = await setup({ buttons: [{ kind: "when_menu", text: "Qachon?" }] });
+    it("marks the click from old when-menu callbacks but not from the answer", async () => {
+      const context = await setup({ buttons: [{ kind: "later", text: "Qachon?" }] });
       await tick(at(61));
       const [row] = await rows();
       const stranger = await makeUser();

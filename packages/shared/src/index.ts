@@ -16,6 +16,9 @@ export const eventTypes = [
   "reminder_later",
   "message_click",
   "price_reached",
+  "second_chance_offer",
+  "second_chance_again",
+  "second_chance_later",
 ] as const;
 
 export type EventType = (typeof eventTypes)[number];

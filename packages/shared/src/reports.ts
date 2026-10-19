@@ -44,11 +44,22 @@ export const messageReportRowSchema = z.object({
 
 export type MessageReportRow = z.infer<typeof messageReportRowSchema>;
 
+export const secondChanceReportSchema = z.object({
+  offered: z.number(),
+  again: z.number(),
+  later: z.number(),
+  reopened: z.number(),
+  reachedPrice: z.number(),
+});
+
+export type SecondChanceReport = z.infer<typeof secondChanceReportSchema>;
+
 export const adminReportResponseSchema = z.object({
   from: z.string(),
   to: z.string(),
   videos: z.array(videoReportRowSchema),
   messages: z.array(messageReportRowSchema),
+  secondChance: secondChanceReportSchema,
 });
 
 export type AdminReportResponse = z.infer<typeof adminReportResponseSchema>;

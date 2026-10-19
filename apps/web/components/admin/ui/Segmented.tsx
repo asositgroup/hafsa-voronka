@@ -56,7 +56,7 @@ export function Segmented<T extends string | number>({
               selected ? "bg-siyoh font-semibold text-varaq" : "font-medium text-qalam hover:bg-white hover:text-siyoh"
             }`}
           >
-            <span className="whitespace-nowrap">{item.label}</span>
+            <span className={fill ? "py-1 text-center leading-tight" : "whitespace-nowrap"}>{item.label}</span>
             {item.sub !== undefined && (
               <span className={`text-xs font-normal tabular-nums ${selected ? "text-varaq/80" : "text-qalam"}`}>{item.sub}</span>
             )}

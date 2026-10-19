@@ -2,7 +2,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import type { EventType } from "@funnel/shared";
 import { events, users } from "@/db/schema";
-import { linkExpiryFor } from "@/messages/plan";
+import { insertGrant } from "@/links/service";
 import { linkTtlHours } from "@/settings/service";
 import { resolveAttribution } from "./attribution";
 
@@ -72,13 +72,17 @@ export async function markRegistered(
   fields: { name: string; phone: string; phoneVerified: boolean },
 ) {
   const now = new Date();
-  const linkExpiresAt = linkExpiryFor(now, await linkTtlHours());
-  const [updated] = await db()
-    .update(users)
-    .set({ ...fields, registeredAt: now, linkGivenAt: now, linkExpiresAt })
-    .where(and(eq(users.id, userId), isNull(users.registeredAt)))
-    .returning();
-  return updated;
+  const ttlHours = await linkTtlHours();
+  return db().transaction(async (tx) => {
+    const [updated] = await tx
+      .update(users)
+      .set({ ...fields, registeredAt: now })
+      .where(and(eq(users.id, userId), isNull(users.registeredAt)))
+      .returning();
+    if (!updated) return undefined;
+    const grant = await insertGrant(tx, userId, { kind: "initial", offerFirst: false, now, ttlHours });
+    return { ...updated, linkId: grant.id, linkGivenAt: grant.givenAt, linkExpiresAt: grant.expiresAt };
+  });
 }
 
 export async function setBotBlocked(telegramId: number, blocked: boolean) {

@@ -1,10 +1,19 @@
-import { and, asc, eq, gt, isNotNull, isNull, lt, lte, ne, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNotNull, isNull, lt, lte, ne, sql } from "drizzle-orm";
 import { type Api, GrammyError, HttpError } from "grammy";
-import type { FunnelSegment, FunnelStatus, TemplateButton } from "@funnel/shared";
+import {
+  type FunnelSegment,
+  type FunnelStatus,
+  linkBoundSegments,
+  offerVariantFor,
+  SECOND_CHANCE_SEGMENT,
+  type TemplateButton,
+} from "@funnel/shared";
 import { db, rawClient } from "@/db";
 import {
+  linkGrants,
   messageTemplates,
   type MessageTemplateRow,
+  secondChanceOffers,
   type SentLinkTarget,
   sentMessages,
   users,
@@ -13,7 +22,12 @@ import {
   watchProgress,
 } from "@/db/schema";
 import { env } from "@/env";
+import { nextOffer, offerDueStamp, pickOfferTemplate } from "@/funnel/secondChance";
+import { syncSegment } from "@/funnel/segments";
 import { NO_VIDEO_MARKS, statusFor } from "@/funnel/status";
+import { logEvent } from "@/funnel/users";
+import { refreshUserLeadCards } from "@/leads/service";
+import { offerHistories } from "@/links/offers";
 import { messageCaps } from "@/settings/service";
 import { bot } from "@/telegram/bot";
 import { isBlockedError, markBlocked } from "@/telegram/blocked";
@@ -23,6 +37,7 @@ import { activeTemplateRows, toTemplate } from "./repo";
 import {
   CHAIN_MS,
   DAY_MS,
+  isNightAt,
   isWatchingNow,
   nextPendingDue,
   pickNext,
@@ -45,6 +60,7 @@ const SWEEP_HARD_MS = 47 * HOUR_MS + 50 * 60_000;
 const DELETE_LIMIT_MS = 48 * HOUR_MS;
 const INTERRUPTED_MS = 10 * 60_000;
 const SWEEP_BATCH_SIZE = 500;
+const EXPIRE_BATCH_SIZE = 500;
 const DEFAULT_RETRY_AFTER_SEC = 30;
 const MESSAGE_NOT_FOUND = "message to delete not found";
 
@@ -58,7 +74,9 @@ type Candidate = {
   userId: number;
   segment: FunnelSegment;
   enteredAt: Date;
+  attempt: number;
   telegramId: number;
+  linkId: number | null;
   linkExpiresAt: Date | null;
   sentKeys: string[];
   usage: SendUsage;
@@ -107,7 +125,9 @@ async function loadCandidates(now: Date, userId?: number): Promise<Candidate[]> 
       userId: segmentRuns.userId,
       segment: segmentRuns.segment,
       enteredAt: segmentRuns.enteredAt,
+      attempt: segmentRuns.attempt,
       telegramId: users.telegramId,
+      linkId: users.linkId,
       linkExpiresAt: users.linkExpiresAt,
       registeredAt: users.registeredAt,
       wroteAdminAt: users.wroteAdminAt,
@@ -119,7 +139,7 @@ async function loadCandidates(now: Date, userId?: number): Promise<Candidate[]> 
       introEndSec: videos.introEndSec,
       courseStartSec: videos.courseStartSec,
       priceSec: videos.priceSec,
-      sentKeys: sql<string[]>`coalesce(array_agg(${sentMessages.templateId}::text || ':' || ${sentMessages.slot}) filter (where ${sentMessages.id} is not null), '{}')::text[]`,
+      sentKeys: sql<string[]>`coalesce(array_agg(${sentMessages.templateId}::text || ':' || ${sentMessages.slot}) filter (where ${sentMessages.templateId} is not null), '{}')::text[]`,
       sentToday: sql<number>`(select count(*) from sent_messages c where c.user_id = ${segmentRuns.userId} and c.sent_at >= ${dayStart}::timestamptz)::int`,
       runToday: sql<number>`(count(*) filter (where ${sentMessages.sentAt} >= ${dayStart}::timestamptz))::int`,
       runTotal: sql<number>`count(${sentMessages.sentAt})::int`,
@@ -144,7 +164,9 @@ async function loadCandidates(now: Date, userId?: number): Promise<Candidate[]> 
     userId: row.userId,
     segment: row.segment,
     enteredAt: row.enteredAt,
+    attempt: row.attempt,
     telegramId: row.telegramId,
+    linkId: row.linkId,
     linkExpiresAt: row.linkExpiresAt,
     sentKeys: row.sentKeys,
     usage: { today: row.sentToday, runToday: row.runToday, runTotal: row.runTotal },
@@ -255,8 +277,8 @@ async function sendOne(api: Api, pick: Pick, now: Date, pace: Pace): Promise<Sen
   const nowIso = now.toISOString();
 
   const reserved = await db().execute<{ id: string; click_token: string }>(sql`
-    insert into sent_messages (user_id, template_id, segment_run_id, slot, due_at, created_at)
-    select ${userId}, ${item.template.id}, ${runId}, ${item.slot}, ${item.sendAt.toISOString()}::timestamptz, ${nowIso}::timestamptz
+    insert into sent_messages (user_id, template_id, link_id, segment_run_id, slot, due_at, created_at)
+    select ${userId}, ${item.template.id}, (select link_id from users where id = ${userId}), ${runId}, ${item.slot}, ${item.sendAt.toISOString()}::timestamptz, ${nowIso}::timestamptz
     where exists (
         select 1 from segment_runs r join users u on u.id = r.user_id
         where r.id = ${runId} and r.ended_at is null and u.bot_blocked = false and u.wrote_admin_at is null
@@ -336,11 +358,12 @@ function chainFor(candidate: Candidate, templates: MessageTemplateRow[]) {
       linkExpiresAt: candidate.linkExpiresAt,
       status: candidate.status,
       watch: candidate.watch,
+      attempt: candidate.attempt,
     }),
   );
 }
 
-async function sendDue(api: Api, now: Date, pace: Pace) {
+async function sendDue(api: Api, now: Date, pace: Pace, candidates: Candidate[]) {
   if (now.getTime() < pausedUntil) return;
 
   const templates = await db()
@@ -354,8 +377,8 @@ async function sendDue(api: Api, now: Date, pace: Pace) {
 
   const caps = await messageCaps();
   const picks: Pick[] = [];
-  for (const candidate of await loadCandidates(now)) {
-    if (isWatchingNow(candidate.watch, now)) continue;
+  for (const candidate of candidates) {
+    if (candidate.segment === SECOND_CHANCE_SEGMENT || isWatchingNow(candidate.watch, now)) continue;
     const plan = chainFor(candidate, bySegment.get(candidate.segment) ?? []);
     const item = pickNext(plan, new Set(candidate.sentKeys), now, candidate.usage, caps[candidate.segment]);
     if (item) picks.push({ candidate, item });
@@ -367,9 +390,126 @@ async function sendDue(api: Api, now: Date, pace: Pace) {
   }
 }
 
+async function expireLinks(api: Api, now: Date, pace: Pace) {
+  const expiring = await db()
+    .select({ userId: segmentRuns.userId })
+    .from(segmentRuns)
+    .innerJoin(users, eq(users.id, segmentRuns.userId))
+    .where(
+      and(
+        isNull(segmentRuns.endedAt),
+        inArray(segmentRuns.segment, [...linkBoundSegments]),
+        lte(users.linkExpiresAt, now),
+      ),
+    )
+    .orderBy(asc(segmentRuns.id))
+    .limit(EXPIRE_BATCH_SIZE);
+  for (const { userId } of expiring) {
+    await syncSegment(userId, now).catch((error) => console.error("Segment sync failed:", error));
+  }
+
+  if (now.getTime() < pausedUntil) return;
+  const stale = await db()
+    .select({
+      id: sentMessages.id,
+      telegramMessageId: sentMessages.telegramMessageId,
+      sentAt: sentMessages.sentAt,
+      telegramId: users.telegramId,
+    })
+    .from(sentMessages)
+    .innerJoin(segmentRuns, eq(segmentRuns.id, sentMessages.segmentRunId))
+    .innerJoin(linkGrants, eq(linkGrants.id, sentMessages.linkId))
+    .innerJoin(users, eq(users.id, sentMessages.userId))
+    .where(
+      and(
+        inArray(segmentRuns.segment, [...linkBoundSegments]),
+        lte(linkGrants.expiresAt, now),
+        gt(sentMessages.sentAt, new Date(now.getTime() - DELETE_LIMIT_MS)),
+        isNotNull(sentMessages.telegramMessageId),
+        isNull(sentMessages.deletedAt),
+        isNull(sentMessages.deleteError),
+      ),
+    )
+    .orderBy(asc(sentMessages.id))
+    .limit(SWEEP_BATCH_SIZE);
+  for (const row of stale) {
+    const result = await deleteSent(
+      api,
+      row.telegramId,
+      { id: row.id, telegramMessageId: row.telegramMessageId!, sentAt: row.sentAt! },
+      now,
+      pace,
+    );
+    if (result === "abort") return;
+  }
+}
+
+async function settleOffer(offerId: number, candidate: Candidate, templateId: number) {
+  const [sent] = await db()
+    .select({ id: sentMessages.id, sentAt: sentMessages.sentAt, sendError: sentMessages.sendError })
+    .from(sentMessages)
+    .where(
+      and(
+        eq(sentMessages.segmentRunId, candidate.runId),
+        eq(sentMessages.templateId, templateId),
+        eq(sentMessages.slot, ""),
+      ),
+    );
+  const offer = eq(secondChanceOffers.id, offerId);
+  if (sent?.sentAt) {
+    await db().update(secondChanceOffers).set({ sentMessageId: sent.id }).where(offer);
+    await logEvent("second_chance_offer", { userId: candidate.userId, meta: { offerId, sentMessageId: sent.id } });
+    await refreshUserLeadCards(candidate.userId).catch((error) => console.error("Lead card refresh failed:", error));
+  } else if (sent?.sendError) {
+    await db().update(secondChanceOffers).set({ skipped: true }).where(offer);
+  } else {
+    await db().delete(secondChanceOffers).where(offer);
+  }
+}
+
+async function sendOffers(api: Api, now: Date, pace: Pace, all: Candidate[]) {
+  if (now.getTime() < pausedUntil) return;
+  const candidates = all.filter((candidate) => candidate.segment === SECOND_CHANCE_SEGMENT);
+  if (candidates.length === 0) return;
+  const templates = await activeTemplateRows(SECOND_CHANCE_SEGMENT);
+  const histories = await offerHistories(db(), candidates.map((candidate) => candidate.userId));
+
+  for (const candidate of candidates) {
+    const history = histories.get(candidate.userId) ?? [];
+    const step = nextOffer({ history, expiresAt: candidate.linkExpiresAt }, now);
+    if (step.kind === "exhausted") {
+      if (now.getTime() >= step.at.getTime()) await syncSegment(candidate.userId, now);
+      continue;
+    }
+    if (step.kind !== "due" || step.dueAt.getTime() > now.getTime() || isNightAt(now)) continue;
+    const variant = offerVariantFor(candidate.status);
+    if (candidate.linkId === null || variant === null) continue;
+
+    const template = pickOfferTemplate(templates, step.occasion, candidate.status);
+    const dueAt = offerDueStamp(step.dueAt, now);
+    const [offer] = await db()
+      .insert(secondChanceOffers)
+      .values({
+        userId: candidate.userId,
+        occasion: step.occasion,
+        variant,
+        expiredLinkId: candidate.linkId,
+        dueAt,
+        skipped: template === null,
+      })
+      .onConflictDoNothing()
+      .returning({ id: secondChanceOffers.id });
+    if (!offer || !template) continue;
+
+    const result = await sendOne(api, { candidate, item: { template, sendAt: dueAt, slot: "", kind: "regular" } }, now, pace);
+    await settleOffer(offer.id, candidate, template.id);
+    if (result === "abort") return;
+  }
+}
+
 async function nextDueForUser(userId: number, now: Date) {
   const [candidate] = await loadCandidates(now, userId);
-  if (!candidate) return null;
+  if (!candidate || candidate.segment === SECOND_CHANCE_SEGMENT) return null;
   const templates = await activeTemplateRows(candidate.segment);
   return nextPendingDue(chainFor(candidate, templates), new Set(candidate.sentKeys), now);
 }
@@ -438,7 +578,10 @@ export async function dispatchMessages(options: DispatchOptions = {}): Promise<v
     if (!lock?.locked) return;
     try {
       await markInterrupted(clock());
-      await sendDue(api, clock(), pace);
+      await expireLinks(api, clock(), pace);
+      const candidates = await loadCandidates(clock());
+      await sendOffers(api, clock(), pace, candidates);
+      await sendDue(api, clock(), pace, candidates);
       await sweep(api, clock(), pace);
     } finally {
       await conn`SELECT pg_advisory_unlock(${DISPATCH_LOCK_KEY})`;

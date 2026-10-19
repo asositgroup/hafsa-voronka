@@ -4,6 +4,7 @@ import { type MessageTemplate, plainTextPreview, renderPlainText, SAMPLE_CONTEXT
 import { Badge } from "@/components/admin/ui/Badge";
 import { IconButton } from "@/components/admin/ui/IconButton";
 import { Switch } from "@/components/admin/ui/Switch";
+import { attemptsLabel } from "@/components/admin/messages/AttemptPicker";
 import { stopPointLabel, type VideoMarks } from "@/components/admin/messages/StopPointPicker";
 import { timelineLabel } from "@/components/admin/messages/TimingPicker";
 import { ButtonsIcon, ChevronDownIcon, ChevronUpIcon, PhotoIcon, VideoIcon, VoiceIcon } from "@/components/icons";
@@ -42,12 +43,13 @@ export function MessageCard({ item, videoMarks, onEdit, onToggle, onMoveUp, onMo
           {timelineLabel(item.timing)}
         </span>
         <span className={`flex min-w-0 flex-1 flex-col gap-1 ${item.isActive ? "" : "opacity-60"}`}>
-          {(item.timing.type === "night_notice" || item.statuses) && (
+          {(item.timing.type === "night_notice" || item.statuses || item.attempts) && (
             <span className="flex flex-wrap gap-1">
               {item.timing.type === "night_notice" && <Badge tone="attention">{copy.nightNotice.badge}</Badge>}
               {item.statuses?.map((status) => (
                 <Badge key={status}>{stopPointLabel(status, videoMarks)}</Badge>
               ))}
+              {item.attempts && <Badge>{attemptsLabel(item.attempts)}</Badge>}
             </span>
           )}
           <span className="line-clamp-2 text-sm text-siyoh">

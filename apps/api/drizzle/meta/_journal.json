@@ -120,6 +120,13 @@
       "when": 1792411926207,
       "tag": "0016_segment_b",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792412774705,
+      "tag": "0017_second_chance",
+      "breakpoints": true
     }
   ]
 }

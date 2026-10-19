@@ -23,6 +23,7 @@ function makeUser(overrides: Partial<User> = {}): User {
     registeredAt: new Date("2026-03-01T10:00:00Z"),
     linkGivenAt: null,
     linkExpiresAt: null,
+    linkId: null,
     completedAt: null,
     unlockedAt: null,
     channelClickAt: null,

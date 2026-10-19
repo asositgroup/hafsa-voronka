@@ -636,6 +636,28 @@ describe("segment B: status variants", () => {
   });
 });
 
+describe("link attempts", () => {
+  const firstLinkOnly = template({ id: 9101, attempts: [1] });
+  const reopened = template({ id: 9102, attempts: [2, 3] });
+  const everyLink = template({ id: 9103, timingValue: 120, attempts: null });
+  const all = [firstLinkOnly, reopened, everyLink];
+  const run = { segment: "A" as const, enteredAt: local("2026-10-19T10:00"), linkExpiresAt: local("2026-10-20T10:00") };
+
+  it("sends texts targeted at the first link only on the first link", () => {
+    const ids = (attempt: number) =>
+      planChain(segmentChainInput(all, { ...run, attempt })).map((item) => item.template.id);
+    expect(ids(1)).toEqual([9101, 9103]);
+    expect(ids(2)).toEqual([9102, 9103]);
+    expect(ids(4)).toEqual([9103]);
+  });
+
+  it("restarts the chain from the reopened link's own anchor and expiry", () => {
+    const reopenedRun = { ...run, enteredAt: local("2026-10-21T08:15"), linkExpiresAt: local("2026-10-22T08:15"), attempt: 2 };
+    const plan = planChain(segmentChainInput([...all, beforeExpiry(1)], reopenedRun));
+    expect(plan.map((item) => localTime(item.sendAt))).toEqual(["2026-10-21T09:15", "2026-10-21T10:15", "2026-10-22T07:15"]);
+  });
+});
+
 describe("caps", () => {
   const bCap = { daily: 4, total: 7 };
   const plan = planChain(segmentAInput("2026-10-19T10:00"));

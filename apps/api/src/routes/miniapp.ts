@@ -5,7 +5,9 @@ import type { AppEnv } from "@/auth";
 import { db } from "@/db";
 import { watchProgress } from "@/db/schema";
 import { env } from "@/env";
+import { NO_VIDEO_MARKS, statusFor } from "@/funnel/status";
 import { logEvent, upsertUser } from "@/funnel/users";
+import { acceptSecondChance, openOffer } from "@/links/service";
 import { recordMessageClick } from "@/messages/clicks";
 import { videoForUser } from "@/videos/service";
 import { remainingWatchSecs } from "@/watch/credit";
@@ -24,7 +26,12 @@ export const miniappRoutes = new Hono<AppEnv>();
 miniappRoutes.post("/session", async (c) => {
   c.header("cache-control", "no-store");
   const { reason, start, sentMessageId } = sessionRequestSchema.catch({ reason: "open" }).parse(await readJson(c.req));
-  const { user } = await upsertUser(c.get("telegramUser"), c.get("startParam"));
+  const now = new Date();
+  const profile = c.get("telegramUser");
+  let { user } = await upsertUser(profile, c.get("startParam"));
+  if (reason === "open" && start === "again" && (await acceptSecondChance(user.id, now)) === "granted") {
+    ({ user } = await upsertUser(profile, undefined));
+  }
   const video = await videoForUser(user);
   if (!video) {
     return c.json({ error: "no_video" }, 503);
@@ -44,12 +51,15 @@ miniappRoutes.post("/session", async (c) => {
     .limit(1);
 
   const lastPosition = progress?.lastPosition ?? 0;
+  const status = statusFor(progress, video ?? NO_VIDEO_MARKS, user);
   const expired =
     user.registeredAt !== null &&
     user.linkExpiresAt !== null &&
-    new Date() >= user.linkExpiresAt &&
+    now >= user.linkExpiresAt &&
     user.completedAt === null &&
-    user.wroteAdminAt === null;
+    status !== "narxni_kurdi" &&
+    status !== "adminga_yozdi";
+  const secondChance = expired && (await openOffer(db(), user, now)) !== null;
 
   return c.json({
     registered: user.registeredAt !== null,
@@ -61,6 +71,7 @@ miniappRoutes.post("/session", async (c) => {
     videoId: video.id,
     priceSec: video.priceSec,
     expired,
+    secondChance,
     startAt: start === "offer" ? (video.courseStartSec ?? lastPosition) : lastPosition,
     progress: {
       lastPosition,
@@ -80,6 +91,13 @@ miniappRoutes.post("/session", async (c) => {
       channelUrl: env.CHANNEL_URL,
     },
   } satisfies SessionResponse);
+});
+
+miniappRoutes.post("/second-chance/accept", async (c) => {
+  c.header("cache-control", "no-store");
+  const { user } = await upsertUser(c.get("telegramUser"), c.get("startParam"));
+  const result = await acceptSecondChance(user.id);
+  return result === "closed" ? c.json({ error: "offer_closed" }, 409) : c.json({ ok: true, result });
 });
 
 miniappRoutes.post("/register", (c) => c.json({ error: "register_in_bot" }, 403));

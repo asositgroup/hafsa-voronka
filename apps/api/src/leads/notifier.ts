@@ -1,5 +1,6 @@
 import { and, asc, eq, gt, lt, sql } from "drizzle-orm";
 import { GrammyError, type InlineKeyboard } from "grammy";
+import type { OfferAnswer } from "@funnel/shared";
 import { db, rawClient } from "@/db";
 import { type Lead, leads, users, videos, watchProgress } from "@/db/schema";
 import { env } from "@/env";
@@ -113,6 +114,9 @@ async function flushPending(sender: LeadSender) {
       user: users,
       maxPosition: watchProgress.maxPosition,
       duration: videos.duration,
+      offered: sql<number>`(select count(*) from second_chance_offers o where o.user_id = ${leads.userId} and o.sent_message_id is not null)::int`,
+      lastAnswer: sql<OfferAnswer | null>`(select o.answer from second_chance_offers o where o.user_id = ${leads.userId} and o.sent_message_id is not null order by o.occasion desc limit 1)`,
+      exhausted: sql<boolean>`exists (select 1 from segment_runs r where r.user_id = ${leads.userId} and r.end_reason = 'offers_exhausted')`,
     })
     .from(leads)
     .leftJoin(users, eq(users.id, leads.userId))
@@ -128,11 +132,12 @@ async function flushPending(sender: LeadSender) {
     .orderBy(asc(leads.id))
     .limit(BATCH_SIZE);
 
-  for (const { lead, user, maxPosition, duration } of pending) {
+  for (const { lead, user, maxPosition, duration, offered, lastAnswer, exhausted } of pending) {
     try {
       const cardUser = user && {
         ...user,
         watchedPercent: watchedPercent(maxPosition ?? 0, duration ?? 0),
+        secondChance: { offered, answer: lastAnswer, exhausted },
       };
       await syncLeadCard(lead, cardUser, sender);
       await db()

@@ -3,10 +3,13 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import {
+  attemptTargetSegments,
+  defaultButtonFor,
   type FunnelSegment,
   type MessageTemplate,
   type MessageTemplateInput,
-  buttonPresets,
+  offerVariantOf,
+  SECOND_CHANCE_SEGMENT,
   TEMPLATE_MEDIA_MIME_TYPES,
   templateTextLimit,
   validateTemplateText,
@@ -24,6 +27,7 @@ import { Disclosure } from "@/components/admin/ui/Disclosure";
 import { Notice } from "@/components/admin/ui/Notice";
 import { Segmented } from "@/components/admin/ui/Segmented";
 import { Switch } from "@/components/admin/ui/Switch";
+import { AttemptPicker } from "@/components/admin/messages/AttemptPicker";
 import { ButtonsEditor } from "@/components/admin/messages/ButtonsEditor";
 import { MessagePreview } from "@/components/admin/messages/MessagePreview";
 import { StopPointPicker, type VideoMarks } from "@/components/admin/messages/StopPointPicker";
@@ -53,7 +57,16 @@ function errorText(code: string | undefined, variable?: string) {
 
 type Admin = { telegramId: number; label: string };
 
-export type MessagePreset = Pick<MessageTemplateInput, "text" | "timing">;
+export type MessagePreset = Pick<MessageTemplateInput, "text" | "timing"> &
+  Partial<Pick<MessageTemplateInput, "day" | "statuses" | "buttons">>;
+
+function sheetTitle(segment: FunnelSegment, draft: MessageTemplateInput, editing: boolean) {
+  const variant = segment === SECOND_CHANCE_SEGMENT ? offerVariantOf(draft.statuses) : null;
+  if (!variant) return editing ? copy.editTitle : copy.newTitle;
+  return adminUz.messages.secondChance.editorTitle
+    .replace("{n}", String(draft.day))
+    .replace("{slot}", adminUz.messages.secondChance.slots[variant]);
+}
 
 type MessageEditorProps = {
   segment: FunnelSegment;
@@ -91,16 +104,18 @@ export function MessageEditor({
           buttons: item.buttons,
           isActive: item.isActive,
           statuses: item.statuses,
+          attempts: item.attempts,
         }
       : {
           segment,
-          day: 1,
+          day: preset?.day ?? 1,
           text: preset?.text ?? "",
           media: null,
           timing: preset?.timing ?? defaultTiming("after_entry", 1),
-          buttons: [],
+          buttons: preset?.buttons ?? [],
           isActive: true,
-          statuses: null,
+          statuses: preset?.statuses ?? null,
+          attempts: null,
         },
   );
   const [busy, setBusy] = useState<"save" | "upload" | "delete" | "test" | null>(null);
@@ -112,7 +127,8 @@ export function MessageEditor({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [tab, setTab] = useState<"edit" | "preview">("edit");
   const [timingOpen, setTimingOpen] = useState(() => !item || window.matchMedia("(min-width: 1024px)").matches);
-  const [buttonsOpen, setButtonsOpen] = useState(() => (item?.buttons.length ?? 0) > 0);
+  const [buttonsOpen, setButtonsOpen] = useState(() => (item?.buttons.length ?? preset?.buttons?.length ?? 0) > 0);
+  const secondChance = segment === SECOND_CHANCE_SEGMENT;
   const [pickerOpen, setPickerOpen] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -221,7 +237,7 @@ export function MessageEditor({
 
   return (
     <>
-      <Sheet open onClose={onClose} title={item ? copy.editTitle : copy.newTitle} size="wide" footer={footer}>
+      <Sheet open onClose={onClose} title={sheetTitle(segment, draft, item !== null)} size="wide" footer={footer}>
         <div className="flex flex-col gap-4">
           <div className="lg:hidden">
             <Segmented
@@ -247,6 +263,9 @@ export function MessageEditor({
                   onChange={(statuses) => patch({ statuses })}
                 />
               )}
+              {attemptTargetSegments.includes(segment) && (
+                <AttemptPicker value={draft.attempts} onChange={(attempts) => patch({ attempts })} />
+              )}
               <TextEditor
                 value={draft.text}
                 onChange={(text) => patch({ text })}
@@ -259,20 +278,22 @@ export function MessageEditor({
                 }
               />
 
-              <Disclosure
-                title={copy.timingTitle}
-                summary={timingSummary(draft.day, draft.timing, segment)}
-                open={timingOpen || timingError !== null}
-                onOpenChange={setTimingOpen}
-              >
-                <TimingPicker
-                  day={draft.day}
-                  timing={draft.timing}
-                  segment={segment}
-                  onChange={patch}
-                  error={timingError}
-                />
-              </Disclosure>
+              {!secondChance && (
+                <Disclosure
+                  title={copy.timingTitle}
+                  summary={timingSummary(draft.day, draft.timing, segment)}
+                  open={timingOpen || timingError !== null}
+                  onOpenChange={setTimingOpen}
+                >
+                  <TimingPicker
+                    day={draft.day}
+                    timing={draft.timing}
+                    segment={segment}
+                    onChange={patch}
+                    error={timingError}
+                  />
+                </Disclosure>
+              )}
 
               <input
                 ref={fileInput}
@@ -349,7 +370,7 @@ export function MessageEditor({
                       size="sm"
                       icon={<PlusIcon className="h-4 w-4" />}
                       onClick={() => {
-                        patch({ buttons: [{ kind: "resume", text: buttonPresets.resume }] });
+                        patch({ buttons: [defaultButtonFor(segment)] });
                         setButtonsOpen(true);
                       }}
                     >
@@ -358,7 +379,12 @@ export function MessageEditor({
                   ) : undefined
                 }
               >
-                <ButtonsEditor buttons={draft.buttons} onChange={(buttons) => patch({ buttons })} prefillSupported={prefillSupported} />
+                <ButtonsEditor
+                  segment={segment}
+                  buttons={draft.buttons}
+                  onChange={(buttons) => patch({ buttons })}
+                  prefillSupported={prefillSupported}
+                />
               </Disclosure>
 
               {item && (

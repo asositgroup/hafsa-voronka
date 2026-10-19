@@ -1,49 +1,29 @@
-import { Composer, InlineKeyboard } from "grammy";
-import type { EventType } from "@funnel/shared";
+import { Composer } from "grammy";
 import { findByTelegramId, logEvent } from "@/funnel/users";
-import { uz } from "@/i18n/uz";
+import { answerLater } from "@/links/service";
 import { recordMessageClick } from "@/messages/clicks";
+import { sendBotText } from "@/telegram/texts";
 
-const copy = uz.reminders;
-
-type Choice = keyof typeof copy.options;
-
-const choices: Choice[] = ["b", "e", "k"];
-
-async function logReminderEvent(telegramId: number, type: EventType, ref: string, choice?: string, op?: string) {
+async function recordLater(telegramId: number, ref: string, op: string) {
   if (!ref.startsWith("s")) return;
   const user = await findByTelegramId(telegramId);
   if (!user) return;
-  await logEvent(type, { userId: user.id, visitorId: user.visitorId, meta: { ref, choice: choice ?? null } });
-  if (op) {
-    await recordMessageClick(Number(ref.slice(1)), user.id, "callback", { op });
+  const sentId = Number(ref.slice(1));
+  if (await answerLater(user.id, sentId)) {
+    await recordMessageClick(sentId, user.id, "callback", { op });
+    return;
   }
+  await logEvent("reminder_later", { userId: user.id, visitorId: user.visitorId, meta: { ref, choice: null } });
+  if (op !== "wa") await recordMessageClick(sentId, user.id, "callback", { op });
 }
 
 export const reminderComposer = new Composer();
 
 reminderComposer.callbackQuery(/^mt:(w|wa|l):([ts]\d+)(?::([bek]))?$/, async (ctx) => {
-  const [, op, ref, choice] = ctx.match;
+  const [, op, ref] = ctx.match;
   const chatId = ctx.chat?.id;
   await ctx.answerCallbackQuery();
   if (!chatId) return;
-
-  if (op === "w") {
-    const keyboard = InlineKeyboard.from(
-      choices.map((option) => [InlineKeyboard.text(copy.options[option], `mt:wa:${ref}:${option}`)]),
-    );
-    await ctx.api.sendMessage(chatId, copy.whenQuestion, { reply_markup: keyboard });
-    await logReminderEvent(ctx.from.id, "reminder_when_open", ref, undefined, op);
-    return;
-  }
-
-  if (op === "wa") {
-    if (!choice) return;
-    await ctx.editMessageText(copy.acks[choice as Choice], { reply_markup: { inline_keyboard: [] } });
-    await logReminderEvent(ctx.from.id, "reminder_when_answer", ref, choice);
-    return;
-  }
-
-  await ctx.api.sendMessage(chatId, copy.laterAck);
-  await logReminderEvent(ctx.from.id, "reminder_later", ref, undefined, op);
+  await sendBotText(ctx.api, chatId, "laterAck");
+  await recordLater(ctx.from.id, ref, op);
 });

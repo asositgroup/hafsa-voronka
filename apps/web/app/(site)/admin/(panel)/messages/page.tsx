@@ -8,6 +8,7 @@ import {
   funnelSegments,
   linkBoundSegments,
   type MessageTemplate,
+  SECOND_CHANCE_SEGMENT,
   timelineGroupKey,
   type TimelineGroupKey,
   timelineSortKey,
@@ -16,6 +17,7 @@ import { AudienceTabs } from "@/components/admin/messages/AudienceTabs";
 import { MessageCard } from "@/components/admin/messages/MessageCard";
 import { MessageEditor, type MessagePreset } from "@/components/admin/messages/MessageEditor";
 import { ScheduleSimulator } from "@/components/admin/messages/ScheduleSimulator";
+import { SecondChancePages } from "@/components/admin/messages/SecondChancePages";
 import type { VideoMarks } from "@/components/admin/messages/StopPointPicker";
 import { Button } from "@/components/admin/ui/Button";
 import { Notice } from "@/components/admin/ui/Notice";
@@ -212,7 +214,16 @@ export default function AdminMessagesPage() {
       {failed && !loaded && <ErrorState onRetry={retry} />}
       {!loaded && !failed && <LoadingState variant="list" rows={3} />}
 
-      {loaded && (
+      {loaded && segment === SECOND_CHANCE_SEGMENT && (
+        <SecondChancePages
+          items={loaded.items}
+          onEdit={(item) => setEditing({ item })}
+          onAdd={(preset) => setEditing({ item: null, preset })}
+          onToggle={(item, isActive) => void toggle(item, isActive)}
+        />
+      )}
+
+      {loaded && segment !== SECOND_CHANCE_SEGMENT && (
         <section className="flex flex-col gap-4">
           {loaded.items.length === 0 ? (
             <EmptyState
@@ -285,7 +296,7 @@ export default function AdminMessagesPage() {
 
       {loaded && editing && (
         <MessageEditor
-          key={editing.item?.id ?? "new"}
+          key={editing.item?.id ?? `new-${editing.preset?.day ?? 0}-${editing.preset?.statuses?.join() ?? ""}`}
           segment={segment}
           item={editing.item}
           preset={editing.preset}

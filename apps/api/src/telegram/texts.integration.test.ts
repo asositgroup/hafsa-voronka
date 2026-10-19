@@ -81,7 +81,7 @@ describe.skipIf(!testDbUrl)("Editable bot texts", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.mediaEnabled).toBe(true);
-    expect(body.items).toHaveLength(11);
+    expect(body.items).toHaveLength(12);
     const welcome = body.items.find((item: { key: string }) => item.key === "welcome");
     expect(welcome).toMatchObject({ kind: "message", placeholders: ["name"], text: null, media: null });
     expect(welcome.defaultText).toContain("{name}");

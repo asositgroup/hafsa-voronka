@@ -30,6 +30,7 @@ export const defaultBotTexts: Record<BotTextKey, string> = {
   completion:
     "Barakalla! 🎉 Darsni ko'rib chiqdingiz. Bu arab tilini o'rganishdagi eng muhim qadam: to'g'ri boshlash.\n\nEndi bilganlaringizni amalda qo'llash vaqti. Arab tilini Hafsa ustoza bilan davom ettirmoqchimisiz yoki savollaringiz bormi? Adminga yozing, sizga batafsil ma'lumot beradi 👇",
   fallback: "Video darsni ko'rish uchun pastdagi tugmani bosing 👇",
+  laterAck: "Mayli, qulay vaqtda ko'rib chiqing. Dars sizni kutmoqda 🌿",
   shareContactButton: "📱 Raqamni yuborish",
   watchButton: "▶️ Bepul darsni ko'rish",
   channelButton: "✍️ Adminga yozish",

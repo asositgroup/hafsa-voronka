@@ -41,7 +41,7 @@ import { sendRendered } from "@/messages/send";
 import { linkTtlHours } from "@/settings/service";
 import { isAdminTelegramId } from "@/telegram/admins";
 import { bot } from "@/telegram/bot";
-import { botMediaChat, downloadBotMedia, uploadToMediaChat } from "@/telegram/media";
+import { MediaChatUnavailableError, botMediaChat, downloadBotMedia, uploadToMediaChat } from "@/telegram/media";
 
 export const adminMessageRoutes = new Hono();
 
@@ -178,7 +178,12 @@ adminMessageRoutes.post(
     if (!type) return c.json({ error: "unsupported_type" }, 415);
     if (file.size > TEMPLATE_MEDIA_LIMITS[type]) return c.json({ error: "too_large" }, 413);
 
-    return c.json({ type, fileId: await uploadToMediaChat(bot().api, type, file) });
+    try {
+      return c.json({ type, fileId: await uploadToMediaChat(bot().api, type, file) });
+    } catch (error) {
+      if (error instanceof MediaChatUnavailableError) return c.json({ error: "media_chat_unavailable" }, 503);
+      throw error;
+    }
   },
 );
 

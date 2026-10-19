@@ -10,7 +10,7 @@ import {
 } from "@funnel/shared";
 import { requireAdminAuth } from "@/admin/auth";
 import { bot } from "@/telegram/bot";
-import { botMediaChat, downloadBotMedia } from "@/telegram/media";
+import { MediaChatUnavailableError, botMediaChat, downloadBotMedia } from "@/telegram/media";
 import {
   clearBotMedia,
   defaultBotTexts,
@@ -75,7 +75,12 @@ adminBotTextRoutes.post(
     const current = (await findBotText(key))?.text ?? defaultBotTexts[key];
     if (validateBotText(key, current, true) === "too_long") return c.json({ error: "caption_too_long" }, 422);
 
-    await uploadBotMedia(bot().api, key, type, file);
+    try {
+      await uploadBotMedia(bot().api, key, type, file);
+    } catch (error) {
+      if (error instanceof MediaChatUnavailableError) return c.json({ error: "media_chat_unavailable" }, 503);
+      throw error;
+    }
     return c.json({ items: await listBotTexts() });
   },
 );

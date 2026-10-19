@@ -18,6 +18,7 @@ describe.skipIf(!testDbUrl)("Editable bot texts", () => {
   let api: ReturnType<typeof import("./bot").bot>["api"];
   let cookie: string;
   const calls: ApiCall[] = [];
+  let mediaChatMissing = false;
 
   beforeAll(async () => {
     setTestEnv({
@@ -32,6 +33,9 @@ describe.skipIf(!testDbUrl)("Editable bot texts", () => {
     api = (await import("./bot")).bot().api;
     api.config.use(async (_prev, method, payload) => {
       calls.push({ method, payload: payload as Record<string, unknown> });
+      if (mediaChatMissing && (method === "sendPhoto" || method === "sendVideo")) {
+        return { ok: false, error_code: 400, description: "Bad Request: chat not found" } as never;
+      }
       if (method === "sendPhoto") {
         return { ok: true, result: { message_id: 501, photo: [{ file_id: "photo-small" }, { file_id: "photo-big" }] } } as never;
       }
@@ -50,6 +54,7 @@ describe.skipIf(!testDbUrl)("Editable bot texts", () => {
 
   beforeEach(async () => {
     calls.length = 0;
+    mediaChatMissing = false;
     await db().delete(botTexts);
     texts.invalidateBotTexts();
   });
@@ -170,6 +175,13 @@ describe.skipIf(!testDbUrl)("Editable bot texts", () => {
     calls.length = 0;
     await texts.sendBotText(api, 7, "completion");
     expect(calls[0]).toMatchObject({ method: "sendVideo", payload: { video: "video-id", supports_streaming: true } });
+  });
+
+  it("explains that the media chat is unreachable instead of failing", async () => {
+    mediaChatMissing = true;
+    const res = await upload("askContact", new File([new Uint8Array([1, 2, 3])], "a.jpg", { type: "image/jpeg" }));
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: "media_chat_unavailable" });
   });
 
   it("rejects unsupported files and media on buttons", async () => {

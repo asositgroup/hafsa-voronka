@@ -10,11 +10,10 @@ import {
 } from "@funnel/shared";
 import { requireAdminAuth } from "@/admin/auth";
 import { bot } from "@/telegram/bot";
+import { botMediaChat, downloadBotMedia } from "@/telegram/media";
 import {
-  botMediaChat,
   clearBotMedia,
   defaultBotTexts,
-  downloadBotMedia,
   findBotText,
   listBotTexts,
   resetBotText,

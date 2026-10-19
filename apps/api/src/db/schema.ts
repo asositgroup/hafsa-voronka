@@ -8,12 +8,21 @@ import {
   jsonb,
   pgTable,
   real,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import { eventTypes, funnelSegments, segmentEndReasons, type Utm } from "@funnel/shared";
+import {
+  eventTypes,
+  funnelSegments,
+  segmentEndReasons,
+  type TemplateButton,
+  templateMediaTypes,
+  timingTypes,
+  type Utm,
+} from "@funnel/shared";
 
 export const botVideoSteps = ["confirm", "duration", "course", "price", "summary", "done", "cancelled"] as const;
 export type BotVideoStep = (typeof botVideoSteps)[number];
@@ -241,3 +250,41 @@ export const settings = pgTable("settings", {
   value: text("value").notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const messageTemplates = pgTable(
+  "message_templates",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    segment: text("segment", { enum: funnelSegments }).notNull(),
+    day: smallint("day").notNull(),
+    position: integer("position").notNull(),
+    text: text("text").notNull(),
+    mediaType: text("media_type", { enum: templateMediaTypes }),
+    mediaFileId: text("media_file_id"),
+    timingType: text("timing_type", { enum: timingTypes }).notNull(),
+    timingValue: integer("timing_value").notNull(),
+    buttons: jsonb("buttons").$type<TemplateButton[]>().default([]).notNull(),
+    isActive: boolean("is_active").default(true).notNull(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("message_templates_day_idx")
+      .on(t.segment, t.day, t.position)
+      .where(sql`${t.deletedAt} is null`),
+    check("message_templates_day_range", sql`${t.day} between 1 and 7`),
+    check("message_templates_segment_values", sql`${t.segment} in ('A', 'B', 'C')`),
+    check(
+      "message_templates_timing_type_values",
+      sql`${t.timingType} in ('after_entry', 'day_time', 'before_expiry')`,
+    ),
+    check("message_templates_media_pair", sql`(${t.mediaType} is null) = (${t.mediaFileId} is null)`),
+    check(
+      "message_templates_day_time_range",
+      sql`${t.timingType} <> 'day_time' or ${t.timingValue} between 420 and 1379`,
+    ),
+  ],
+);
+
+export type MessageTemplateRow = typeof messageTemplates.$inferSelect;

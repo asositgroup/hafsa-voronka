@@ -9,6 +9,7 @@ const tabs = [
   { href: "/admin", label: adminUz.nav.stats },
   { href: "/admin/bot", label: adminUz.nav.botTexts },
   { href: "/admin/videos", label: adminUz.nav.videos },
+  { href: "/admin/messages", label: adminUz.nav.messages },
 ];
 
 export function AdminNav() {

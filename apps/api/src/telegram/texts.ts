@@ -1,6 +1,5 @@
-import { Readable } from "node:stream";
 import { eq } from "drizzle-orm";
-import { type Api, InputFile } from "grammy";
+import type { Api } from "grammy";
 import type { ForceReply, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove } from "grammy/types";
 import {
   type BotMediaType,
@@ -12,8 +11,7 @@ import {
 } from "@funnel/shared";
 import { db } from "@/db";
 import { type BotTextRow, botTexts } from "@/db/schema";
-import { env } from "@/env";
-import { openTelegramFile } from "@/telegram/files";
+import { uploadToMediaChat } from "@/telegram/media";
 
 export const defaultBotTexts: Record<BotTextKey, string> = {
   askContact:
@@ -118,32 +116,7 @@ export async function clearBotMedia(key: BotTextKey) {
   await upsert(key, { mediaType: null, mediaFileId: null });
 }
 
-export function botMediaChat() {
-  if (env.MEDIA_CHAT_ID) return { chatId: env.MEDIA_CHAT_ID, threadId: undefined };
-  if (env.LEADS_CHAT_ID) return { chatId: env.LEADS_CHAT_ID, threadId: env.LEADS_THREAD_ID };
-  return null;
-}
-
 export async function uploadBotMedia(api: Api, key: BotTextKey, type: BotMediaType, file: File) {
-  const target = botMediaChat()!;
-  const input = new InputFile(new Uint8Array(await file.arrayBuffer()), file.name || `${key}.${type === "photo" ? "jpg" : "mp4"}`);
-  const options = { message_thread_id: target.threadId, disable_notification: true };
-  let fileId: string;
-  let messageId: number;
-  if (type === "photo") {
-    const message = await api.sendPhoto(target.chatId, input, options);
-    fileId = message.photo[message.photo.length - 1].file_id;
-    messageId = message.message_id;
-  } else {
-    const message = await api.sendVideo(target.chatId, input, { ...options, supports_streaming: true });
-    fileId = message.video.file_id;
-    messageId = message.message_id;
-  }
-  await api.deleteMessage(target.chatId, messageId).catch((error) => console.error("Media upload cleanup failed:", error));
+  const fileId = await uploadToMediaChat(api, type, file);
   await upsert(key, { mediaType: type, mediaFileId: fileId });
-}
-
-export async function downloadBotMedia(api: Api, fileId: string) {
-  const { stream } = await openTelegramFile(api, fileId);
-  return new Response(Readable.toWeb(stream) as ReadableStream<Uint8Array>);
 }

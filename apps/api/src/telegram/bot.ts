@@ -17,6 +17,7 @@ import type { LeadAction } from "@/leads/card";
 import { findMatchingWebLead } from "@/leads/service";
 import { markBlockedByTelegramId } from "@/telegram/blocked";
 import { adminVideoComposer } from "@/telegram/admin-video/handlers";
+import { reminderComposer } from "@/telegram/reminders";
 import { botText, sendBotText } from "@/telegram/texts";
 
 export function watchAppUrl(start?: StartMode) {
@@ -77,6 +78,7 @@ function createBot() {
   const bot = root.chatType("private");
 
   bot.use(adminVideoComposer);
+  bot.use(reminderComposer);
 
   bot.command("start", async (ctx) => {
     if (!ctx.from) return;

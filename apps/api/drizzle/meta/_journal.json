@@ -71,6 +71,13 @@
       "when": 1792390202932,
       "tag": "0009_bot_video_drafts",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792390830120,
+      "tag": "0010_message_templates",
+      "breakpoints": true
     }
   ]
 }

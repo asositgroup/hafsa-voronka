@@ -41,6 +41,16 @@ export const uz = {
       },
     },
   },
+  reminders: {
+    whenQuestion: "Qachon ko'rasiz?",
+    options: { b: "Bugun", e: "Ertaga", k: "Keyinroq" },
+    acks: {
+      b: "Zo'r! Bugun vaqt topib ko'ring, dars sizni kutmoqda 🌿",
+      e: "Yaxshi, ertaga ko'rasiz. Dars sizni kutmoqda 🌿",
+      k: "Mayli, qulay vaqtda ko'rib chiqing. Dars sizni kutmoqda 🌿",
+    },
+    laterAck: "Mayli, qulay vaqtda ko'rib chiqing. Dars sizni kutmoqda 🌿",
+  },
   validation: {
     nameRequired: "Ismingizni kiriting (2-60 ta belgi)",
     phoneRequired: "Telefon raqamingizni to'g'ri kiriting (+998XXXXXXXXX)",

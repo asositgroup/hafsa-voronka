@@ -1,5 +1,8 @@
 import { Hono, type Context } from "hono";
 import {
+  type DriveConfig,
+  type DriveImport,
+  driveImportRequestSchema,
   type UploadStartResponse,
   uploadAbortRequestSchema,
   uploadCompleteRequestSchema,
@@ -9,6 +12,8 @@ import {
   VIDEO_PART_SIZE,
 } from "@funnel/shared";
 import { requireAdminAuth } from "@/admin/auth";
+import { driveConfig, getDriveImport, startDriveImport } from "@/drive/imports";
+import type { VideoImport } from "@/db/schema";
 import { isBrowserUploadKey, newVideoKey, r2 } from "@/storage/r2";
 import {
   activateVideo,
@@ -45,6 +50,25 @@ function failureResponse(c: Context, failure: VideoFailure) {
 function parseId(raw: string) {
   const id = Number(raw);
   return Number.isSafeInteger(id) ? id : null;
+}
+
+const importStatusByCode: Record<string, 400 | 409 | 422 | 502 | 503> = {
+  invalid_link: 400,
+  import_in_progress: 409,
+  drive_unavailable: 502,
+  uploads_not_configured: 503,
+};
+
+function importResponse(item: VideoImport): DriveImport {
+  return {
+    id: item.id,
+    title: item.title,
+    status: item.status,
+    bytesDone: item.bytesDone,
+    totalBytes: item.totalBytes,
+    error: item.error,
+    videoId: item.videoId,
+  };
 }
 
 adminVideoRoutes.get("/", async (c) => c.json(await snapshot()));
@@ -106,6 +130,26 @@ adminVideoRoutes.post("/uploads/abort", async (c) => {
 
   await store.abortMultipart(body.data.key, body.data.uploadId);
   return c.json({ ok: true });
+});
+
+adminVideoRoutes.get("/drive", (c) => c.json(driveConfig() satisfies DriveConfig));
+
+adminVideoRoutes.post("/drive/imports", async (c) => {
+  const body = driveImportRequestSchema.safeParse(await c.req.json().catch(() => null));
+  if (!body.success) return c.json({ error: "invalid_request" }, 400);
+
+  const result = await startDriveImport(body.data);
+  if (!result.ok) return c.json({ error: result.code }, importStatusByCode[result.code] ?? 422);
+  return c.json(importResponse(result.item), 202);
+});
+
+adminVideoRoutes.get("/drive/imports/:id{[0-9]+}", async (c) => {
+  const id = parseId(c.req.param("id"));
+  if (id === null) return c.json({ error: "not_found" }, 404);
+
+  const item = await getDriveImport(id);
+  if (!item) return c.json({ error: "not_found" }, 404);
+  return c.json(importResponse(item));
 });
 
 adminVideoRoutes.patch("/:id{[0-9]+}", async (c) => {

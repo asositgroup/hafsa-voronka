@@ -17,6 +17,8 @@ import {
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import {
+  driveImportErrors,
+  driveImportStatuses,
   eventTypes,
   funnelSegments,
   type FunnelStatus,
@@ -280,6 +282,26 @@ export const botVideoDrafts = pgTable(
 );
 
 export type BotVideoDraft = typeof botVideoDrafts.$inferSelect;
+
+export const videoImports = pgTable(
+  "video_imports",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    driveFileId: text("drive_file_id").notNull(),
+    title: text("title").notNull(),
+    totalBytes: bigint("total_bytes", { mode: "number" }).notNull(),
+    durationSec: integer("duration_sec").notNull(),
+    status: text("status", { enum: driveImportStatuses }).notNull().default("running"),
+    bytesDone: bigint("bytes_done", { mode: "number" }).notNull().default(0),
+    error: text("error", { enum: driveImportErrors }),
+    videoId: bigint("video_id", { mode: "number" }).references(() => videos.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("video_imports_one_running_idx").on(t.status).where(sql`${t.status} = 'running'`)],
+);
+
+export type VideoImport = typeof videoImports.$inferSelect;
 
 export const settings = pgTable("settings", {
   key: text("key").primaryKey(),

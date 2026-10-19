@@ -9,9 +9,13 @@ function getAuthClient() {
   authClient ??= new JWT({
     email: env.GOOGLE_SA_EMAIL,
     key: env.GOOGLE_SA_KEY,
-    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+    scopes: ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive.readonly"],
   });
   return authClient;
+}
+
+export function googleAuthHeaders() {
+  return getAuthClient().getRequestHeaders();
 }
 
 export function formatTashkentDate(date: Date): string {
@@ -34,7 +38,7 @@ export function sheetPhone(phone: string | null | undefined) {
 }
 
 async function sheetsRequest<T>(path: string, init: { method: "GET" | "POST"; body?: unknown }) {
-  const headers = await getAuthClient().getRequestHeaders();
+  const headers = await googleAuthHeaders();
   headers.set("Content-Type", "application/json");
   const sheetId = encodeURIComponent(env.SHEET_ID!);
   const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/${path}`, {

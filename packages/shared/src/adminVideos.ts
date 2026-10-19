@@ -130,3 +130,44 @@ export type UploadCompleteRequest = z.infer<typeof uploadCompleteRequestSchema>;
 export const uploadCompleteResponseSchema = z.object({ fileUrl: z.string() });
 
 export const uploadAbortRequestSchema = z.object({ key: z.string(), uploadId: z.string() });
+
+export const driveImportStatuses = ["running", "done", "failed"] as const;
+export type DriveImportStatus = (typeof driveImportStatuses)[number];
+
+export const driveImportErrors = [
+  "invalid_link",
+  "not_shared",
+  "not_mp4",
+  "too_large",
+  "no_duration",
+  "drive_unavailable",
+  "download_failed",
+  "interrupted",
+] as const;
+export type DriveImportError = (typeof driveImportErrors)[number];
+
+export const driveConfigSchema = z.object({
+  enabled: z.boolean(),
+  serviceAccountEmail: z.string().nullable(),
+});
+
+export type DriveConfig = z.infer<typeof driveConfigSchema>;
+
+export const driveImportRequestSchema = z.object({
+  url: z.string().trim().min(1).max(2048),
+  title: titleSchema.optional(),
+});
+
+export type DriveImportRequest = z.infer<typeof driveImportRequestSchema>;
+
+export const driveImportSchema = z.object({
+  id: z.number().int(),
+  title: z.string(),
+  status: z.enum(driveImportStatuses),
+  bytesDone: z.number(),
+  totalBytes: z.number(),
+  error: z.enum(driveImportErrors).nullable(),
+  videoId: z.number().int().nullable(),
+});
+
+export type DriveImport = z.infer<typeof driveImportSchema>;

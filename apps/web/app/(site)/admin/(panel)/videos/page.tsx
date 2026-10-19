@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import type { AdminVideoItem } from "@funnel/shared";
+import { VideoDriveImportForm } from "@/components/admin/VideoDriveImportForm";
 import { VideoCard } from "@/components/admin/VideoCard";
 import { VideoUploadForm } from "@/components/admin/VideoUploadForm";
 import { Button } from "@/components/admin/ui/Button";
 import { Notice } from "@/components/admin/ui/Notice";
 import { Page, PageHeader } from "@/components/admin/ui/Page";
+import { Segmented } from "@/components/admin/ui/Segmented";
 import { EmptyState, ErrorState, LoadingState } from "@/components/admin/ui/States";
 import { PlusIcon } from "@/components/icons";
 import { fetchVideos } from "@/lib/admin/videos";
@@ -33,6 +35,7 @@ export default function AdminVideosPage() {
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [source, setSource] = useState<"file" | "drive">("file");
 
   useEffect(() => {
     let active = true;
@@ -98,7 +101,26 @@ export default function AdminVideosPage() {
         <>
           {!uploadsEnabled && <Notice tone="info">{copy.uploadsDisabled}</Notice>}
 
-          {uploadsEnabled && uploadOpen && <VideoUploadForm onItems={onUploaded} />}
+          {uploadsEnabled && uploadOpen && (
+            <div className="flex flex-col gap-3">
+              <Segmented
+                role="tablist"
+                label={copy.sources.label}
+                value={source}
+                onChange={setSource}
+                items={[
+                  { value: "file", label: copy.sources.file },
+                  { value: "drive", label: copy.sources.drive },
+                ]}
+              />
+              <div hidden={source !== "file"}>
+                <VideoUploadForm onItems={onUploaded} />
+              </div>
+              <div hidden={source !== "drive"}>
+                <VideoDriveImportForm onItems={onUploaded} />
+              </div>
+            </div>
+          )}
 
           {items.length === 0 && !uploadOpen && (
             <EmptyState

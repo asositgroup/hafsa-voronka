@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { DownloadIcon } from "@/components/icons";
 import { getLeadsCsvUrl } from "@/lib/admin/api";
+import { addDays, formatDate, getTashkentToday } from "@/lib/admin/dates";
 import { adminUz } from "@/lib/i18n/admin";
 
 type FiltersProps = {
@@ -22,27 +23,6 @@ const PRESET_LABELS: Record<Preset, string> = {
   "7d": adminUz.filters.presets.last7Days,
   "30d": adminUz.filters.presets.last30Days,
 };
-
-function getTashkentToday(): string {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Tashkent",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  return formatter.format(new Date());
-}
-
-function addDays(dateStr: string, days: number): string {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  const date = new Date(Date.UTC(y, m - 1, d + days, 12, 0, 0));
-  return date.toISOString().slice(0, 10);
-}
-
-function formatDate(dateStr: string): string {
-  const [y, m, d] = dateStr.split("-");
-  return `${d}.${m}.${y}`;
-}
 
 function activePreset(from: string, to: string): Preset | null {
   const today = getTashkentToday();

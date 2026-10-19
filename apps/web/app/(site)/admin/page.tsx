@@ -11,24 +11,9 @@ import { FunnelChart } from "@/components/admin/FunnelChart";
 import { KpiCards } from "@/components/admin/KpiCards";
 import { AdminNav } from "@/components/admin/AdminNav";
 import { fetchAdminStats } from "@/lib/admin/api";
+import { addDays, getTashkentToday } from "@/lib/admin/dates";
 import { useAdminSession } from "@/lib/admin/useAdminSession";
 import { adminUz } from "@/lib/i18n/admin";
-
-function getTashkentToday(): string {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Tashkent",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  return formatter.format(new Date());
-}
-
-function addDays(dateStr: string, days: number): string {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  const date = new Date(Date.UTC(y, m - 1, d + days, 12, 0, 0));
-  return date.toISOString().slice(0, 10);
-}
 
 function AdminDashboardContent() {
   const router = useRouter();

@@ -41,16 +41,13 @@ export async function recordProgress(
     return { ok: false, error: "not_registered" };
   }
 
-  let watchConfig = config;
-  if (!watchConfig) {
-    const video = await videoForUser(user);
-    if (!video) {
-      return { ok: false, error: "no_video" };
-    }
-    watchConfig = { duration: video.duration, threshold: env.COMPLETE_THRESHOLD };
+  const video = await videoForUser(user);
+  if (!video && !config) {
+    return { ok: false, error: "no_video" };
   }
+  const watchConfig: WatchConfig = config ?? { duration: video!.duration, threshold: env.COMPLETE_THRESHOLD };
 
-  const { result } = await db().transaction(async (tx) => {
+  const { result, previousMax } = await db().transaction(async (tx) => {
     await tx
       .insert(watchProgress)
       .values({
@@ -92,7 +89,7 @@ export async function recordProgress(
         .where(eq(watchProgress.userId, user.id));
     }
 
-    return { result: res };
+    return { result: res, previousMax: locked.maxPosition };
   });
 
   if (!result.ignored) {
@@ -103,6 +100,15 @@ export async function recordProgress(
     await logEvent(`progress_${milestone}` as EventType, {
       userId: user.id,
       visitorId: user.visitorId,
+    });
+  }
+
+  const priceSec = video?.priceSec ?? null;
+  if (!result.ignored && priceSec !== null && previousMax < priceSec && result.state.maxPosition >= priceSec) {
+    await logEvent("price_reached", {
+      userId: user.id,
+      visitorId: user.visitorId,
+      meta: { videoId: video!.id, priceSec },
     });
   }
 

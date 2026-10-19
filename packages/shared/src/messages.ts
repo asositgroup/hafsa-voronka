@@ -202,6 +202,11 @@ export function visibleLength(html: string): number {
   return withVariables.length;
 }
 
+export function plainTextPreview(html: string, max = 60): string {
+  const text = decodeEntities(html.replace(/<[^>]*>/g, "")).replace(/\s+/g, " ").trim();
+  return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+}
+
 export function templateTextLimit(hasMedia: boolean): number {
   return hasMedia ? TEMPLATE_TEXT_LIMITS.caption : TEMPLATE_TEXT_LIMITS.message;
 }

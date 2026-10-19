@@ -20,7 +20,7 @@ Client sections 1–6 are treated as done, but these parts of them are not in th
 | «Menga sinab yuborish» | `ADMIN_TELEGRAM_IDS` env (shared with §8.2); the panel offers a dropdown of admins to send the test to |
 | Button click tracking | URL buttons go through `/r/:sentMessageId` (logs the click, then redirects); callback and web_app buttons are logged directly |
 | "After the message" window in reports | Until the next message in the chain is sent, at most 48h |
-| Excel | `.xlsx` via exceljs |
+| Excel | `.xlsx` via `write-excel-file` (one small dependency, `fflate`; exceljs is 20+ MB with an aging tree) |
 
 ## Scope
 

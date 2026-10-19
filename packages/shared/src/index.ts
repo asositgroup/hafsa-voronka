@@ -15,6 +15,7 @@ export const eventTypes = [
   "reminder_when_answer",
   "reminder_later",
   "message_click",
+  "price_reached",
 ] as const;
 
 export type EventType = (typeof eventTypes)[number];
@@ -37,3 +38,4 @@ export * from "./funnel";
 export * from "./time";
 export * from "./adminVideos";
 export * from "./messages";
+export * from "./reports";

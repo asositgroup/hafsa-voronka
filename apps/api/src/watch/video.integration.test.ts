@@ -150,6 +150,50 @@ describe.skipIf(!testDbUrl)("Video Integration Tests", () => {
     expect(completeEvents.length).toBe(1);
   });
 
+  async function priceReachedEvents(userId: number) {
+    return db()
+      .select()
+      .from(events)
+      .where(and(eq(events.userId, userId), eq(events.type, "price_reached")));
+  }
+
+  async function walkTo(telegramId: number, positions: number[]) {
+    const start = new Date(1700000000000);
+    await recordProgress(telegramId, { position: 0, event: "play" }, start);
+    for (const position of positions) {
+      await recordProgress(telegramId, { position, event: "tick" }, new Date(start.getTime() + position * 1000));
+    }
+  }
+
+  it("logs price_reached exactly once when the position first crosses the price mark", async () => {
+    const telegramId = Math.floor(Math.random() * 1000000) + 2000000;
+    const video = await createTestVideo({ duration: 100, courseStartSec: 20, priceSec: 50 });
+    const [user] = await db()
+      .insert(users)
+      .values({ telegramId, firstName: "Price", registeredAt: new Date(), videoId: video.id })
+      .returning();
+
+    await walkTo(telegramId, [10, 20, 30, 40]);
+    expect(await priceReachedEvents(user.id)).toHaveLength(0);
+
+    await walkTo(telegramId, [50, 60]);
+    const logged = await priceReachedEvents(user.id);
+    expect(logged).toHaveLength(1);
+    expect(logged[0].meta).toMatchObject({ videoId: video.id, priceSec: 50 });
+  });
+
+  it("does not log price_reached for a video without a price mark", async () => {
+    const telegramId = Math.floor(Math.random() * 1000000) + 3000000;
+    const video = await createTestVideo({ duration: 100 });
+    const [user] = await db()
+      .insert(users)
+      .values({ telegramId, firstName: "NoPrice", registeredAt: new Date(), videoId: video.id })
+      .returning();
+
+    await walkTo(telegramId, [10, 20, 30, 40, 50, 60]);
+    expect(await priceReachedEvents(user.id)).toHaveLength(0);
+  });
+
   it("sets completed_at exactly once even with subsequent beats", async () => {
     const telegramId = Math.floor(Math.random() * 1000000) + 200000;
     const user = await createRegisteredUser(telegramId);

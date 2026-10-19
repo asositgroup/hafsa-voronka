@@ -28,6 +28,7 @@ import { consumeRateLimit } from "@/http/rateLimit";
 import { adminBotTextRoutes } from "@/routes/adminBotTexts";
 import { adminVideoRoutes } from "@/routes/adminVideos";
 import { adminMessageRoutes } from "@/routes/adminMessages";
+import { adminReportRoutes } from "@/routes/adminReports";
 
 export const adminRoutes = new Hono();
 
@@ -36,6 +37,7 @@ adminRoutes.use("*", requireAdminConfig);
 adminRoutes.route("/bot-texts", adminBotTextRoutes);
 adminRoutes.route("/videos", adminVideoRoutes);
 adminRoutes.route("/messages", adminMessageRoutes);
+adminRoutes.route("/reports", adminReportRoutes);
 
 adminRoutes.post("/login", async (c) => {
   const ip = clientIp(c);

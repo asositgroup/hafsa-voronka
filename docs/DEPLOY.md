@@ -324,6 +324,30 @@ Verify webhook status:
 curl https://api.telegram.org/bot<PRODUCTION_BOT_TOKEN>/getWebhookInfo
 ```
 
+### Local Bot API Server (Admin Video Uploads from Telegram)
+
+Admins in `ADMIN_TELEGRAM_IDS` can send a video to the bot and replace the lesson video. Files larger than 20 MB need the self-hosted `aiogram/telegram-bot-api` container (`telegram-bot-api` service in `deploy/docker-compose.prod.yml`, pinned to `10.3`, run with `TELEGRAM_LOCAL=1`). The `api` and `telegram-bot-api` services share the `tgbotapi` volume at `/var/lib/telegram-bot-api`; the API reads downloaded files straight from disk and deletes them after the R2 upload.
+
+On Coolify the separate-resource setup cannot easily share a volume: deploy `api` and `telegram-bot-api` together as one Docker Compose resource using this compose file.
+
+Cutover:
+
+1. Get `api_id` and `api_hash` from https://my.telegram.org and set `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `BOT_API_ROOT=http://telegram-bot-api:8081`, `BOT_WEBHOOK_URL=http://api:3001/bot` and `ADMIN_TELEGRAM_IDS` in `.env.prod`.
+2. Deploy with the new service.
+3. Log the bot out of the cloud API once (the cloud API refuses the bot for about 10 minutes afterwards, so do this at low traffic):
+   ```bash
+   curl https://api.telegram.org/bot<TOKEN>/logOut
+   ```
+4. Register the webhook through the local server. `scripts/set-webhook.ts` is not part of the production image, so run it with tsx from a one-off container or from the repo:
+   ```bash
+   BOT_API_ROOT="http://telegram-bot-api:8081" \
+   BOT_WEBHOOK_URL="http://api:3001/bot" \
+   BOT_TOKEN="<TOKEN>" WEBHOOK_SECRET="<SECRET>" API_URL="https://api.yourdomain.uz" WEB_URL="https://yourdomain.uz" \
+   pnpm --filter @funnel/api set-webhook
+   ```
+   Verify with `getWebhookInfo` against `http://telegram-bot-api:8081/bot<TOKEN>/getWebhookInfo`.
+5. Rollback: call `close` on the local server, wait 10 minutes, then run set-webhook against the cloud API with `BOT_API_ROOT` unset.
+
 ---
 
 ## 7. Google Sheets Lead Synchronization
@@ -557,6 +581,10 @@ Comprehensive reference for all environment variables used by the API and Web ap
 | `ADMIN_PASSWORD_HASH` | API (`apps/api`) | Optional | `$2a$10$...` | Hash generated via `pnpm --filter @funnel/api hash-password` |
 | `SESSION_SECRET` | API (`apps/api`) | Optional | `openssl rand -base64 48` string | Secret key for signing admin session cookies (min 32 chars) |
 | `MEDIA_CHAT_ID` | API (`apps/api`) | Optional | `-1001234567890` | Chat where the bot uploads photos and videos for editable bot messages. Defaults to `LEADS_CHAT_ID` (and its `LEADS_THREAD_ID` topic); the upload message is deleted right after Telegram returns the file ID |
+| `ADMIN_TELEGRAM_IDS` | API (`apps/api`) | Optional | `123456789,987654321` | Comma-separated Telegram user ids allowed to upload and activate videos from the bot |
+| `BOT_API_ROOT` | API (`apps/api`) | Optional | `http://telegram-bot-api:8081` | Self-hosted Bot API server. When unset the bot uses the cloud API and only files up to 20 MB work |
+| `BOT_WEBHOOK_URL` | set-webhook script | Optional | `http://api:3001/bot` | Webhook URL registered on the local Bot API server (only used when `BOT_API_ROOT` is set); defaults to `API_URL/bot` |
+| `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` | `telegram-bot-api` container | Required for the local Bot API server | `<from my.telegram.org>` | Read only by the Bot API container, not by the API |
 | `R2_ACCOUNT_ID` | API (`apps/api`) | Optional, all five `R2_*` variables together | `0123456789abcdef0123456789abcdef` | Cloudflare account ID used for the R2 S3 endpoint |
 | `R2_BUCKET` | API (`apps/api`) | Optional, all five `R2_*` variables together | `funnel-video` | R2 bucket that stores uploaded videos |
 | `R2_ACCESS_KEY_ID` | API (`apps/api`) | Optional, all five `R2_*` variables together | `<access key id>` | R2 API token (Object Read & Write on the bucket) key ID |

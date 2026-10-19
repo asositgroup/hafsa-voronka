@@ -16,6 +16,7 @@ import { applyLeadAction } from "@/leads/actions";
 import type { LeadAction } from "@/leads/card";
 import { findMatchingWebLead } from "@/leads/service";
 import { markBlockedByTelegramId } from "@/telegram/blocked";
+import { adminVideoComposer } from "@/telegram/admin-video/handlers";
 import { botText, sendBotText } from "@/telegram/texts";
 
 export function watchAppUrl(start?: StartMode) {
@@ -50,7 +51,7 @@ function isLeadsChat(chat: { id: number; username?: string } | undefined) {
 }
 
 function createBot() {
-  const root = new Bot(env.BOT_TOKEN);
+  const root = new Bot(env.BOT_TOKEN, { client: { apiRoot: env.BOT_API_ROOT } });
 
   root.chatType(["group", "supergroup"]).command("chatid", async (ctx) => {
     const thread = ctx.msg.is_topic_message ? `\nLEADS_THREAD_ID=${ctx.msg.message_thread_id}` : "";
@@ -74,6 +75,8 @@ function createBot() {
   });
 
   const bot = root.chatType("private");
+
+  bot.use(adminVideoComposer);
 
   bot.command("start", async (ctx) => {
     if (!ctx.from) return;

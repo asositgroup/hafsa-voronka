@@ -1,3 +1,4 @@
+import { Readable } from "node:stream";
 import { eq } from "drizzle-orm";
 import { type Api, InputFile } from "grammy";
 import type { ForceReply, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove } from "grammy/types";
@@ -12,6 +13,7 @@ import {
 import { db } from "@/db";
 import { type BotTextRow, botTexts } from "@/db/schema";
 import { env } from "@/env";
+import { openTelegramFile } from "@/telegram/files";
 
 export const defaultBotTexts: Record<BotTextKey, string> = {
   askContact:
@@ -142,7 +144,6 @@ export async function uploadBotMedia(api: Api, key: BotTextKey, type: BotMediaTy
 }
 
 export async function downloadBotMedia(api: Api, fileId: string) {
-  const file = await api.getFile(fileId);
-  if (!file.file_path) return null;
-  return fetch(`https://api.telegram.org/file/bot${env.BOT_TOKEN}/${file.file_path}`);
+  const { stream } = await openTelegramFile(api, fileId);
+  return new Response(Readable.toWeb(stream) as ReadableStream<Uint8Array>);
 }

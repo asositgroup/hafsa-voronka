@@ -18,10 +18,14 @@ describe("parseMmSs", () => {
     expect(parseMmSs("9:05")).toBe(545);
     expect(parseMmSs(" 75:03 ")).toBe(4503);
     expect(parseMmSs("1:02:03")).toBe(3723);
+    expect(parseMmSs("0:00")).toBe(0);
+    expect(parseMmSs("75:30")).toBe(4530);
   });
 
   it("rejects malformed input", () => {
     expect(parseMmSs("5:60")).toBeNull();
+    expect(parseMmSs("1:60")).toBeNull();
+    expect(parseMmSs("-1:00")).toBeNull();
     expect(parseMmSs("abc")).toBeNull();
     expect(parseMmSs("")).toBeNull();
     expect(parseMmSs("12")).toBeNull();

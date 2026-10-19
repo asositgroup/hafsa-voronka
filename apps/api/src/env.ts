@@ -47,6 +47,25 @@ const schema = z
       .url()
       .transform((value) => value.replace(/\/+$/, ""))
       .optional(),
+    ADMIN_TELEGRAM_IDS: z
+      .string()
+      .default("")
+      .transform(
+        (value) =>
+          new Set(
+            value
+              .split(",")
+              .map((part) => part.trim())
+              .filter(Boolean)
+              .map(Number),
+          ),
+      )
+      .refine((ids) => [...ids].every(Number.isSafeInteger), "ADMIN_TELEGRAM_IDS must be comma-separated numeric ids"),
+    BOT_API_ROOT: z
+      .url()
+      .transform((value) => value.replace(/\/+$/, ""))
+      .optional(),
+    BOT_WEBHOOK_URL: z.url().optional(),
     ADMIN_PASSWORD_HASH: z.string().optional(),
     SESSION_SECRET: z.string().min(32).optional(),
   })

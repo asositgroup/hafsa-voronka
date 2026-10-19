@@ -64,6 +64,13 @@
       "when": 1792389863743,
       "tag": "0008_video_marks_order",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792390202932,
+      "tag": "0009_bot_video_drafts",
+      "breakpoints": true
     }
   ]
 }

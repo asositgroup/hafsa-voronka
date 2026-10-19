@@ -15,6 +15,12 @@ import {
 import { sql } from "drizzle-orm";
 import { eventTypes, funnelSegments, segmentEndReasons, type Utm } from "@funnel/shared";
 
+export const botVideoSteps = ["confirm", "duration", "course", "price", "summary", "done", "cancelled"] as const;
+export type BotVideoStep = (typeof botVideoSteps)[number];
+
+export const botVideoUploadStatuses = ["idle", "pending", "uploading", "done", "failed"] as const;
+export type BotVideoUploadStatus = (typeof botVideoUploadStatuses)[number];
+
 export const videos = pgTable(
   "videos",
   {
@@ -194,6 +200,41 @@ export const botTexts = pgTable("bot_texts", {
 });
 
 export type BotTextRow = typeof botTexts.$inferSelect;
+
+export const botVideoDrafts = pgTable(
+  "bot_video_drafts",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    adminTelegramId: bigint("admin_telegram_id", { mode: "number" }).notNull(),
+    fileId: text("file_id").notNull(),
+    fileUniqueId: text("file_unique_id").notNull().unique(),
+    fileName: text("file_name"),
+    mimeType: text("mime_type"),
+    fileSize: bigint("file_size", { mode: "number" }),
+    caption: text("caption"),
+    duration: integer("duration"),
+    step: text("step", { enum: botVideoSteps }).notNull().default("confirm"),
+    courseStartSec: integer("course_start_sec"),
+    priceSec: integer("price_sec"),
+    uploadStatus: text("upload_status", { enum: botVideoUploadStatuses }).notNull().default("idle"),
+    uploadClaimedAt: timestamp("upload_claimed_at", { withTimezone: true }),
+    progressMessageId: bigint("progress_message_id", { mode: "number" }),
+    r2Key: text("r2_key"),
+    fileUrl: text("file_url"),
+    uploadError: text("upload_error"),
+    activateOnUpload: boolean("activate_on_upload").default(false).notNull(),
+    videoId: bigint("video_id", { mode: "number" }).references(() => videos.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("bot_video_drafts_one_open_idx")
+      .on(t.adminTelegramId)
+      .where(sql`${t.step} not in ('done', 'cancelled')`),
+  ],
+);
+
+export type BotVideoDraft = typeof botVideoDrafts.$inferSelect;
 
 export const settings = pgTable("settings", {
   key: text("key").primaryKey(),

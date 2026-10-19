@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { watchProgress } from "@/db/schema";
 import { env } from "@/env";
 import { logEvent, upsertUser } from "@/funnel/users";
+import { videoForUser } from "@/videos/service";
 import { remainingWatchSecs } from "@/watch/credit";
 
 async function readJson(request: { json: () => Promise<unknown> }) {
@@ -21,6 +22,10 @@ export const miniappRoutes = new Hono<AppEnv>();
 miniappRoutes.post("/session", async (c) => {
   const { reason } = sessionRequestSchema.catch({ reason: "open" }).parse(await readJson(c.req));
   const { user } = await upsertUser(c.get("telegramUser"), c.get("startParam"));
+  const video = await videoForUser(user);
+  if (!video) {
+    return c.json({ error: "no_video" }, 503);
+  }
 
   if (reason === "open") {
     await logEvent("app_open", { userId: user.id, visitorId: user.visitorId });
@@ -43,13 +48,13 @@ miniappRoutes.post("/session", async (c) => {
       remainingSecs: remainingWatchSecs(
         progress?.watchedSecs ?? 0,
         user.completedAt !== null || Boolean(progress?.completed),
-        { duration: env.VIDEO_DURATION_SEC, threshold: env.COMPLETE_THRESHOLD },
+        { duration: video.duration, threshold: env.COMPLETE_THRESHOLD },
       ),
     },
     config: {
-      videoUrl: env.VIDEO_URL,
+      videoUrl: video.fileUrl,
       poster: env.VIDEO_POSTER_URL,
-      duration: env.VIDEO_DURATION_SEC,
+      duration: video.duration,
       seekLock: env.SEEK_LOCK,
       gateProceed: env.GATE_PROCEED,
       channelUrl: env.CHANNEL_URL,

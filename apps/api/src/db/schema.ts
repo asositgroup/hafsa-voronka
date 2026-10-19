@@ -2,6 +2,7 @@ import {
   bigint,
   bigserial,
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -9,8 +10,36 @@ import {
   real,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { eventTypes, type Utm } from "@funnel/shared";
+
+export const videos = pgTable(
+  "videos",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    title: text("title").notNull(),
+    fileUrl: text("file_url").notNull(),
+    duration: integer("duration").notNull(),
+    introEndSec: integer("intro_end_sec"),
+    courseStartSec: integer("course_start_sec"),
+    priceSec: integer("price_sec"),
+    shortOfferVideoUrl: text("short_offer_video_url"),
+    isActive: boolean("is_active").default(false).notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("videos_one_active_idx").on(t.isActive).where(sql`${t.isActive}`),
+    check(
+      "videos_marks_order",
+      sql`${t.duration} > 0 AND (${t.courseStartSec} IS NULL OR ${t.priceSec} IS NULL OR ${t.courseStartSec} < ${t.priceSec}) AND (${t.priceSec} IS NULL OR ${t.priceSec} < ${t.duration})`,
+    ),
+  ],
+);
+
+export type Video = typeof videos.$inferSelect;
 
 export const users = pgTable(
   "users",
@@ -33,9 +62,13 @@ export const users = pgTable(
   completedAt: timestamp("completed_at", { withTimezone: true }),
   channelClickAt: timestamp("channel_click_at", { withTimezone: true }),
   botBlocked: boolean("bot_blocked").default(false).notNull(),
+  videoId: bigint("video_id", { mode: "number" }).references(() => videos.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (t) => [index("users_registered_at_idx").on(t.registeredAt)],
+  (t) => [
+    index("users_registered_at_idx").on(t.registeredAt),
+    index("users_video_id_idx").on(t.videoId),
+  ],
 );
 
 export const events = pgTable(

@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import type { EventType } from "@funnel/shared";
 import { events, users } from "@/db/schema";
@@ -48,6 +48,7 @@ export async function upsertUser(
       utmCampaign: attribution.utm_campaign ?? null,
       utmContent: attribution.utm_content ?? null,
       fbclid: attribution.fbclid ?? null,
+      videoId: sql`(select id from videos where is_active)`,
     })
     .onConflictDoUpdate({ target: users.telegramId, set: profileFields })
     .returning();

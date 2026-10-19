@@ -1,7 +1,7 @@
 import { and, asc, eq, gt, lt, sql } from "drizzle-orm";
 import { GrammyError, type InlineKeyboard } from "grammy";
 import { db, rawClient } from "@/db";
-import { type Lead, leads, users, watchProgress } from "@/db/schema";
+import { type Lead, leads, users, videos, watchProgress } from "@/db/schema";
 import { env } from "@/env";
 import { bot } from "@/telegram/bot";
 import {
@@ -108,10 +108,16 @@ export async function syncLeadCard(lead: Lead, user: CardUser | null, sender: Le
 
 async function flushPending(sender: LeadSender) {
   const pending = await db()
-    .select({ lead: leads, user: users, maxPosition: watchProgress.maxPosition })
+    .select({
+      lead: leads,
+      user: users,
+      maxPosition: watchProgress.maxPosition,
+      duration: videos.duration,
+    })
     .from(leads)
     .leftJoin(users, eq(users.id, leads.userId))
     .leftJoin(watchProgress, eq(watchProgress.userId, leads.userId))
+    .leftJoin(videos, eq(videos.id, users.videoId))
     .where(
       and(
         gt(leads.notifyVersion, leads.notifiedVersion),
@@ -122,11 +128,11 @@ async function flushPending(sender: LeadSender) {
     .orderBy(asc(leads.id))
     .limit(BATCH_SIZE);
 
-  for (const { lead, user, maxPosition } of pending) {
+  for (const { lead, user, maxPosition, duration } of pending) {
     try {
       const cardUser = user && {
         ...user,
-        watchedPercent: watchedPercent(maxPosition ?? 0, env.VIDEO_DURATION_SEC),
+        watchedPercent: watchedPercent(maxPosition ?? 0, duration ?? 0),
       };
       await syncLeadCard(lead, cardUser, sender);
       await db()

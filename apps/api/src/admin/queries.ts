@@ -9,7 +9,7 @@ import type {
   LeadItem,
 } from "@funnel/shared";
 import { db } from "@/db";
-import { env } from "@/env";
+import { watchedPercent } from "@/leads/card";
 import { formatTashkentDate, listDaysInRange } from "./dates";
 
 const FUNNEL_STEP_NAMES: Record<string, string> = {
@@ -216,7 +216,6 @@ export async function getCampaignStats(filters: QueryFilters): Promise<CampaignS
 }
 
 export async function getWatchDropoff(filters: QueryFilters): Promise<DropoffStat[]> {
-  const duration = env.VIDEO_DURATION_SEC;
   const [row] = await db().execute<{
     total_registered: string | number;
     p10: string | number;
@@ -232,18 +231,19 @@ export async function getWatchDropoff(filters: QueryFilters): Promise<DropoffSta
   }>(sql`
     SELECT
       count(u.id) AS total_registered,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.1 * ${duration} THEN 1 END) AS p10,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.2 * ${duration} THEN 1 END) AS p20,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.3 * ${duration} THEN 1 END) AS p30,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.4 * ${duration} THEN 1 END) AS p40,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.5 * ${duration} THEN 1 END) AS p50,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.6 * ${duration} THEN 1 END) AS p60,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.7 * ${duration} THEN 1 END) AS p70,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.8 * ${duration} THEN 1 END) AS p80,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.9 * ${duration} THEN 1 END) AS p90,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 1.0 * ${duration} THEN 1 END) AS p100
+      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.1 * v.duration THEN 1 END) AS p10,
+      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.2 * v.duration THEN 1 END) AS p20,
+      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.3 * v.duration THEN 1 END) AS p30,
+      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.4 * v.duration THEN 1 END) AS p40,
+      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.5 * v.duration THEN 1 END) AS p50,
+      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.6 * v.duration THEN 1 END) AS p60,
+      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.7 * v.duration THEN 1 END) AS p70,
+      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.8 * v.duration THEN 1 END) AS p80,
+      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.9 * v.duration THEN 1 END) AS p90,
+      count(CASE WHEN coalesce(wp.max_position, 0) >= 1.0 * v.duration THEN 1 END) AS p100
     FROM users u
     LEFT JOIN watch_progress wp ON wp.user_id = u.id
+    LEFT JOIN videos v ON v.id = u.video_id
     WHERE
       u.registered_at IS NOT NULL
       AND (u.registered_at AT TIME ZONE 'Asia/Tashkent')::date >= ${filters.from}::date
@@ -308,7 +308,6 @@ export async function getLeads(
   page = 1,
   pageSize = 50,
 ): Promise<AdminLeadsResponse> {
-  const duration = env.VIDEO_DURATION_SEC;
   const offset = (page - 1) * pageSize;
 
   const [countRow] = await db().execute<{ total: string | number }>(sql`
@@ -332,6 +331,7 @@ export async function getLeads(
     source: string | null;
     campaign: string | null;
     max_position: string | number;
+    duration: number | null;
     completed: boolean;
     channel_clicked: boolean;
   }>(sql`
@@ -344,10 +344,12 @@ export async function getLeads(
       u.utm_source AS source,
       u.utm_campaign AS campaign,
       coalesce(wp.max_position, 0) AS max_position,
+      v.duration AS duration,
       coalesce(u.completed_at IS NOT NULL OR wp.completed IS TRUE, false) AS completed,
       (u.channel_click_at IS NOT NULL) AS channel_clicked
     FROM users u
     LEFT JOIN watch_progress wp ON wp.user_id = u.id
+    LEFT JOIN videos v ON v.id = u.video_id
     WHERE
       u.registered_at IS NOT NULL
       AND (u.registered_at AT TIME ZONE 'Asia/Tashkent')::date >= ${filters.from}::date
@@ -360,7 +362,7 @@ export async function getLeads(
 
   const leads: LeadItem[] = rows.map((r) => {
     const maxPos = Number(r.max_position) || 0;
-    const progressPercent = duration > 0 ? Math.min(100, Math.round((maxPos / duration) * 100)) : 0;
+    const progressPercent = watchedPercent(maxPos, r.duration ?? 0);
     return {
       id: Number(r.id),
       registeredAt: r.registered_at,
@@ -394,7 +396,6 @@ function escapeCsvCell(val: unknown): string {
 }
 
 export async function getLeadsCsv(filters: QueryFilters): Promise<string> {
-  const duration = env.VIDEO_DURATION_SEC;
   const rows = await db().execute<{
     id: number;
     registered_at: string;
@@ -404,6 +405,7 @@ export async function getLeadsCsv(filters: QueryFilters): Promise<string> {
     source: string | null;
     campaign: string | null;
     max_position: string | number;
+    duration: number | null;
     completed: boolean;
     channel_clicked: boolean;
   }>(sql`
@@ -416,10 +418,12 @@ export async function getLeadsCsv(filters: QueryFilters): Promise<string> {
       u.utm_source AS source,
       u.utm_campaign AS campaign,
       coalesce(wp.max_position, 0) AS max_position,
+      v.duration AS duration,
       coalesce(u.completed_at IS NOT NULL OR wp.completed IS TRUE, false) AS completed,
       (u.channel_click_at IS NOT NULL) AS channel_clicked
     FROM users u
     LEFT JOIN watch_progress wp ON wp.user_id = u.id
+    LEFT JOIN videos v ON v.id = u.video_id
     WHERE
       u.registered_at IS NOT NULL
       AND (u.registered_at AT TIME ZONE 'Asia/Tashkent')::date >= ${filters.from}::date
@@ -445,7 +449,7 @@ export async function getLeadsCsv(filters: QueryFilters): Promise<string> {
 
   for (const r of rows) {
     const maxPos = Number(r.max_position) || 0;
-    const progressPercent = duration > 0 ? Math.min(100, Math.round((maxPos / duration) * 100)) : 0;
+    const progressPercent = watchedPercent(maxPos, r.duration ?? 0);
     const line = [
       formatTashkentDate(r.registered_at),
       r.name ?? "",

@@ -8,6 +8,7 @@ import { env } from "@/env";
 import { findByTelegramId, logEvent } from "@/funnel/users";
 import { refreshUserLeadCards } from "@/leads/service";
 import { bot } from "@/telegram/bot";
+import { videoForUser } from "@/videos/service";
 import { botText, sendBotText } from "@/telegram/texts";
 import {
   applyBeat,
@@ -19,7 +20,7 @@ import {
 
 export type ProgressResult =
   | { ok: true; completed: boolean; maxPosition: number; remainingSecs: number }
-  | { ok: false; error: "not_registered" };
+  | { ok: false; error: "not_registered" | "no_video" };
 
 export type EventResult =
   | { ok: true }
@@ -37,10 +38,14 @@ export async function recordProgress(
     return { ok: false, error: "not_registered" };
   }
 
-  const watchConfig = config ?? {
-    duration: env.VIDEO_DURATION_SEC,
-    threshold: env.COMPLETE_THRESHOLD,
-  };
+  let watchConfig = config;
+  if (!watchConfig) {
+    const video = await videoForUser(user);
+    if (!video) {
+      return { ok: false, error: "no_video" };
+    }
+    watchConfig = { duration: video.duration, threshold: env.COMPLETE_THRESHOLD };
+  }
 
   const { result } = await db().transaction(async (tx) => {
     await tx

@@ -531,9 +531,9 @@ Comprehensive reference for all environment variables used by the API and Web ap
 | `WEB_URL` | API (`apps/api`) | Required | `https://yourdomain.uz` | Public HTTPS base URL of the Web app |
 | `DATABASE_URL` | API (`apps/api`) | Required | `postgres://funnel:pwd@postgresql:5432/funnel` | PostgreSQL 17 connection string |
 | `CHANNEL_URL` | API (`apps/api`) | Required | `https://t.me/yourchannel` | Destination Telegram channel URL after completion |
-| `VIDEO_URL` | API (`apps/api`) | Required | `https://video.yourdomain.uz/lesson-1/master.mp4` | URL to master video file (MP4 or HLS master.m3u8) |
+| `VIDEO_URL` | API (`apps/api`) | Optional, first-deploy seed only: creates the initial active video when the videos table is empty | `https://video.yourdomain.uz/lesson-1/master.mp4` | URL to master video file (MP4 or HLS master.m3u8) |
 | `VIDEO_POSTER_URL` | API (`apps/api`) | Required | `https://video.yourdomain.uz/lesson-1/poster.webp` | URL to video poster image |
-| `VIDEO_DURATION_SEC` | API (`apps/api`) | Required | `900` | Duration of the video in whole seconds |
+| `VIDEO_DURATION_SEC` | API (`apps/api`) | Optional, first-deploy seed only: creates the initial active video when the videos table is empty | `900` | Duration of the video in whole seconds |
 | `SEEK_LOCK` | API (`apps/api`) | Optional | `true` (default: `true`) | Lock player forward seeking |
 | `GATE_PROCEED` | API (`apps/api`) | Optional | `true` (default: `true`) | Lock Proceed button until completion threshold reached |
 | `COMPLETE_THRESHOLD` | API (`apps/api`) | Optional | `0.7` (default: `0.7`) | Share of the video that must really be watched to unlock the channel button (0.5 to 1.0); playback up to 2× counts |

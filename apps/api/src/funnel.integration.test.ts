@@ -5,12 +5,14 @@ import { closeDb, db } from "./db";
 import { events, users } from "./db/schema";
 import { runMigrations } from "./db/migrate";
 import { signInitData } from "./telegram/initData";
+import { ensureActiveTestVideo } from "./test/videos";
 
 const testDbUrl = process.env.TEST_DATABASE_URL;
 const BOT_TOKEN = "123456:TEST-token";
 
 describe.skipIf(!testDbUrl)("Funnel Integration Tests", () => {
   let createApp: typeof import("./app").createApp;
+  let activeVideo: Awaited<ReturnType<typeof ensureActiveTestVideo>>;
 
   beforeAll(async () => {
     Object.assign(process.env, {
@@ -21,12 +23,11 @@ describe.skipIf(!testDbUrl)("Funnel Integration Tests", () => {
       WEB_URL: "https://example.com",
       DATABASE_URL: testDbUrl,
       CHANNEL_URL: "https://t.me/example",
-      VIDEO_URL: "https://video.example.com/master.mp4",
       VIDEO_POSTER_URL: "https://video.example.com/poster.webp",
-      VIDEO_DURATION_SEC: "900",
     });
 
     await runMigrations(testDbUrl!);
+    activeVideo = await ensureActiveTestVideo();
     const appModule = await import("./app");
     createApp = appModule.createApp;
   });
@@ -76,6 +77,7 @@ describe.skipIf(!testDbUrl)("Funnel Integration Tests", () => {
     expect(sessionJson.registered).toBe(false);
     expect(sessionJson.phoneSet).toBe(false);
     expect(sessionJson.config.duration).toBe(900);
+    expect(sessionJson.config.videoUrl).toBe(activeVideo.fileUrl);
 
     const [createdUser] = await db()
       .select()
@@ -85,6 +87,7 @@ describe.skipIf(!testDbUrl)("Funnel Integration Tests", () => {
 
     expect(createdUser).toBeDefined();
     expect(createdUser.visitorId).toBe(visitorId);
+    expect(createdUser.videoId).toBe(activeVideo.id);
     expect(createdUser.utmSource).toBe("fb_ad");
     expect(createdUser.utmCampaign).toBe("promo_2026");
     expect(createdUser.utmContent).toBe("banner_1");

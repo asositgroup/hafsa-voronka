@@ -24,6 +24,7 @@ function makeUser(overrides: Partial<User> = {}): User {
     completedAt: null,
     channelClickAt: null,
     botBlocked: false,
+    videoId: null,
     createdAt: new Date("2026-03-01T09:00:00Z"),
     ...overrides,
   };

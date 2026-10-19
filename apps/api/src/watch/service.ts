@@ -5,6 +5,7 @@ import { type CapiClient, sendCapiEvent } from "@/capi";
 import { db } from "@/db";
 import { users, watchProgress } from "@/db/schema";
 import { env } from "@/env";
+import { recordChannelClick } from "@/funnel/channel";
 import { syncSegment } from "@/funnel/segments";
 import { findByTelegramId, logEvent } from "@/funnel/users";
 import { refreshUserLeadCards } from "@/leads/service";
@@ -172,15 +173,7 @@ export async function recordVideoEvent(
       visitorId: user.visitorId,
     });
   } else if (type === "channel_click") {
-    await logEvent("channel_click", {
-      userId: user.id,
-      visitorId: user.visitorId,
-    });
-    await db()
-      .update(users)
-      .set({ channelClickAt: now })
-      .where(and(eq(users.id, user.id), isNull(users.channelClickAt)));
-    await syncSegment(user.id, now).catch((error) => console.error("Segment sync failed:", error));
+    await recordChannelClick(user, now);
   }
 
   return { ok: true };

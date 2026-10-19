@@ -4,6 +4,7 @@ import { startModes } from "./funnel";
 export const sessionRequestSchema = z.object({
   reason: z.enum(["open", "poll"]).default("open"),
   start: z.enum(startModes).optional().catch(undefined),
+  sentMessageId: z.number().int().positive().optional().catch(undefined),
 });
 
 export type SessionRequest = z.input<typeof sessionRequestSchema>;

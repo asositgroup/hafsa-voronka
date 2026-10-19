@@ -14,6 +14,7 @@ export const eventTypes = [
   "reminder_when_open",
   "reminder_when_answer",
   "reminder_later",
+  "message_click",
 ] as const;
 
 export type EventType = (typeof eventTypes)[number];

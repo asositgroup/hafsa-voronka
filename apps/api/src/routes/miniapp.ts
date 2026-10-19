@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { watchProgress } from "@/db/schema";
 import { env } from "@/env";
 import { logEvent, upsertUser } from "@/funnel/users";
+import { recordMessageClick } from "@/messages/clicks";
 import { videoForUser } from "@/videos/service";
 import { remainingWatchSecs } from "@/watch/credit";
 
@@ -20,7 +21,7 @@ async function readJson(request: { json: () => Promise<unknown> }) {
 export const miniappRoutes = new Hono<AppEnv>();
 
 miniappRoutes.post("/session", async (c) => {
-  const { reason, start } = sessionRequestSchema.catch({ reason: "open" }).parse(await readJson(c.req));
+  const { reason, start, sentMessageId } = sessionRequestSchema.catch({ reason: "open" }).parse(await readJson(c.req));
   const { user } = await upsertUser(c.get("telegramUser"), c.get("startParam"));
   const video = await videoForUser(user);
   if (!video) {
@@ -29,6 +30,9 @@ miniappRoutes.post("/session", async (c) => {
 
   if (reason === "open") {
     await logEvent("app_open", { userId: user.id, visitorId: user.visitorId });
+    if (sentMessageId) {
+      await recordMessageClick(sentMessageId, user.id, "web_app", { start }).catch(console.error);
+    }
   }
 
   const [progress] = await db()

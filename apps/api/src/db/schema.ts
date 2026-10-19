@@ -12,6 +12,7 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  uuid,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import {
@@ -288,3 +289,41 @@ export const messageTemplates = pgTable(
 );
 
 export type MessageTemplateRow = typeof messageTemplates.$inferSelect;
+
+export type SentLinkTarget = { kind: "admin" | "link"; url: string } | null;
+
+export const sentMessages = pgTable(
+  "sent_messages",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    userId: bigint("user_id", { mode: "number" })
+      .notNull()
+      .references(() => users.id),
+    templateId: bigint("template_id", { mode: "number" })
+      .notNull()
+      .references(() => messageTemplates.id),
+    segmentRunId: bigint("segment_run_id", { mode: "number" })
+      .notNull()
+      .references(() => segmentRuns.id),
+    dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
+    clickToken: uuid("click_token").defaultRandom().notNull().unique(),
+    linkTargets: jsonb("link_targets").$type<SentLinkTarget[]>().default([]).notNull(),
+    telegramMessageId: bigint("telegram_message_id", { mode: "number" }),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    sendError: text("send_error"),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    deleteError: text("delete_error"),
+    clickedAt: timestamp("clicked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("sent_messages_run_template_idx").on(t.segmentRunId, t.templateId),
+    index("sent_messages_user_sent_idx").on(t.userId, t.sentAt),
+    index("sent_messages_undeleted_idx")
+      .on(t.sentAt)
+      .where(sql`${t.sentAt} is not null and ${t.deletedAt} is null and ${t.deleteError} is null`),
+    index("sent_messages_template_idx").on(t.templateId),
+  ],
+);
+
+export type SentMessage = typeof sentMessages.$inferSelect;

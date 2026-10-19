@@ -9,6 +9,7 @@ import { env } from "@/env";
 import { adminRoutes } from "@/routes/admin";
 import { leadRoutes } from "@/routes/leads";
 import { miniappRoutes } from "@/routes/miniapp";
+import { redirectRoutes } from "@/routes/redirect";
 import { trackRoutes } from "@/routes/track";
 import { videoRoutes } from "@/routes/video";
 import { bot } from "@/telegram/bot";
@@ -70,6 +71,8 @@ export function createApp() {
 
   app.use("/leads", publicCors);
   app.route("/leads", leadRoutes);
+
+  app.route("/r", redirectRoutes);
 
   app.use(
     "/admin/*",

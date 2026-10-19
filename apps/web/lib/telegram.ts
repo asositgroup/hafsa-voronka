@@ -1,6 +1,7 @@
 import { startModes, type StartMode } from "@funnel/shared";
 
 let capturedStartMode: StartMode | undefined;
+let capturedMessageRef: number | undefined;
 
 export function getTelegramWebApp() {
   if (typeof window === "undefined") return undefined;
@@ -53,4 +54,13 @@ export function readStartMode(): StartMode | undefined {
     parseStartMode(new URLSearchParams(window.location.search).get("start")) ??
     parseStartMode(getTelegramWebApp()?.initDataUnsafe?.start_param);
   return capturedStartMode;
+}
+
+export function readMessageRef(): number | undefined {
+  if (typeof window === "undefined") return capturedMessageRef;
+  if (capturedMessageRef === undefined) {
+    const value = Number(new URLSearchParams(window.location.search).get("m"));
+    if (Number.isInteger(value) && value > 0) capturedMessageRef = value;
+  }
+  return capturedMessageRef;
 }

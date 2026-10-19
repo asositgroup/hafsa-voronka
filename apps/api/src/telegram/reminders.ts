@@ -2,6 +2,7 @@ import { Composer, InlineKeyboard } from "grammy";
 import type { EventType } from "@funnel/shared";
 import { findByTelegramId, logEvent } from "@/funnel/users";
 import { uz } from "@/i18n/uz";
+import { recordMessageClick } from "@/messages/clicks";
 
 const copy = uz.reminders;
 
@@ -9,11 +10,14 @@ type Choice = keyof typeof copy.options;
 
 const choices: Choice[] = ["b", "e", "k"];
 
-async function logReminderEvent(telegramId: number, type: EventType, ref: string, choice?: string) {
+async function logReminderEvent(telegramId: number, type: EventType, ref: string, choice?: string, op?: string) {
   if (!ref.startsWith("s")) return;
   const user = await findByTelegramId(telegramId);
   if (!user) return;
   await logEvent(type, { userId: user.id, visitorId: user.visitorId, meta: { ref, choice: choice ?? null } });
+  if (op) {
+    await recordMessageClick(Number(ref.slice(1)), user.id, "callback", { op });
+  }
 }
 
 export const reminderComposer = new Composer();
@@ -29,7 +33,7 @@ reminderComposer.callbackQuery(/^mt:(w|wa|l):([ts]\d+)(?::([bek]))?$/, async (ct
       choices.map((option) => [InlineKeyboard.text(copy.options[option], `mt:wa:${ref}:${option}`)]),
     );
     await ctx.api.sendMessage(chatId, copy.whenQuestion, { reply_markup: keyboard });
-    await logReminderEvent(ctx.from.id, "reminder_when_open", ref);
+    await logReminderEvent(ctx.from.id, "reminder_when_open", ref, undefined, op);
     return;
   }
 
@@ -41,5 +45,5 @@ reminderComposer.callbackQuery(/^mt:(w|wa|l):([ts]\d+)(?::([bek]))?$/, async (ct
   }
 
   await ctx.api.sendMessage(chatId, copy.laterAck);
-  await logReminderEvent(ctx.from.id, "reminder_later", ref);
+  await logReminderEvent(ctx.from.id, "reminder_later", ref, undefined, op);
 });

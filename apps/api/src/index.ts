@@ -4,6 +4,7 @@ import { closeDb } from "@/db";
 import { runMigrations } from "@/db/migrate";
 import { loadEnv } from "@/env";
 import { startLeadNotifyLoop } from "@/leads/notifier";
+import { startMessageDispatchLoop } from "@/messages/dispatch";
 import { resumeBotUploads } from "@/telegram/admin-video/upload";
 import { bot } from "@/telegram/bot";
 import { seedVideoFromEnv } from "@/videos/service";
@@ -16,6 +17,7 @@ await bot().init();
 await resumeBotUploads(bot().api);
 
 const stopLeadNotify = env.LEADS_CHAT_ID || env.SHEETS_ENABLED ? startLeadNotifyLoop() : undefined;
+const stopMessageDispatch = startMessageDispatchLoop();
 
 const server = serve({ fetch: createApp().fetch, port: env.PORT }, (info) => {
   console.log(`API listening on :${info.port} as @${bot().botInfo.username}`);
@@ -23,6 +25,7 @@ const server = serve({ fetch: createApp().fetch, port: env.PORT }, (info) => {
 
 async function shutdown() {
   stopLeadNotify?.();
+  stopMessageDispatch();
   server.close();
   await closeDb();
   process.exit(0);

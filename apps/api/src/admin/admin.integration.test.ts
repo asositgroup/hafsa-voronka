@@ -124,14 +124,18 @@ describe.skipIf(!testDbUrl)("Admin Integration Tests", () => {
       body: JSON.stringify({ password: TEST_PASSWORD }),
     });
     expect(goodLoginRes.status).toBe(200);
-    expect(await goodLoginRes.json()).toEqual({ ok: true });
+    const loginBody = (await goodLoginRes.json()) as { ok: boolean; token: string };
+    expect(loginBody.ok).toBe(true);
+    expect(typeof loginBody.token).toBe("string");
+    expect(loginBody.token.length).toBeGreaterThan(0);
 
     const cookieHeader = goodLoginRes.headers.get("set-cookie");
     expect(cookieHeader).toBeDefined();
     expect(cookieHeader).toContain("admin_session=");
     expect(cookieHeader).toContain("HttpOnly");
-    expect(cookieHeader).toContain("SameSite=Lax");
-    expect(cookieHeader).toContain("Path=/admin");
+    expect(cookieHeader).toContain("SameSite=None");
+    expect(cookieHeader).toContain("Secure");
+    expect(cookieHeader).toContain("Path=/");
     expect(cookieHeader).toContain("Max-Age=604800");
 
     const cookieMatch = cookieHeader?.match(/admin_session=[^;]+/);

@@ -37,3 +37,19 @@ describe("POST /bot", () => {
     expect(response.status).toBe(401);
   });
 });
+
+describe("admin CORS", () => {
+  it.each(["PUT", "PATCH", "DELETE"])("allows %s preflight from the web origin", async (method) => {
+    const { createApp } = await import("./app");
+    const response = await createApp().request("/admin/videos/1", {
+      method: "OPTIONS",
+      headers: {
+        origin: "https://example.com",
+        "access-control-request-method": method,
+        "access-control-request-headers": "authorization,content-type",
+      },
+    });
+    expect(response.headers.get("access-control-allow-origin")).toBe("https://example.com");
+    expect(response.headers.get("access-control-allow-methods")?.split(",")).toContain(method);
+  });
+});

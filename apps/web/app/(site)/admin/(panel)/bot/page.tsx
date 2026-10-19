@@ -2,27 +2,25 @@
 
 import { useEffect, useState } from "react";
 import type { BotTextItem, BotTextKey } from "@funnel/shared";
-import { BotTextCard } from "@/components/admin/BotTextCard";
+import { BotChat } from "@/components/admin/bot/BotChat";
+import { BotTextEditor } from "@/components/admin/bot/BotTextEditor";
+import { type ScenarioId, scenarioOrder } from "@/components/admin/bot/scenarios";
 import { Notice } from "@/components/admin/ui/Notice";
 import { Page, PageHeader } from "@/components/admin/ui/Page";
+import { Segmented } from "@/components/admin/ui/Segmented";
 import { ErrorState, LoadingState } from "@/components/admin/ui/States";
 import { fetchBotTexts } from "@/lib/admin/botTexts";
 import { adminUz } from "@/lib/i18n/admin";
 
 const copy = adminUz.botTexts;
 
-const groups: { title: string; keys: BotTextKey[] }[] = [
-  { title: copy.groups.registration, keys: ["askContact", "askContactShort", "registered", "watchPrompt"] },
-  { title: copy.groups.returning, keys: ["welcome", "welcomeBack", "fallback"] },
-  { title: copy.groups.afterLesson, keys: ["completion"] },
-  { title: copy.groups.buttons, keys: ["shareContactButton", "watchButton", "channelButton"] },
-];
-
 export default function AdminBotTextsPage() {
   const [items, setItems] = useState<BotTextItem[] | null>(null);
   const [mediaEnabled, setMediaEnabled] = useState(false);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [scenario, setScenario] = useState<ScenarioId>("newUser");
+  const [editing, setEditing] = useState<BotTextKey | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -41,7 +39,7 @@ export default function AdminBotTextsPage() {
     };
   }, [attempt]);
 
-  const byKey = new Map(items?.map((item) => [item.key, item]));
+  const editingItem = items?.find((item) => item.key === editing) ?? null;
 
   const retry = () => {
     setFailed(false);
@@ -57,18 +55,37 @@ export default function AdminBotTextsPage() {
       {failed && <ErrorState onRetry={retry} />}
       {!items && !failed && <LoadingState variant="list" rows={3} />}
 
-      {items &&
-        groups.map((group) => (
-          <section key={group.title} className="flex flex-col gap-3">
-            <h2 className="m-0 text-[17px] font-semibold text-siyoh">{group.title}</h2>
-            <div className="flex flex-col gap-3">
-              {group.keys.map((key) => {
-                const item = byKey.get(key);
-                return item ? <BotTextCard key={key} item={item} mediaEnabled={mediaEnabled} onItems={setItems} /> : null;
-              })}
-            </div>
-          </section>
-        ))}
+      {items && (
+        <div className="flex flex-col gap-4">
+          <div className="mx-auto w-full max-w-[640px]">
+            <Segmented
+              label={copy.tabsLabel}
+              role="tablist"
+              fill
+              value={scenario}
+              onChange={setScenario}
+              items={scenarioOrder.map((id) => ({ value: id, label: copy.tabs[id] }))}
+            />
+          </div>
+          <BotChat
+            key={scenario}
+            scenario={scenario}
+            items={items}
+            onEditMessage={setEditing}
+            onEditButton={setEditing}
+          />
+        </div>
+      )}
+
+      {editingItem && (
+        <BotTextEditor
+          key={editingItem.key}
+          item={editingItem}
+          mediaEnabled={mediaEnabled}
+          onItems={setItems}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </Page>
   );
 }

@@ -6,22 +6,27 @@ import {
   type FunnelSegment,
   type MessageTemplate,
   type MessageTemplateInput,
+  buttonPresets,
   TEMPLATE_MEDIA_MIME_TYPES,
   templateTextLimit,
   validateTemplateText,
+  dayForTiming,
   validateTiming,
   visibleLength,
   sanitizeTelegramHtml,
 } from "@funnel/shared";
 import { Button } from "@/components/admin/ui/Button";
-import { ConfirmDialog, Sheet } from "@/components/admin/ui/Dialog";
-import { Field, Select } from "@/components/admin/ui/Field";
+import { ConfirmDialog, Dialog, Sheet } from "@/components/admin/ui/Dialog";
+import { Field } from "@/components/admin/ui/Field";
+import { Select } from "@/components/admin/ui/Select";
+import { Disclosure } from "@/components/admin/ui/Disclosure";
 import { Notice } from "@/components/admin/ui/Notice";
+import { Segmented } from "@/components/admin/ui/Segmented";
 import { Switch } from "@/components/admin/ui/Switch";
 import { ButtonsEditor } from "@/components/admin/messages/ButtonsEditor";
 import { MessagePreview } from "@/components/admin/messages/MessagePreview";
-import { RichTextField } from "@/components/admin/messages/RichTextField";
-import { defaultTiming, shiftTimingToDay, TimingPicker } from "@/components/admin/messages/TimingPicker";
+import { TextEditor } from "@/components/admin/messages/editor/TextEditor";
+import { defaultTiming, TimingPicker, timingSummary } from "@/components/admin/messages/TimingPicker";
 import {
   createMessage,
   deleteMessage,
@@ -31,10 +36,12 @@ import {
   updateMessage,
   uploadMessageMedia,
 } from "@/lib/admin/messages";
+import { PhotoIcon, PlusIcon, VideoIcon, VoiceIcon } from "@/components/icons";
 import { adminUz } from "@/lib/i18n/admin";
 
 const copy = adminUz.messages.editor;
 const errors = adminUz.messages.errors;
+const mediaIcons = { photo: PhotoIcon, video: VideoIcon, voice: VoiceIcon };
 const acceptedMedia = Object.values(TEMPLATE_MEDIA_MIME_TYPES).flat().join(",");
 
 function errorText(code: string | undefined, variable?: string) {
@@ -46,7 +53,6 @@ type Admin = { telegramId: number; label: string };
 
 type MessageEditorProps = {
   segment: FunnelSegment;
-  day: number;
   item: MessageTemplate | null;
   admins: Admin[];
   mediaEnabled: boolean;
@@ -58,7 +64,6 @@ type MessageEditorProps = {
 
 export function MessageEditor({
   segment,
-  day,
   item,
   admins,
   mediaEnabled,
@@ -80,10 +85,10 @@ export function MessageEditor({
         }
       : {
           segment,
-          day,
+          day: 1,
           text: "",
           media: null,
-          timing: defaultTiming("after_entry", day),
+          timing: defaultTiming("after_entry", 1),
           buttons: [],
           isActive: true,
         },
@@ -95,6 +100,10 @@ export function MessageEditor({
   const [localMedia, setLocalMedia] = useState<{ url: string; type: string } | null>(null);
   const [previewFailed, setPreviewFailed] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [tab, setTab] = useState<"edit" | "preview">("edit");
+  const [timingOpen, setTimingOpen] = useState(() => !item || window.matchMedia("(min-width: 1024px)").matches);
+  const [buttonsOpen, setButtonsOpen] = useState(() => (item?.buttons.length ?? 0) > 0);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -130,10 +139,12 @@ export function MessageEditor({
     after(result.data);
   }
 
+  const payload: MessageTemplateInput = { ...draft, day: dayForTiming(draft.timing, draft.day) };
+
   const save = () =>
     run(
       "save",
-      () => (item ? updateMessage(item.id, draft) : createMessage(draft)),
+      () => (item ? updateMessage(item.id, payload) : createMessage(payload)),
       (saved) => onSaved(saved),
     );
 
@@ -153,15 +164,16 @@ export function MessageEditor({
       },
     );
 
-  const test = () =>
+  const test = (adminTelegramId: number) =>
     run(
       "test",
-      () => sendTestMessage(draft, testAdmin!, item?.id),
+      () => sendTestMessage(payload, adminTelegramId, item?.id),
       () => setTestNote(copy.testSent),
     );
 
-  function changeDay(next: number) {
-    patch({ day: next, timing: shiftTimingToDay(draft.timing, draft.day, next) });
+  function startTest() {
+    if (admins.length === 1) void test(admins[0].telegramId);
+    else if (admins.length > 1) setPickerOpen(true);
   }
 
   const previewSrc = localMedia?.url ?? (item?.media && draft.media?.fileId === item.media.fileId ? messageMediaUrl(item) : null);
@@ -169,20 +181,30 @@ export function MessageEditor({
 
   const textMessage = draft.text && textError ? errorText(textError.error, textError.variable) : null;
 
+  const canSubmit = valid && buttonsValid && busy === null;
+  const MediaIcon = draft.media ? mediaIcons[draft.media.type] : null;
+
   const footer = (
     <div className="flex flex-col gap-3">
       {error && <Notice tone="danger">{error}</Notice>}
-      <div className="flex items-center justify-between gap-3">
-        {item ? (
-          <Button variant="dangerGhost" disabled={busy !== null} onClick={() => setConfirmDelete(true)}>
-            {copy.delete}
+      {testNote && <Notice tone="success">{testNote}</Notice>}
+      {admins.length === 0 && <p className="m-0 text-[13px] text-qalam">{copy.testNoAdmins}</p>}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Switch checked={draft.isActive} onChange={(isActive) => patch({ isActive })} label={copy.active} showLabel />
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            variant="secondary"
+            disabled={!canSubmit || admins.length === 0}
+            loading={busy === "test"}
+            loadingLabel={copy.testSending}
+            onClick={startTest}
+          >
+            {copy.testSend}
           </Button>
-        ) : (
-          <span />
-        )}
-        <Button disabled={!valid || !buttonsValid || busy === "upload" || busy === "delete" || busy === "test"} loading={busy === "save"} loadingLabel={copy.saving} onClick={() => void save()}>
-          {copy.save}
-        </Button>
+          <Button disabled={!canSubmit} loading={busy === "save"} loadingLabel={copy.saving} onClick={() => void save()}>
+            {copy.save}
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -190,52 +212,89 @@ export function MessageEditor({
   return (
     <>
       <Sheet open onClose={onClose} title={item ? copy.editTitle : copy.newTitle} size="wide" footer={footer}>
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-x-8">
-          <div className="flex flex-col gap-5 lg:col-start-1 lg:row-start-1">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm font-medium text-siyoh">{copy.status}</span>
-              <Switch checked={draft.isActive} onChange={(isActive) => patch({ isActive })} label={copy.active} showLabel />
-            </div>
-
-            <RichTextField
-              value={draft.text}
-              onChange={(text) => patch({ text })}
-              invalid={textError !== null}
-              error={textMessage}
-              counter={
-                <span className={length > limit ? "text-anor" : ""}>
-                  {length} / {limit}
-                </span>
-              }
+        <div className="flex flex-col gap-4">
+          <div className="lg:hidden">
+            <Segmented
+              label={copy.preview}
+              role="tablist"
+              fill
+              value={tab}
+              onChange={setTab}
+              items={[
+                { value: "edit", label: copy.tabEdit },
+                { value: "preview", label: copy.tabPreview },
+              ]}
             />
+          </div>
 
-            <div className="flex flex-col gap-2">
-              <h3 className="m-0 text-[15px] font-semibold text-siyoh">{copy.media}</h3>
-              {mediaEnabled ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    ref={fileInput}
-                    type="file"
-                    accept={acceptedMedia}
-                    hidden
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      e.target.value = "";
-                      if (file) void upload(file);
-                    }}
-                  />
-                  <Button
-                    variant="secondary"
-                    disabled={busy !== null}
-                    loading={busy === "upload"}
-                    loadingLabel={copy.uploading}
-                    onClick={() => fileInput.current?.click()}
-                  >
-                    {hasMedia ? copy.replaceMedia : copy.addMedia}
-                  </Button>
-                  {hasMedia && (
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-x-8">
+            <div className={`${tab === "edit" ? "flex" : "hidden"} flex-col gap-5 lg:flex`}>
+              <TextEditor
+                value={draft.text}
+                onChange={(text) => patch({ text })}
+                invalid={textError !== null}
+                error={textMessage}
+                counter={
+                  <span className={length > limit ? "text-anor" : ""}>
+                    {length} / {limit}
+                  </span>
+                }
+              />
+
+              <Disclosure
+                title={copy.timingTitle}
+                summary={timingSummary(draft.day, draft.timing, segment)}
+                open={timingOpen || timingError !== null}
+                onOpenChange={setTimingOpen}
+              >
+                <TimingPicker
+                  day={draft.day}
+                  timing={draft.timing}
+                  segment={segment}
+                  onChange={patch}
+                  error={timingError}
+                />
+              </Disclosure>
+
+              <input
+                ref={fileInput}
+                type="file"
+                accept={acceptedMedia}
+                hidden
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (file) void upload(file);
+                }}
+              />
+              <div className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 rounded-[12px] border border-chiziq px-3 py-1">
+                <span className="flex min-w-0 flex-1 items-center gap-2 text-[15px] font-semibold text-siyoh">
+                  {MediaIcon && draft.media ? (
+                    <>
+                      <MediaIcon className="h-5 w-5 shrink-0 text-qalam" />
+                      <span className="truncate">{adminUz.messages.mediaBadge[draft.media.type]}</span>
+                    </>
+                  ) : (
+                    copy.media
+                  )}
+                </span>
+                {!mediaEnabled ? (
+                  <span className="text-[13px] text-qalam">{copy.mediaDisabled}</span>
+                ) : hasMedia ? (
+                  <span className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={busy !== null}
+                      loading={busy === "upload"}
+                      loadingLabel={copy.uploading}
+                      onClick={() => fileInput.current?.click()}
+                    >
+                      {copy.replaceMedia}
+                    </Button>
                     <Button
                       variant="dangerGhost"
+                      size="sm"
                       disabled={busy !== null}
                       onClick={() => {
                         setLocalMedia(null);
@@ -244,40 +303,56 @@ export function MessageEditor({
                     >
                       {copy.removeMedia}
                     </Button>
-                  )}
+                  </span>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={busy !== null}
+                    loading={busy === "upload"}
+                    loadingLabel={copy.uploading}
+                    icon={<PlusIcon className="h-4 w-4" />}
+                    onClick={() => fileInput.current?.click()}
+                  >
+                    {copy.add}
+                  </Button>
+                )}
+              </div>
+
+              <Disclosure
+                title={copy.buttonsTitle}
+                summary={draft.buttons.length > 0 ? String(draft.buttons.length) : undefined}
+                open={buttonsOpen}
+                onOpenChange={setButtonsOpen}
+                action={
+                  !buttonsOpen && draft.buttons.length === 0 ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon={<PlusIcon className="h-4 w-4" />}
+                      onClick={() => {
+                        patch({ buttons: [{ kind: "resume", text: buttonPresets.resume }] });
+                        setButtonsOpen(true);
+                      }}
+                    >
+                      {copy.add}
+                    </Button>
+                  ) : undefined
+                }
+              >
+                <ButtonsEditor buttons={draft.buttons} onChange={(buttons) => patch({ buttons })} prefillSupported={prefillSupported} />
+              </Disclosure>
+
+              {item && (
+                <div>
+                  <Button variant="dangerGhost" disabled={busy !== null} onClick={() => setConfirmDelete(true)}>
+                    {copy.delete}
+                  </Button>
                 </div>
-              ) : (
-                <Notice tone="info">{copy.mediaDisabled}</Notice>
               )}
             </div>
 
-            <div className="flex flex-col gap-3">
-              <h3 className="m-0 text-[15px] font-semibold text-siyoh">{copy.buttonsTitle}</h3>
-              <ButtonsEditor buttons={draft.buttons} onChange={(buttons) => patch({ buttons })} prefillSupported={prefillSupported} />
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <h3 className="m-0 text-[15px] font-semibold text-siyoh">{copy.timingTitle}</h3>
-              <Field label={copy.day}>
-                {({ id }) => (
-                  <Select id={id} value={draft.day} onChange={(e) => changeDay(Number(e.target.value))}>
-                    {[1, 2, 3, 4, 5, 6, 7].map((n) => (
-                      <option key={n} value={n}>
-                        {adminUz.messages.dayLabel.replace("{n}", String(n))}
-                      </option>
-                    ))}
-                  </Select>
-                )}
-              </Field>
-              <TimingPicker day={draft.day} timing={draft.timing} onChange={(timing) => patch({ timing })} error={timingError} />
-            </div>
-          </div>
-
-          <details open className="group lg:sticky lg:top-0 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start">
-            <summary className="flex min-h-11 cursor-pointer items-center text-[15px] font-semibold text-siyoh focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-siyoh">
-              {copy.preview}
-            </summary>
-            <div className="mt-2 flex flex-col gap-2">
+            <div className={`${tab === "preview" ? "flex" : "hidden"} flex-col gap-2 lg:sticky lg:top-0 lg:flex lg:self-start`}>
               {draft.media && previewSrc && !previewFailed && (
                 <div className="overflow-hidden rounded-[12px] bg-varaq">
                   {mediaType === "photo" ? (
@@ -300,42 +375,36 @@ export function MessageEditor({
               {draft.media && (!previewSrc || previewFailed) && <p className="m-0 text-[13px] text-qalam">{copy.mediaPreviewUnavailable}</p>}
               <MessagePreview text={draft.text} buttons={draft.buttons} />
             </div>
-          </details>
-
-          <div className="flex flex-col gap-3 rounded-[12px] bg-varaq p-3 lg:col-start-1">
-            <h3 className="m-0 text-[15px] font-semibold text-siyoh">{copy.testTitle}</h3>
-            {admins.length === 0 ? (
-              <p className="m-0 text-[13px] text-qalam">{copy.testNoAdmins}</p>
-            ) : (
-              <Field
-                label={copy.testAdmin}
-                suffix={
-                  <Button
-                    variant="secondary"
-                    disabled={busy !== null || !valid || !buttonsValid || testAdmin === null}
-                    loading={busy === "test"}
-                    loadingLabel={copy.testSending}
-                    onClick={() => void test()}
-                  >
-                    {copy.testSend}
-                  </Button>
-                }
-              >
-                {({ id }) => (
-                  <Select id={id} value={testAdmin ?? ""} onChange={(e) => setTestAdmin(Number(e.target.value))}>
-                    {admins.map((admin) => (
-                      <option key={admin.telegramId} value={admin.telegramId}>
-                        {admin.label}
-                      </option>
-                    ))}
-                  </Select>
-                )}
-              </Field>
-            )}
-            {testNote && <Notice tone="success">{testNote}</Notice>}
           </div>
         </div>
       </Sheet>
+
+      <Dialog open={pickerOpen} title={copy.testPick} onClose={() => setPickerOpen(false)}>
+        <Field label={copy.testAdmin} hideLabel>
+          {({ id }) => (
+            <Select
+              id={id}
+              value={testAdmin === null ? "" : String(testAdmin)}
+              onValueChange={(next) => setTestAdmin(Number(next))}
+              options={admins.map((admin) => ({ value: String(admin.telegramId), label: admin.label }))}
+            />
+          )}
+        </Field>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button variant="ghost" onClick={() => setPickerOpen(false)}>
+            {adminUz.confirm.cancel}
+          </Button>
+          <Button
+            disabled={testAdmin === null}
+            onClick={() => {
+              setPickerOpen(false);
+              void test(testAdmin!);
+            }}
+          >
+            {copy.testSend}
+          </Button>
+        </div>
+      </Dialog>
 
       <ConfirmDialog
         open={confirmDelete}

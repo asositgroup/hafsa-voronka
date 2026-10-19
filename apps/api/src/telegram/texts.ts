@@ -8,6 +8,8 @@ import {
   type BotTextKey,
   botTextDefinitions,
   botTextKeys,
+  escapeHtml,
+  sanitizeTelegramHtml,
 } from "@funnel/shared";
 import { db } from "@/db";
 import { type BotTextRow, botTexts } from "@/db/schema";
@@ -50,6 +52,15 @@ function render(template: string, vars: Record<string, string>) {
   return template.replace(/\{(\w+)\}/g, (match, name: string) => vars[name] ?? match);
 }
 
+function renderHtml(template: string, vars: Record<string, string>) {
+  const sanitized = sanitizeTelegramHtml(template);
+  const html = sanitized.ok ? sanitized.html : escapeHtml(template);
+  return render(
+    html,
+    Object.fromEntries(Object.entries(vars).map(([name, value]) => [name, escapeHtml(value)])),
+  );
+}
+
 export async function botText(key: BotTextKey, vars: Record<string, string> = {}) {
   const row = (await overrides()).get(key);
   return render(row?.text ?? defaultBotTexts[key], vars);
@@ -63,8 +74,8 @@ export async function sendBotText(
   replyMarkup?: ReplyMarkup,
 ) {
   const row = (await overrides()).get(key);
-  const text = render(row?.text ?? defaultBotTexts[key], vars);
-  const options = { reply_markup: replyMarkup };
+  const text = renderHtml(row?.text ?? defaultBotTexts[key], vars);
+  const options = { reply_markup: replyMarkup, parse_mode: "HTML" as const };
 
   if (row?.mediaFileId && row.mediaType === "photo") {
     return api.sendPhoto(chatId, row.mediaFileId, { ...options, caption: text });

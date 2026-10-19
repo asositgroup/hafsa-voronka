@@ -44,8 +44,8 @@ const columns: StatColumn<MessageReportRow>[] = [
 
 export function MessageReportTable({ rows }: { rows: MessageReportRow[] }) {
   const groups = funnelSegments
-    .map((segment, index) => ({
-      label: `${index + 1}. ${adminUz.segments[segment].label}`,
+    .map((segment) => ({
+      label: adminUz.segments[segment].label,
       rows: rows.filter((row) => row.segment === segment),
     }))
     .filter((group) => group.rows.length > 0);

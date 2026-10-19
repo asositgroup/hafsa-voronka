@@ -1,72 +1,91 @@
 "use client";
 
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { type MessageTemplate, renderPlainText, SAMPLE_CONTEXT, variableValues } from "@funnel/shared";
-import { Badge } from "@/components/admin/ui/Badge";
+import { type MessageTemplate, plainTextPreview, renderPlainText, SAMPLE_CONTEXT, variableValues } from "@funnel/shared";
+import { IconButton } from "@/components/admin/ui/IconButton";
 import { Switch } from "@/components/admin/ui/Switch";
-import { timingLabel } from "@/components/admin/messages/TimingPicker";
-import { GripIcon } from "@/components/icons";
+import { timelineLabel } from "@/components/admin/messages/TimingPicker";
+import { ButtonsIcon, ChevronDownIcon, ChevronUpIcon, PhotoIcon, VideoIcon, VoiceIcon } from "@/components/icons";
 import { adminUz } from "@/lib/i18n/admin";
 
 const copy = adminUz.messages;
 const sampleValues = variableValues(SAMPLE_CONTEXT);
+const mediaIcons = { photo: PhotoIcon, video: VideoIcon, voice: VoiceIcon };
 
-function plainPreview(html: string) {
-  const text = html.replace(/<[^>]*>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&amp;/g, "&");
-  return renderPlainText(text, sampleValues);
+function MediaIcon({ type }: { type: keyof typeof mediaIcons }) {
+  const Icon = mediaIcons[type];
+  return <Icon className="h-4 w-4" />;
 }
 
 type MessageCardProps = {
   item: MessageTemplate;
   onEdit: () => void;
   onToggle: (isActive: boolean) => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 };
 
-export function MessageCard({ item, onEdit, onToggle }: MessageCardProps) {
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
-    id: item.id,
-  });
-
+export function MessageCard({ item, onEdit, onToggle, onMoveUp, onMoveDown }: MessageCardProps) {
   return (
-    <article
-      ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`flex items-center gap-1 rounded-[16px] bg-white p-2 sm:p-3 ${isDragging ? "z-10 shadow-lg" : ""}`}
-    >
-      <button
-        type="button"
-        ref={setActivatorNodeRef}
-        aria-label={copy.dragHandle}
-        {...attributes}
-        {...listeners}
-        className="flex h-11 w-9 shrink-0 cursor-grab touch-none items-center justify-center self-start rounded-[10px] text-qalam hover:bg-varaq focus-visible:outline-2 focus-visible:outline-siyoh active:cursor-grabbing"
-      >
-        <GripIcon className="h-5 w-5" />
-      </button>
-
+    <li className="flex items-center gap-1 px-2 py-2 sm:px-3">
       <button
         type="button"
         onClick={onEdit}
         aria-label={copy.edit}
-        className="flex min-w-0 flex-1 flex-col gap-1.5 rounded-[10px] py-1 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-siyoh"
+        className="flex min-w-0 flex-1 items-start gap-3 rounded-[10px] py-1 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-siyoh"
       >
-        <span className="flex flex-wrap items-center gap-2">
-          <span className={`text-[13px] font-semibold ${item.isActive ? "text-siyoh" : "text-qalam"}`}>
-            {copy.timing[item.timing.type].replace("{time}", timingLabel(item.timing))}
-          </span>
-          {!item.isActive && <Badge>{copy.inactive}</Badge>}
+        <span
+          className={`w-[4.5rem] shrink-0 pt-px text-[13px] font-semibold tabular-nums text-siyoh sm:w-24 ${item.isActive ? "" : "opacity-60"}`}
+        >
+          {timelineLabel(item.timing)}
         </span>
-        <span className={`line-clamp-2 text-sm ${item.isActive ? "text-siyoh" : "text-qalam"}`}>{plainPreview(item.text)}</span>
-        {(item.media || item.buttons.length > 0) && (
-          <span className="flex flex-wrap items-center gap-1.5">
-            {item.media && <Badge>{copy.mediaBadge[item.media.type]}</Badge>}
-            {item.buttons.length > 0 && <Badge>{copy.buttonsCount.replace("{n}", String(item.buttons.length))}</Badge>}
+        <span className={`flex min-w-0 flex-1 flex-col gap-1 ${item.isActive ? "" : "opacity-60"}`}>
+          <span className="line-clamp-2 text-sm text-siyoh">
+            {renderPlainText(plainTextPreview(item.text, 140), sampleValues)}
           </span>
-        )}
+          {(item.media || item.buttons.length > 0) && (
+            <span className="flex items-center gap-3 text-qalam">
+              {item.media && (
+                <span role="img" aria-label={copy.mediaBadge[item.media.type]} className="inline-flex">
+                  <MediaIcon type={item.media.type} />
+                </span>
+              )}
+              {item.buttons.length > 0 && (
+                <span
+                  role="img"
+                  aria-label={copy.buttonsCount.replace("{n}", String(item.buttons.length))}
+                  className="inline-flex items-center gap-1 text-xs tabular-nums"
+                >
+                  <ButtonsIcon className="h-4 w-4" />
+                  {item.buttons.length}
+                </span>
+              )}
+            </span>
+          )}
+        </span>
       </button>
 
+      {(onMoveUp || onMoveDown) && (
+        <span className="flex shrink-0 flex-col">
+          <IconButton
+            size="sm"
+            label={copy.moveUp}
+            icon={<ChevronUpIcon className="h-4 w-4" />}
+            disabled={!onMoveUp}
+            onClick={onMoveUp}
+            className="!h-6"
+          />
+          <IconButton
+            size="sm"
+            label={copy.moveDown}
+            icon={<ChevronDownIcon className="h-4 w-4" />}
+            disabled={!onMoveDown}
+            onClick={onMoveDown}
+            className="!h-6"
+          />
+        </span>
+      )}
+
       <Switch checked={item.isActive} onChange={onToggle} label={item.isActive ? copy.active : copy.inactive} />
-    </article>
+    </li>
   );
 }

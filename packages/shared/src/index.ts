@@ -38,5 +38,6 @@ export * from "./funnel";
 export * from "./time";
 export * from "./adminVideos";
 export * from "./messages";
+export * from "./richText";
 export * from "./reports";
 export * from "./adminSettings";

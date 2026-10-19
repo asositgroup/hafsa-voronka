@@ -98,45 +98,171 @@ export function variableValues(ctx: TemplateContext): Record<TemplateVariable, s
   };
 }
 
+export type MarkTag = "b" | "i" | "u" | "s" | "tg-spoiler" | "code";
+
+export type HtmlTag = MarkTag | "a" | "pre" | "blockquote";
+
 export type HtmlToken =
   | { kind: "text"; text: string }
-  | { kind: "open"; tag: "b" | "i" | "a"; href?: string }
-  | { kind: "close"; tag: "b" | "i" | "a" };
+  | { kind: "open"; tag: MarkTag }
+  | { kind: "open"; tag: "a"; href: string }
+  | { kind: "open"; tag: "pre"; language?: string }
+  | { kind: "open"; tag: "blockquote"; expandable: boolean }
+  | { kind: "close"; tag: HtmlTag };
 
-export type SanitizeResult =
-  | { ok: true; html: string; tokens: HtmlToken[] }
-  | { ok: false; error: "unbalanced_tag" | "invalid_link" };
+export type SanitizeError = "unbalanced_tag" | "invalid_link" | "invalid_nesting";
 
-const ENTITY_PATTERN = /&(amp|lt|gt|quot);/g;
+export type SanitizeResult = { ok: true; html: string; tokens: HtmlToken[] } | { ok: false; error: SanitizeError };
+
+export const TELEGRAM_LANGUAGE_PATTERN = /^[\w#+.-]{1,32}$/;
+
+const ENTITY_PATTERN = /&(?:(amp|lt|gt|quot)|#(\d{1,7})|#[xX]([0-9a-fA-F]{1,6}));/g;
 const ENTITY_VALUES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"' };
-const TAG_PATTERN = /^<(\/?)([bi])>|^<\/(a)>|^<a\s+href\s*=\s*(?:"([^"]*)"|'([^']*)')\s*>/;
+const OPEN_TAG_PATTERN = /^<([a-z][a-z-]*)((?:\s+[a-z-]+(?:\s*=\s*(?:"[^"]*"|'[^']*'))?)*)\s*>/;
+const CLOSE_TAG_PATTERN = /^<\/([a-z][a-z-]*)>/;
+const ATTRIBUTE_PATTERN = /\s+([a-z-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'))?/g;
 const LINK_PATTERN = /^(?:https?:\/\/|tg:\/\/)[^\s<>"{]+$/;
 
+const MARK_ALIASES: Record<string, MarkTag> = {
+  b: "b",
+  strong: "b",
+  i: "i",
+  em: "i",
+  u: "u",
+  ins: "u",
+  s: "s",
+  strike: "s",
+  del: "s",
+  "tg-spoiler": "tg-spoiler",
+};
+
+const CLOSABLE_SOURCES: Record<string, HtmlTag> = {
+  ...MARK_ALIASES,
+  span: "tg-spoiler",
+  code: "code",
+  pre: "pre",
+  blockquote: "blockquote",
+  a: "a",
+};
+
+const MARKS_EXCLUDING_CODE: readonly HtmlTag[] = ["b", "i", "u", "s", "tg-spoiler", "a"];
+
+type Frame = { source: string; tag: HtmlTag; folded?: boolean };
+
+type OpenOutcome =
+  | { kind: "text" }
+  | { kind: "error"; error: SanitizeError }
+  | { kind: "open"; token: HtmlToken; language?: string };
+
+function decodeCodePoint(value: number): string | null {
+  if (value === 0 || value > 0x10ffff || (value >= 0xd800 && value <= 0xdfff)) return null;
+  return String.fromCodePoint(value);
+}
+
 function decodeEntities(value: string): string {
-  return value.replace(ENTITY_PATTERN, (_, name: string) => ENTITY_VALUES[name]);
+  return value.replace(ENTITY_PATTERN, (match, name?: string, decimal?: string, hex?: string) => {
+    if (name) return ENTITY_VALUES[name];
+    const decoded = decodeCodePoint(decimal !== undefined ? Number.parseInt(decimal, 10) : Number.parseInt(hex ?? "", 16));
+    return decoded ?? match;
+  });
 }
 
 export function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-function escapeAttribute(value: string): string {
+export function escapeAttribute(value: string): string {
   return escapeHtml(value).replace(/"/g, "&quot;");
 }
 
+export function isTelegramLink(href: string): boolean {
+  return LINK_PATTERN.test(href);
+}
+
+function parseAttributes(raw: string): { name: string; value: string | null }[] {
+  const attributes: { name: string; value: string | null }[] = [];
+  for (const match of raw.matchAll(ATTRIBUTE_PATTERN)) {
+    attributes.push({ name: match[1], value: match[2] ?? match[3] ?? null });
+  }
+  return attributes;
+}
+
+function languageFromClass(value: string | null): { language?: string; error?: true } | null {
+  if (value === null || !value.startsWith("language-")) return null;
+  const language = value.slice("language-".length);
+  return TELEGRAM_LANGUAGE_PATTERN.test(language) ? { language } : { error: true };
+}
+
+function interpretOpen(name: string, rawAttributes: string): OpenOutcome {
+  const attributes = parseAttributes(rawAttributes);
+  const mark = MARK_ALIASES[name];
+  if (mark) return attributes.length === 0 ? { kind: "open", token: { kind: "open", tag: mark } } : { kind: "text" };
+  if (name === "span") {
+    const only = attributes.length === 1 ? attributes[0] : null;
+    return only && only.name === "class" && only.value === "tg-spoiler"
+      ? { kind: "open", token: { kind: "open", tag: "tg-spoiler" } }
+      : { kind: "text" };
+  }
+  if (name === "pre") {
+    return attributes.length === 0 ? { kind: "open", token: { kind: "open", tag: "pre" } } : { kind: "text" };
+  }
+  if (name === "code") {
+    if (attributes.length === 0) return { kind: "open", token: { kind: "open", tag: "code" } };
+    const only = attributes.length === 1 ? attributes[0] : null;
+    const parsed = only && only.name === "class" ? languageFromClass(only.value) : null;
+    if (!parsed) return { kind: "text" };
+    if (parsed.error) return { kind: "error", error: "invalid_nesting" };
+    return { kind: "open", token: { kind: "open", tag: "code" }, language: parsed.language };
+  }
+  if (name === "blockquote") {
+    if (attributes.length === 0) return { kind: "open", token: { kind: "open", tag: "blockquote", expandable: false } };
+    const only = attributes.length === 1 ? attributes[0] : null;
+    return only && only.name === "expandable" && (only.value === null || only.value === "")
+      ? { kind: "open", token: { kind: "open", tag: "blockquote", expandable: true } }
+      : { kind: "text" };
+  }
+  if (name === "a") {
+    const only = attributes.length === 1 ? attributes[0] : null;
+    if (!only || only.name !== "href" || only.value === null) return { kind: "text" };
+    const href = decodeEntities(only.value);
+    if (!isTelegramLink(href)) return { kind: "error", error: "invalid_link" };
+    return { kind: "open", token: { kind: "open", tag: "a", href } };
+  }
+  return { kind: "text" };
+}
+
+function violatesNesting(stack: Frame[], next: HtmlTag): boolean {
+  const inside = (tag: HtmlTag) => stack.some((frame) => frame.tag === tag && !frame.folded);
+  if (inside("code") || inside("pre")) return true;
+  if ((next === "code" || next === "pre") && stack.some((frame) => MARKS_EXCLUDING_CODE.includes(frame.tag))) return true;
+  if (next === "pre" && inside("blockquote")) return true;
+  if (next === "a" && inside("a")) return true;
+  return next === "blockquote" && (inside("blockquote") || inside("a"));
+}
+
 function serialize(tokens: HtmlToken[]): string {
+  const languages: (string | undefined)[] = [];
   return tokens
     .map((token) => {
       if (token.kind === "text") return escapeHtml(token.text);
-      if (token.kind === "close") return `</${token.tag}>`;
-      return token.tag === "a" ? `<a href="${escapeAttribute(token.href ?? "")}">` : `<${token.tag}>`;
+      if (token.kind === "close") {
+        if (token.tag !== "pre") return `</${token.tag}>`;
+        return languages.pop() ? "</code></pre>" : "</pre>";
+      }
+      if (token.tag === "a") return `<a href="${escapeAttribute(token.href)}">`;
+      if (token.tag === "pre") {
+        languages.push(token.language);
+        return token.language ? `<pre><code class="language-${token.language}">` : "<pre>";
+      }
+      if (token.tag === "blockquote") return token.expandable ? "<blockquote expandable>" : "<blockquote>";
+      return `<${token.tag}>`;
     })
     .join("");
 }
 
 export function sanitizeTelegramHtml(input: string): SanitizeResult {
   const tokens: HtmlToken[] = [];
-  const stack: string[] = [];
+  const stack: Frame[] = [];
   let buffer = "";
   const flush = () => {
     if (buffer) tokens.push({ kind: "text", text: decodeEntities(buffer) });
@@ -145,34 +271,47 @@ export function sanitizeTelegramHtml(input: string): SanitizeResult {
 
   let index = 0;
   while (index < input.length) {
-    const char = input[index];
-    if (char === "<") {
-      const match = TAG_PATTERN.exec(input.slice(index));
-      if (match) {
+    if (input[index] === "<") {
+      const rest = input.slice(index);
+      const closeMatch = CLOSE_TAG_PATTERN.exec(rest);
+      const closeTag = closeMatch ? CLOSABLE_SOURCES[closeMatch[1]] : undefined;
+      if (closeMatch && closeTag) {
         flush();
-        index += match[0].length;
-        if (match[3]) {
-          if (stack.pop() !== "a") return { ok: false, error: "unbalanced_tag" };
-          tokens.push({ kind: "close", tag: "a" });
-        } else if (match[2]) {
-          const tag = match[2] as "b" | "i";
-          if (match[1]) {
-            if (stack.pop() !== tag) return { ok: false, error: "unbalanced_tag" };
-            tokens.push({ kind: "close", tag });
-          } else {
-            stack.push(tag);
-            tokens.push({ kind: "open", tag });
-          }
-        } else {
-          const href = decodeEntities(match[4] ?? match[5] ?? "");
-          if (!LINK_PATTERN.test(href)) return { ok: false, error: "invalid_link" };
-          stack.push("a");
-          tokens.push({ kind: "open", tag: "a", href });
-        }
+        index += closeMatch[0].length;
+        const frame = stack.pop();
+        if (!frame || frame.source !== closeMatch[1]) return { ok: false, error: "unbalanced_tag" };
+        if (!frame.folded) tokens.push({ kind: "close", tag: frame.tag });
         continue;
       }
+      const openMatch = closeMatch ? null : OPEN_TAG_PATTERN.exec(rest);
+      if (openMatch) {
+        const outcome = interpretOpen(openMatch[1], openMatch[2]);
+        if (outcome.kind === "error") return { ok: false, error: outcome.error };
+        if (outcome.kind === "open") {
+          flush();
+          index += openMatch[0].length;
+          const top = stack[stack.length - 1];
+          const last = tokens[tokens.length - 1];
+          if (
+            outcome.token.kind === "open" &&
+            outcome.token.tag === "code" &&
+            top?.tag === "pre" &&
+            last?.kind === "open" &&
+            last.tag === "pre"
+          ) {
+            last.language = outcome.language;
+            stack.push({ source: "code", tag: "code", folded: true });
+            continue;
+          }
+          const tag = (outcome.token as { tag: HtmlTag }).tag;
+          if (violatesNesting(stack, tag)) return { ok: false, error: "invalid_nesting" };
+          stack.push({ source: openMatch[1], tag });
+          tokens.push(outcome.token);
+          continue;
+        }
+      }
     }
-    buffer += char;
+    buffer += input[index];
     index += 1;
   }
   flush();
@@ -212,7 +351,7 @@ export function templateTextLimit(hasMedia: boolean): number {
 }
 
 export type TemplateTextError = {
-  error: "empty" | "too_long" | "unbalanced_tag" | "invalid_link" | "unknown_variable";
+  error: "empty" | "too_long" | SanitizeError | "unknown_variable";
   variable?: string;
 };
 
@@ -254,6 +393,34 @@ export function validateTiming(day: number, timing: TemplateTiming): TimingError
     return isNightMinute(value) ? "night" : null;
   }
   return value >= 1 && value <= TEMPLATE_DAYS * MINUTES_PER_DAY ? null : "out_of_range";
+}
+
+export function dayForTiming(timing: TemplateTiming, fallbackDay: number): number {
+  if (timing.type === "after_entry") return Math.floor(timing.value / MINUTES_PER_DAY) + 1;
+  if (timing.type === "day_time") return fallbackDay;
+  return 1;
+}
+
+export const EXPIRY_TIMELINE_GROUP = "expiry" as const;
+
+export type TimelineGroupKey = number | typeof EXPIRY_TIMELINE_GROUP;
+
+export type TimelineEntry = { day: number; timing: TemplateTiming; position: number; id: number };
+
+export function timelineGroupKey(entry: Pick<TimelineEntry, "day" | "timing">): TimelineGroupKey {
+  if (entry.timing.type === "before_expiry") return EXPIRY_TIMELINE_GROUP;
+  return dayForTiming(entry.timing, entry.day);
+}
+
+export function timelineSortKey(entry: Pick<TimelineEntry, "day" | "timing">): number {
+  const { type, value } = entry.timing;
+  if (type === "before_expiry") return -value;
+  if (type === "day_time") return (entry.day - 1) * MINUTES_PER_DAY + value;
+  return value;
+}
+
+export function compareTimeline(a: TimelineEntry, b: TimelineEntry): number {
+  return timelineSortKey(a) - timelineSortKey(b) || a.position - b.position || a.id - b.id;
 }
 
 export const templateMediaTypes = ["photo", "video", "voice"] as const;

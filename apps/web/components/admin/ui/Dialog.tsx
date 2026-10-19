@@ -117,3 +117,33 @@ export function ConfirmDialog({ open, title, description, confirmLabel, busy = f
     </dialog>
   );
 }
+
+type DialogProps = {
+  open: boolean;
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+};
+
+export function Dialog({ open, title, onClose, children }: DialogProps) {
+  const ref = useModal(open);
+
+  return (
+    <dialog
+      ref={ref}
+      aria-label={title}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+      className={`${entrance} starting:translate-y-2 m-auto w-[calc(100%-32px)] max-w-md rounded-[20px] border-0 bg-white p-5 text-siyoh backdrop:bg-siyoh/40`}
+    >
+      {open && (
+        <div className="flex flex-col gap-4">
+          <h2 className="m-0 text-[17px] font-semibold text-siyoh">{title}</h2>
+          {children}
+        </div>
+      )}
+    </dialog>
+  );
+}

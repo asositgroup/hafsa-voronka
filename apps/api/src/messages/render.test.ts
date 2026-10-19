@@ -22,6 +22,15 @@ describe("renderTemplate", () => {
     expect(rendered.reply_markup).toBeUndefined();
   });
 
+  it("sends the canonical HTML instead of the raw stored text", () => {
+    const rendered = renderTemplate(
+      { text: "1 < 2 <strong>{ism}</strong>", media: null, buttons: [] },
+      SAMPLE_CONTEXT,
+      { ref: "s1" },
+    );
+    expect(rendered.text).toBe("1 &lt; 2 <b>Aziza</b>");
+  });
+
   it("builds one button per row with the right button types", () => {
     const rendered = render([
       { kind: "resume", text: "Ha, ko'raman" },

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { type SanitizeError, sanitizeTelegramHtml, visibleLength } from "./messages";
 
 export const BOT_TEXT_LIMITS = {
   message: 4096,
@@ -53,11 +54,19 @@ export const botTextDefinitions: Record<BotTextKey, { kind: BotTextKind; placeho
   channelButton: { kind: "button", placeholders: [] },
 };
 
-export type BotTextError = "empty" | "too_long" | "unknown_placeholder" | "multiline_button";
+export const BOT_PLACEHOLDER_MAX_LENGTH = 64;
+
+export type BotTextError = "empty" | "too_long" | "unknown_placeholder" | "multiline_button" | SanitizeError;
 
 export function botTextLimit(key: BotTextKey, hasMedia: boolean): number {
   if (botTextDefinitions[key].kind === "button") return BOT_TEXT_LIMITS.button;
   return hasMedia ? BOT_TEXT_LIMITS.caption : BOT_TEXT_LIMITS.message;
+}
+
+export function botVisibleLength(text: string): number {
+  const sanitized = sanitizeTelegramHtml(text);
+  const html = sanitized.ok ? sanitized.html : text;
+  return visibleLength(html.replace(/\{\w+\}/g, "x".repeat(BOT_PLACEHOLDER_MAX_LENGTH)));
 }
 
 export function validateBotText(key: BotTextKey, text: string, hasMedia: boolean): BotTextError | null {
@@ -66,8 +75,10 @@ export function validateBotText(key: BotTextKey, text: string, hasMedia: boolean
   if (kind === "button" && /\n/.test(text)) return "multiline_button";
   const used = [...text.matchAll(/\{(\w+)\}/g)].map((match) => match[1]);
   if (used.some((name) => !placeholders.includes(name))) return "unknown_placeholder";
-  const rendered = text.replace(/\{\w+\}/g, "");
-  if (rendered.length > botTextLimit(key, hasMedia)) return "too_long";
+  if (kind === "button") return text.replace(/\{\w+\}/g, "").length > botTextLimit(key, hasMedia) ? "too_long" : null;
+  const sanitized = sanitizeTelegramHtml(text);
+  if (!sanitized.ok) return sanitized.error;
+  if (botVisibleLength(text) > botTextLimit(key, hasMedia)) return "too_long";
   return null;
 }
 

@@ -67,11 +67,3 @@ export function Textarea({ invalid, className = "", ...rest }: ComponentProps<"t
     />
   );
 }
-
-export function Select({ invalid, className = "", children, ...rest }: ComponentProps<"select"> & WithInvalid) {
-  return (
-    <select {...rest} aria-invalid={invalid || undefined} className={`${inputClass(invalid)} ${className}`}>
-      {children}
-    </select>
-  );
-}

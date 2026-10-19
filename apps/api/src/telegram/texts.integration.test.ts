@@ -92,8 +92,39 @@ describe.skipIf(!testDbUrl)("Editable bot texts", () => {
 
     await texts.sendBotText(api, 42, "welcome", { name: "Aziza" });
     expect(calls).toEqual([
-      { method: "sendMessage", payload: expect.objectContaining({ chat_id: 42, text: "Xush kelibsiz, Aziza!" }) },
+      { method: "sendMessage", payload: expect.objectContaining({ chat_id: 42, text: "Xush kelibsiz, Aziza!", parse_mode: "HTML" }) },
     ]);
+  });
+
+  it("sends formatting as Telegram HTML and escapes the substituted name", async () => {
+    expect((await putText("welcome", "<b>Salom</b>, {name}!")).status).toBe(200);
+
+    await texts.sendBotText(api, 42, "welcome", { name: "A<i>&Z" });
+    expect(calls[0]).toMatchObject({
+      method: "sendMessage",
+      payload: { text: "<b>Salom</b>, A&lt;i&gt;&amp;Z!", parse_mode: "HTML" },
+    });
+  });
+
+  it("sends a caption as HTML when media is attached", async () => {
+    await putText("welcome", "<i>Salom</i> {name}");
+    await upload("welcome", new File([new Uint8Array([1])], "a.png", { type: "image/png" }));
+    calls.length = 0;
+    await texts.sendBotText(api, 42, "welcome", { name: "Ali" });
+    expect(calls[0]).toMatchObject({ method: "sendPhoto", payload: { caption: "<i>Salom</i> Ali", parse_mode: "HTML" } });
+  });
+
+  it("rejects badly nested formatting for messages but stores buttons as plain text", async () => {
+    expect(await (await putText("welcome", "<b><code>x</code></b>")).json()).toEqual({ error: "invalid_nesting" });
+    expect(await (await putText("welcome", "<b>Salom")).json()).toEqual({ error: "unbalanced_tag" });
+    expect((await putText("watchButton", "A <b> B")).status).toBe(200);
+    expect(await texts.botText("watchButton")).toBe("A <b> B");
+  });
+
+  it("treats a legacy text with literal angle brackets as escaped after migration", async () => {
+    expect((await putText("fallback", "1 &lt; 2 &amp; 3")).status).toBe(200);
+    await texts.sendBotText(api, 1, "fallback");
+    expect(calls[0].payload).toMatchObject({ text: "1 &lt; 2 &amp; 3" });
   });
 
   it("rejects invalid text and keeps the previous value", async () => {

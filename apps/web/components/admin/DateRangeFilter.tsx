@@ -3,7 +3,8 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { Button } from "@/components/admin/ui/Button";
-import { Field, Input } from "@/components/admin/ui/Field";
+import { Field } from "@/components/admin/ui/Field";
+import { DateRangePicker, RangeCalendar } from "@/components/admin/ui/DateRangePicker";
 import { Segmented } from "@/components/admin/ui/Segmented";
 import { Sheet } from "@/components/admin/ui/Dialog";
 import { activePreset, addDays, getTashkentToday, PRESET_DAYS, type Preset } from "@/lib/admin/dates";
@@ -71,16 +72,15 @@ export function DateRangeFilter({
     setSheetOpen(false);
   };
 
-  const dateFields = (
-    <div className="grid grid-cols-2 gap-3 lg:flex lg:items-end">
-      <Field label={copy.fromLabel}>
-        {({ id }) => <Input id={id} type="date" value={currentFrom} max={currentTo} onChange={(e) => setCurrentFrom(e.target.value)} />}
-      </Field>
-      <Field label={copy.toLabel}>
-        {({ id }) => <Input id={id} type="date" value={currentTo} min={currentFrom} onChange={(e) => setCurrentTo(e.target.value)} />}
-      </Field>
-    </div>
-  );
+  const range = { from: currentFrom, to: currentTo };
+  const changeRange = (next: { from: string; to: string }) => {
+    setCurrentFrom(next.from);
+    setCurrentTo(next.to);
+  };
+  const presetRanges = presetItems.map((item) => {
+    const today = getTashkentToday();
+    return { label: item.label, range: { from: addDays(today, -PRESET_DAYS[item.value]), to: today } };
+  });
 
   const actions = (
     <>
@@ -109,7 +109,7 @@ export function DateRangeFilter({
 
       <Sheet open={sheetOpen} onClose={() => setSheetOpen(false)} title={copy.sheetTitle}>
         <form onSubmit={submit} className="flex flex-col gap-4">
-          {dateFields}
+          <RangeCalendar value={range} onChange={changeRange} />
           {extra}
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">{actions}</div>
         </form>
@@ -120,7 +120,9 @@ export function DateRangeFilter({
           <span className="text-sm font-medium text-siyoh">{copy.rangeLabel}</span>
           <Segmented label={copy.dateLabel} items={presetItems} value={preset} onChange={applyPreset} />
         </div>
-        {dateFields}
+        <Field label={copy.dateLabel} className="w-64">
+          {({ id }) => <DateRangePicker id={id} value={range} onChange={changeRange} presets={presetRanges} />}
+        </Field>
         {extra}
         <div className="ml-auto flex items-center gap-2">{actions}</div>
       </form>

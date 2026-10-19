@@ -1,7 +1,9 @@
 import type { InlineKeyboardMarkup } from "grammy/types";
 import {
+  escapeHtml,
   renderPlainText,
   renderText,
+  sanitizeTelegramHtml,
   type TemplateButton,
   type TemplateContext,
   type TemplateMedia,
@@ -66,8 +68,9 @@ export function renderTemplate(
   opts: { ref: string; wrap?: ButtonWrap },
 ): RenderedMessage {
   const values = variableValues(ctx);
+  const sanitized = sanitizeTelegramHtml(template.text);
   const rendered: RenderedMessage = {
-    text: renderText(template.text, values),
+    text: renderText(sanitized.ok ? sanitized.html : escapeHtml(template.text), values),
     parse_mode: "HTML",
     media: template.media,
   };

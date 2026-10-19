@@ -89,7 +89,28 @@ describe.skipIf(!testDbUrl)("Bot registration flow", () => {
     const reply = calls.find((c) => c.method === "sendMessage");
     const markup = reply?.payload.reply_markup as { keyboard?: { request_contact?: boolean }[][] };
     expect(markup.keyboard?.[0]?.[0]?.request_contact).toBe(true);
+    expect(reply?.payload.parse_mode).toBe("HTML");
+    expect(reply?.payload.text).toContain("Ali");
     expect((await userRow(telegramId)).registeredAt).toBeNull();
+  });
+
+  it("escapes HTML in the user's first name", async () => {
+    const telegramId = 7_050_000 + Math.floor(Math.random() * 10_000);
+    await testBot.handleUpdate({
+      update_id: updateId++,
+      message: {
+        message_id: updateId,
+        date: Math.floor(Date.now() / 1000),
+        chat: { id: telegramId, type: "private", first_name: "x" },
+        from: { id: telegramId, is_bot: false, first_name: "<b>Ali&" },
+        text: "/start",
+        entities: [{ type: "bot_command", offset: 0, length: 6 }],
+      },
+    } as never);
+
+    const reply = calls.find((c) => c.method === "sendMessage");
+    expect(reply?.payload.text).toContain("&lt;b&gt;Ali&amp;");
+    expect(reply?.payload.text).not.toContain("<b>Ali");
   });
 
   it("registers with a verified phone when the user shares their own contact", async () => {

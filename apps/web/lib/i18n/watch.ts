@@ -1,6 +1,9 @@
 export const watchUz = {
   seekLockedToast: "Darsni o‘tkazib yubormang, har bir qism muhim",
   proceedButton: "Adminga yozish",
+  expiredTitle: "Havola muddati tugadi",
+  expiredBody: "Bepul dars havolasi muddati o‘tib ketdi. Arab tilini Hafsa ustoza bilan davom ettirmoqchi bo‘lsangiz yoki savolingiz bo‘lsa, adminga yozing, u sizga eng qulay yo‘lni ko‘rsatadi.",
+  expiredButton: "Adminga yozish",
   play: "Ijro etish",
   pause: "To‘xtatish",
   mute: "Ovozni o‘chirish",

@@ -2,10 +2,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { sessionResponseSchema } from "@funnel/shared";
 import { closeDb, db } from "./db";
-import { events, users } from "./db/schema";
+import { events, users, watchProgress } from "./db/schema";
 import { runMigrations } from "./db/migrate";
 import { signInitData } from "./telegram/initData";
-import { ensureActiveTestVideo } from "./test/videos";
+import { createTestVideo, ensureActiveTestVideo } from "./test/videos";
 
 const testDbUrl = process.env.TEST_DATABASE_URL;
 const BOT_TOKEN = "123456:TEST-token";
@@ -137,5 +137,87 @@ describe.skipIf(!testDbUrl)("Funnel Integration Tests", () => {
       (e) => e.type === "app_open",
     );
     expect(opens.length).toBe(1);
+  });
+
+  describe("link expiry and start position", () => {
+    async function sessionUser(
+      overrides: Partial<typeof users.$inferInsert> = {},
+      videoMarks: Parameters<typeof createTestVideo>[0] = { courseStartSec: 300, priceSec: 600 },
+    ) {
+      const video = await createTestVideo(videoMarks);
+      const telegramId = Math.floor(Math.random() * 1000000) + 6000000;
+      const registeredAt = new Date(Date.now() - 3_600_000);
+      const [user] = await db()
+        .insert(users)
+        .values({
+          telegramId,
+          firstName: "TestUser",
+          registeredAt,
+          linkGivenAt: registeredAt,
+          linkExpiresAt: new Date(Date.now() + 3_600_000),
+          videoId: video.id,
+          ...overrides,
+        })
+        .returning();
+      return user;
+    }
+
+    async function session(telegramId: number, body?: unknown) {
+      const res = await createApp().request("/app/session", {
+        method: "POST",
+        headers: { authorization: makeAuthHeader(telegramId), "content-type": "application/json" },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      expect(res.status).toBe(200);
+      return sessionResponseSchema.parse(await res.json());
+    }
+
+    it("stamps link_given_at and link_expires_at 72 hours out on registration", async () => {
+      const { completeRegistration } = await import("./funnel/registration");
+      const video = await createTestVideo();
+      const [created] = await db()
+        .insert(users)
+        .values({ telegramId: Math.floor(Math.random() * 1000000) + 7000000, firstName: "Reg", videoId: video.id })
+        .returning();
+      const registered = await completeRegistration(
+        created,
+        { name: "Reg User", phone: "+998901234567", phoneVerified: true },
+        { actionSource: "chat" },
+      );
+      expect(registered?.linkGivenAt).toEqual(registered?.registeredAt);
+      const ttlMs = registered!.linkExpiresAt!.getTime() - registered!.linkGivenAt!.getTime();
+      expect(ttlMs).toBe(72 * 3_600_000);
+    });
+
+    it("reports expired only after the deadline and while neither completed nor written to admin", async () => {
+      const live = await sessionUser();
+      expect((await session(live.telegramId)).expired).toBe(false);
+
+      const past = new Date(Date.now() - 1000);
+      const lapsed = await sessionUser({ linkExpiresAt: past });
+      expect((await session(lapsed.telegramId)).expired).toBe(true);
+
+      const completed = await sessionUser({ linkExpiresAt: past, completedAt: new Date() });
+      expect((await session(completed.telegramId)).expired).toBe(false);
+
+      const clicked = await sessionUser({ linkExpiresAt: past, channelClickAt: new Date() });
+      expect((await session(clicked.telegramId)).expired).toBe(false);
+    });
+
+    it("returns the resume position by default and the course start for offer", async () => {
+      const user = await sessionUser();
+      await db().insert(watchProgress).values({ userId: user.id, lastPosition: 120, maxPosition: 150 });
+
+      expect((await session(user.telegramId)).startAt).toBe(120);
+      expect((await session(user.telegramId, { start: "resume" })).startAt).toBe(120);
+      expect((await session(user.telegramId, { start: "offer" })).startAt).toBe(300);
+      expect((await session(user.telegramId, { start: "bogus" })).startAt).toBe(120);
+    });
+
+    it("falls back to the resume position for offer when the video has no course start", async () => {
+      const user = await sessionUser({}, { priceSec: 600 });
+      await db().insert(watchProgress).values({ userId: user.id, lastPosition: 45, maxPosition: 45 });
+      expect((await session(user.telegramId, { start: "offer" })).startAt).toBe(45);
+    });
   });
 });

@@ -1,3 +1,7 @@
+import { startModes, type StartMode } from "@funnel/shared";
+
+let capturedStartMode: StartMode | undefined;
+
 export function getTelegramWebApp() {
   if (typeof window === "undefined") return undefined;
   return window.Telegram?.WebApp;
@@ -37,4 +41,16 @@ export function initTelegramWebApp(tg: NonNullable<ReturnType<typeof getTelegram
 
 export function hapticSuccess() {
   getTelegramWebApp()?.HapticFeedback?.notificationOccurred("success");
+}
+
+function parseStartMode(value: string | null | undefined) {
+  return startModes.find((mode) => mode === value);
+}
+
+export function readStartMode(): StartMode | undefined {
+  if (typeof window === "undefined") return capturedStartMode;
+  capturedStartMode ??=
+    parseStartMode(new URLSearchParams(window.location.search).get("start")) ??
+    parseStartMode(getTelegramWebApp()?.initDataUnsafe?.start_param);
+  return capturedStartMode;
 }

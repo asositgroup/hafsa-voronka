@@ -5,9 +5,11 @@ import { type CapiClient, sendCapiEvent } from "@/capi";
 import { db } from "@/db";
 import { users, watchProgress } from "@/db/schema";
 import { env } from "@/env";
+import { syncSegment } from "@/funnel/segments";
 import { findByTelegramId, logEvent } from "@/funnel/users";
 import { refreshUserLeadCards } from "@/leads/service";
 import { bot } from "@/telegram/bot";
+import { isBlockedError, markBlocked } from "@/telegram/blocked";
 import { videoForUser } from "@/videos/service";
 import { botText, sendBotText } from "@/telegram/texts";
 import {
@@ -92,6 +94,10 @@ export async function recordProgress(
     return { result: res };
   });
 
+  if (!result.ignored) {
+    await syncSegment(user.id, now).catch((error) => console.error("Segment sync failed:", error));
+  }
+
   for (const milestone of result.milestones) {
     await logEvent(`progress_${milestone}` as EventType, {
       userId: user.id,
@@ -133,7 +139,11 @@ export async function recordProgress(
         const keyboard = new InlineKeyboard().url(await botText("channelButton"), env.CHANNEL_URL);
         await sendBotText(bot().api, user.telegramId, "completion", {}, keyboard);
       } catch (error) {
-        console.error("Failed to send bot completion message:", error);
+        if (isBlockedError(error)) {
+          await markBlocked(user.id).catch((e) => console.error("Segment sync failed:", e));
+        } else {
+          console.error("Failed to send bot completion message:", error);
+        }
       }
     }
   }
@@ -170,6 +180,7 @@ export async function recordVideoEvent(
       .update(users)
       .set({ channelClickAt: now })
       .where(and(eq(users.id, user.id), isNull(users.channelClickAt)));
+    await syncSegment(user.id, now).catch((error) => console.error("Segment sync failed:", error));
   }
 
   return { ok: true };

@@ -13,7 +13,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import { eventTypes, type Utm } from "@funnel/shared";
+import { eventTypes, funnelSegments, segmentEndReasons, type Utm } from "@funnel/shared";
 
 export const videos = pgTable(
   "videos",
@@ -59,6 +59,8 @@ export const users = pgTable(
   utmContent: text("utm_content"),
   fbclid: text("fbclid"),
   registeredAt: timestamp("registered_at", { withTimezone: true }),
+  linkGivenAt: timestamp("link_given_at", { withTimezone: true }),
+  linkExpiresAt: timestamp("link_expires_at", { withTimezone: true }),
   completedAt: timestamp("completed_at", { withTimezone: true }),
   channelClickAt: timestamp("channel_click_at", { withTimezone: true }),
   botBlocked: boolean("bot_blocked").default(false).notNull(),
@@ -70,6 +72,27 @@ export const users = pgTable(
     index("users_video_id_idx").on(t.videoId),
   ],
 );
+
+export const segmentRuns = pgTable(
+  "segment_runs",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    userId: bigint("user_id", { mode: "number" })
+      .notNull()
+      .references(() => users.id),
+    segment: text("segment", { enum: funnelSegments }).notNull(),
+    enteredAt: timestamp("entered_at", { withTimezone: true }).defaultNow().notNull(),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    endReason: text("end_reason", { enum: segmentEndReasons }),
+  },
+  (t) => [
+    uniqueIndex("segment_runs_one_open_idx").on(t.userId).where(sql`${t.endedAt} is null`),
+    index("segment_runs_user_entered_idx").on(t.userId, t.enteredAt),
+    check("segment_runs_end_pair", sql`(${t.endedAt} is null) = (${t.endReason} is null)`),
+  ],
+);
+
+export type SegmentRun = typeof segmentRuns.$inferSelect;
 
 export const events = pgTable(
   "events",
@@ -167,3 +190,9 @@ export const botTexts = pgTable("bot_texts", {
 });
 
 export type BotTextRow = typeof botTexts.$inferSelect;
+
+export const settings = pgTable("settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});

@@ -1,5 +1,5 @@
 import { Bot, type Context, InlineKeyboard, Keyboard } from "grammy";
-import { normalizeContactPhone } from "@funnel/shared";
+import { normalizeContactPhone, type StartMode } from "@funnel/shared";
 import type { User } from "@/db/schema";
 import { env } from "@/env";
 import { completeRegistration, nameFromTelegram } from "@/funnel/registration";
@@ -10,14 +10,20 @@ import {
   setBotBlocked,
   upsertUser,
 } from "@/funnel/users";
+import { syncSegment } from "@/funnel/segments";
 import { uz } from "@/i18n/uz";
 import { applyLeadAction } from "@/leads/actions";
 import type { LeadAction } from "@/leads/card";
 import { findMatchingWebLead } from "@/leads/service";
+import { markBlockedByTelegramId } from "@/telegram/blocked";
 import { botText, sendBotText } from "@/telegram/texts";
 
+export function watchAppUrl(start?: StartMode) {
+  return `${env.WEB_URL}/app${start ? `?start=${start}` : ""}`;
+}
+
 async function watchKeyboard(completed: boolean) {
-  const keyboard = new InlineKeyboard().webApp(await botText("watchButton"), `${env.WEB_URL}/app`);
+  const keyboard = new InlineKeyboard().webApp(await botText("watchButton"), watchAppUrl());
   return completed ? keyboard.row().url(await botText("channelButton"), env.CHANNEL_URL) : keyboard;
 }
 
@@ -115,8 +121,16 @@ function createBot() {
 
   bot.on("my_chat_member", async (ctx) => {
     const status = ctx.myChatMember.new_chat_member.status;
-    if (status === "kicked") await setBotBlocked(ctx.myChatMember.from.id, true);
-    if (status === "member") await setBotBlocked(ctx.myChatMember.from.id, false);
+    const telegramId = ctx.myChatMember.from.id;
+    if (status === "kicked") {
+      await markBlockedByTelegramId(telegramId).catch((error) => console.error("Segment sync failed:", error));
+    }
+    if (status === "member") {
+      const unblocked = await setBotBlocked(telegramId, false);
+      if (unblocked) {
+        await syncSegment(unblocked.id).catch((error) => console.error("Segment sync failed:", error));
+      }
+    }
   });
 
   root.catch((err) => {

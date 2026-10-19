@@ -2,6 +2,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import type { EventType } from "@funnel/shared";
 import { events, users } from "@/db/schema";
+import { linkTtlHours } from "@/settings/service";
 import { resolveAttribution } from "./attribution";
 
 export type TelegramProfile = {
@@ -69,16 +70,23 @@ export async function markRegistered(
   userId: number,
   fields: { name: string; phone: string; phoneVerified: boolean },
 ) {
+  const now = new Date();
+  const linkExpiresAt = new Date(now.getTime() + (await linkTtlHours()) * 3_600_000);
   const [updated] = await db()
     .update(users)
-    .set({ ...fields, registeredAt: new Date() })
+    .set({ ...fields, registeredAt: now, linkGivenAt: now, linkExpiresAt })
     .where(and(eq(users.id, userId), isNull(users.registeredAt)))
     .returning();
   return updated;
 }
 
 export async function setBotBlocked(telegramId: number, blocked: boolean) {
-  await db().update(users).set({ botBlocked: blocked }).where(eq(users.telegramId, telegramId));
+  const [updated] = await db()
+    .update(users)
+    .set({ botBlocked: blocked })
+    .where(eq(users.telegramId, telegramId))
+    .returning({ id: users.id });
+  return updated;
 }
 
 export async function findByTelegramId(telegramId: number) {

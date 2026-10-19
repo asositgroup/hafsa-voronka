@@ -20,7 +20,7 @@ async function readJson(request: { json: () => Promise<unknown> }) {
 export const miniappRoutes = new Hono<AppEnv>();
 
 miniappRoutes.post("/session", async (c) => {
-  const { reason } = sessionRequestSchema.catch({ reason: "open" }).parse(await readJson(c.req));
+  const { reason, start } = sessionRequestSchema.catch({ reason: "open" }).parse(await readJson(c.req));
   const { user } = await upsertUser(c.get("telegramUser"), c.get("startParam"));
   const video = await videoForUser(user);
   if (!video) {
@@ -37,13 +37,23 @@ miniappRoutes.post("/session", async (c) => {
     .where(eq(watchProgress.userId, user.id))
     .limit(1);
 
+  const lastPosition = progress?.lastPosition ?? 0;
+  const expired =
+    user.registeredAt !== null &&
+    user.linkExpiresAt !== null &&
+    new Date() >= user.linkExpiresAt &&
+    user.completedAt === null &&
+    user.channelClickAt === null;
+
   return c.json({
     registered: user.registeredAt !== null,
     name: user.name,
     phoneSet: Boolean(user.phone),
     completed: user.completedAt !== null,
+    expired,
+    startAt: start === "offer" ? (video.courseStartSec ?? lastPosition) : lastPosition,
     progress: {
-      lastPosition: progress?.lastPosition ?? 0,
+      lastPosition,
       maxPosition: progress?.maxPosition ?? 0,
       remainingSecs: remainingWatchSecs(
         progress?.watchedSecs ?? 0,

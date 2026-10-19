@@ -1,7 +1,9 @@
 import { z } from "zod";
+import { startModes } from "./funnel";
 
 export const sessionRequestSchema = z.object({
   reason: z.enum(["open", "poll"]).default("open"),
+  start: z.enum(startModes).optional().catch(undefined),
 });
 
 export type SessionRequest = z.input<typeof sessionRequestSchema>;
@@ -11,6 +13,8 @@ export const sessionResponseSchema = z.object({
   name: z.string().nullable(),
   phoneSet: z.boolean(),
   completed: z.boolean(),
+  expired: z.boolean(),
+  startAt: z.number(),
   progress: z.object({
     lastPosition: z.number(),
     maxPosition: z.number(),

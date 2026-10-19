@@ -159,10 +159,14 @@ export function WatchScreen() {
       setDuration(video.duration);
     }
 
-    const resumePos = session.progress.lastPosition;
-    if (resumePos > 0 && resumePos < video.duration) {
-      video.currentTime = resumePos;
-      setCurrentTime(resumePos);
+    const startPos = session.startAt;
+    if (startPos > 0 && startPos < video.duration) {
+      if (startPos > maxReachedRef.current) {
+        maxReachedRef.current = startPos;
+        setMaxReached(startPos);
+      }
+      video.currentTime = startPos;
+      setCurrentTime(startPos);
     }
   };
 

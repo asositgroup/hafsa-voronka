@@ -1,4 +1,5 @@
 import { sessionResponseSchema, type SessionRequest, type SessionResponse } from "@funnel/shared";
+import { readStartMode } from "@/lib/telegram";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -23,7 +24,7 @@ export async function fetchSession(
   initData: string,
   request: SessionRequest = { reason: "open" },
 ): Promise<SessionResponse> {
-  const res = await miniAppPost("/app/session", initData, request);
+  const res = await miniAppPost("/app/session", initData, { ...request, start: readStartMode() });
   if (!res.ok) {
     throw new Error(`Session request failed: ${res.status}`);
   }

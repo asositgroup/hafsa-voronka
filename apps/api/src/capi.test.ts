@@ -21,6 +21,8 @@ function makeUser(overrides: Partial<User> = {}): User {
     utmContent: "video",
     fbclid: "fbclid_12345",
     registeredAt: new Date("2026-03-01T10:00:00Z"),
+    linkGivenAt: null,
+    linkExpiresAt: null,
     completedAt: null,
     channelClickAt: null,
     botBlocked: false,

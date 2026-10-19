@@ -1,6 +1,7 @@
 import { type CapiActionSource, type CapiClient, sendCapiEvent } from "@/capi";
 import type { User } from "@/db/schema";
 import { attachLeadToUser } from "@/leads/service";
+import { syncSegment } from "./segments";
 import { logEvent, markRegistered } from "./users";
 
 export type RegistrationFields = { name: string; phone: string; phoneVerified: boolean };
@@ -14,6 +15,8 @@ export async function completeRegistration(
 ) {
   const registered = await markRegistered(user.id, fields);
   if (!registered) return undefined;
+
+  await syncSegment(user.id).catch((error) => console.error("Segment sync failed:", error));
 
   await logEvent("registered", { userId: user.id, visitorId: user.visitorId });
   await attachLeadToUser(registered).catch((error) =>

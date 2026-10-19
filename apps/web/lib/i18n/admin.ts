@@ -284,6 +284,16 @@ export const adminUz = {
       generic: "Xatolik yuz berdi. Qayta urinib ko‘ring.",
     },
   },
+  settings: {
+    title: "Sozlamalar",
+    linkTtlLabel: "Havola amal qilish muddati (soat)",
+    linkTtlHint: "O‘zgarish faqat yangi havolalarga ta’sir qiladi. Berilgan havolalar muddati o‘zgarmaydi.",
+    save: "Saqlash",
+    saving: "Saqlanmoqda...",
+    saved: "Saqlandi",
+    invalid: "1 dan 720 gacha butun son kiriting",
+    error: "Saqlashda xatolik yuz berdi",
+  },
   videos: {
     title: "Videolar",
     subtitle: "Faol video yangi foydalanuvchilarga beriladi. Mavjud foydalanuvchilar o‘z videosida qoladi.",

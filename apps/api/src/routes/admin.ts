@@ -29,6 +29,7 @@ import { adminBotTextRoutes } from "@/routes/adminBotTexts";
 import { adminVideoRoutes } from "@/routes/adminVideos";
 import { adminMessageRoutes } from "@/routes/adminMessages";
 import { adminReportRoutes } from "@/routes/adminReports";
+import { adminSettingsRoutes } from "@/routes/adminSettings";
 
 export const adminRoutes = new Hono();
 
@@ -38,6 +39,7 @@ adminRoutes.route("/bot-texts", adminBotTextRoutes);
 adminRoutes.route("/videos", adminVideoRoutes);
 adminRoutes.route("/messages", adminMessageRoutes);
 adminRoutes.route("/reports", adminReportRoutes);
+adminRoutes.route("/settings", adminSettingsRoutes);
 
 adminRoutes.post("/login", async (c) => {
   const ip = clientIp(c);

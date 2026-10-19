@@ -39,3 +39,4 @@ export * from "./time";
 export * from "./adminVideos";
 export * from "./messages";
 export * from "./reports";
+export * from "./adminSettings";

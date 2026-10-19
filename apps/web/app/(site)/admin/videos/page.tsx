@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { AdminVideoItem } from "@funnel/shared";
 import { AdminNav } from "@/components/admin/AdminNav";
+import { SettingsCard } from "@/components/admin/SettingsCard";
 import { VideoCard } from "@/components/admin/VideoCard";
 import { VideoUploadForm } from "@/components/admin/VideoUploadForm";
 import { fetchVideos } from "@/lib/admin/videos";
@@ -48,6 +49,8 @@ export default function AdminVideosPage() {
           <h1 className="m-0 text-[28px] font-bold leading-tight text-siyoh">{copy.title}</h1>
           <p className="m-0 mt-1 text-sm text-qalam">{copy.subtitle}</p>
         </div>
+
+        <SettingsCard />
 
         {failed && <p className="m-0 text-sm text-anor">{adminUz.common.error}</p>}
         {!items && !failed && <p className="m-0 py-20 text-center text-sm text-qalam">{adminUz.common.loading}</p>}

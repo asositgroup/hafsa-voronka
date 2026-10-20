@@ -3,11 +3,15 @@ import { InlineKeyboard } from "grammy";
 import type { EventType } from "@funnel/shared";
 import { type CapiClient, sendCapiEvent } from "@/capi";
 import { db } from "@/db";
-import { users, watchProgress } from "@/db/schema";
+import { linkGrants, users, watchProgress } from "@/db/schema";
 import { env } from "@/env";
+import { recordChannelClick } from "@/funnel/channel";
+import { syncSegment } from "@/funnel/segments";
 import { findByTelegramId, logEvent } from "@/funnel/users";
 import { refreshUserLeadCards } from "@/leads/service";
 import { bot } from "@/telegram/bot";
+import { isBlockedError, markBlocked } from "@/telegram/blocked";
+import { videoForUser } from "@/videos/service";
 import { botText, sendBotText } from "@/telegram/texts";
 import {
   applyBeat,
@@ -16,14 +20,29 @@ import {
   type WatchConfig,
   type WatchState,
 } from "./credit";
+import { isOfferComplete } from "./offerVideo";
+import { effectiveUnlockSec } from "./unlock";
 
 export type ProgressResult =
-  | { ok: true; completed: boolean; maxPosition: number; remainingSecs: number }
-  | { ok: false; error: "not_registered" };
+  | { ok: true; completed: boolean; unlocked: boolean; maxPosition: number; remainingSecs: number }
+  | { ok: false; error: "not_registered" | "no_video" };
 
 export type EventResult =
   | { ok: true }
   | { ok: false; error: "not_found" };
+
+async function sendUnlockMessage(userId: number, telegramId: number) {
+  try {
+    const keyboard = new InlineKeyboard().url(await botText("channelButton"), env.CHANNEL_URL);
+    await sendBotText(bot().api, telegramId, "completion", {}, keyboard);
+  } catch (error) {
+    if (isBlockedError(error)) {
+      await markBlocked(userId).catch((e) => console.error("Segment sync failed:", e));
+    } else {
+      console.error("Failed to send bot completion message:", error);
+    }
+  }
+}
 
 export async function recordProgress(
   telegramId: number,
@@ -37,12 +56,17 @@ export async function recordProgress(
     return { ok: false, error: "not_registered" };
   }
 
-  const watchConfig = config ?? {
-    duration: env.VIDEO_DURATION_SEC,
+  const video = await videoForUser(user);
+  if (!video && !config) {
+    return { ok: false, error: "no_video" };
+  }
+  const watchConfig: WatchConfig = config ?? {
+    duration: video!.duration,
     threshold: env.COMPLETE_THRESHOLD,
+    courseStartSec: video!.courseStartSec,
   };
 
-  const { result } = await db().transaction(async (tx) => {
+  const { result, previousMax } = await db().transaction(async (tx) => {
     await tx
       .insert(watchProgress)
       .values({
@@ -84,8 +108,12 @@ export async function recordProgress(
         .where(eq(watchProgress.userId, user.id));
     }
 
-    return { result: res };
+    return { result: res, previousMax: locked.maxPosition };
   });
+
+  if (!result.ignored) {
+    await syncSegment(user.id, now).catch((error) => console.error("Segment sync failed:", error));
+  }
 
   for (const milestone of result.milestones) {
     await logEvent(`progress_${milestone}` as EventType, {
@@ -94,10 +122,35 @@ export async function recordProgress(
     });
   }
 
+  const priceSec = video?.priceSec ?? null;
+  if (!result.ignored && priceSec !== null && previousMax < priceSec && result.state.maxPosition >= priceSec) {
+    await logEvent("price_reached", {
+      userId: user.id,
+      visitorId: user.visitorId,
+      meta: { videoId: video!.id, priceSec },
+    });
+  }
+
   if (result.milestones.length > 0 && !result.completedNow) {
     await refreshUserLeadCards(user.id).catch((error) =>
       console.error("Lead progress update failed:", error),
     );
+  }
+
+  const unlockSec = effectiveUnlockSec(video);
+  const unlockReached =
+    !result.ignored &&
+    user.unlockedAt === null &&
+    (result.state.completed || (unlockSec !== null && result.state.maxPosition >= unlockSec));
+  if (unlockReached) {
+    const [unlockedUser] = await db()
+      .update(users)
+      .set({ unlockedAt: now })
+      .where(and(eq(users.id, user.id), isNull(users.unlockedAt)))
+      .returning();
+    if (unlockedUser && !user.botBlocked) {
+      await sendUnlockMessage(user.id, user.telegramId);
+    }
   }
 
   if (result.completedNow) {
@@ -123,19 +176,12 @@ export async function recordProgress(
       client,
     }).catch((error) => console.error("CAPI VideoComplete failed:", error));
 
-    if (!user.botBlocked) {
-      try {
-        const keyboard = new InlineKeyboard().url(await botText("channelButton"), env.CHANNEL_URL);
-        await sendBotText(bot().api, user.telegramId, "completion", {}, keyboard);
-      } catch (error) {
-        console.error("Failed to send bot completion message:", error);
-      }
-    }
   }
 
   return {
     ok: true,
     completed: result.state.completed,
+    unlocked: user.unlockedAt !== null || unlockReached,
     maxPosition: result.state.maxPosition,
     remainingSecs: remainingWatchSecs(result.state.watchedSecs, result.state.completed, watchConfig),
   };
@@ -157,15 +203,71 @@ export async function recordVideoEvent(
       visitorId: user.visitorId,
     });
   } else if (type === "channel_click") {
-    await logEvent("channel_click", {
-      userId: user.id,
-      visitorId: user.visitorId,
-    });
-    await db()
-      .update(users)
-      .set({ channelClickAt: now })
-      .where(and(eq(users.id, user.id), isNull(users.channelClickAt)));
+    await recordChannelClick(user, now);
   }
 
   return { ok: true };
+}
+
+export type OfferProgressResult =
+  | { ok: true; completed: boolean }
+  | { ok: false; error: "not_registered" | "no_offer_video" };
+
+export async function recordOfferProgress(
+  telegramId: number,
+  beat: WatchBeat,
+  now: Date = new Date(),
+): Promise<OfferProgressResult> {
+  const user = await findByTelegramId(telegramId);
+  if (!user || user.registeredAt === null) {
+    return { ok: false, error: "not_registered" };
+  }
+
+  const video = await videoForUser(user);
+  const duration = video?.shortOfferVideoUrl ? video.shortOfferDuration : null;
+  if (duration === null || duration === undefined || user.linkId === null) {
+    return { ok: false, error: "no_offer_video" };
+  }
+  const [grant] = await db()
+    .select({ offerFirst: linkGrants.offerFirst })
+    .from(linkGrants)
+    .where(eq(linkGrants.id, user.linkId))
+    .limit(1);
+  if (!grant?.offerFirst) {
+    return { ok: false, error: "no_offer_video" };
+  }
+  if (user.offerWatchedAt !== null) {
+    return { ok: true, completed: true };
+  }
+
+  let startedAt = user.offerStartedAt;
+  if (startedAt === null && beat.event === "play") {
+    await db()
+      .update(users)
+      .set({ offerStartedAt: now })
+      .where(and(eq(users.id, user.id), isNull(users.offerStartedAt)));
+    startedAt = now;
+  }
+
+  if (!isOfferComplete({ position: beat.position, duration, startedAt, now })) {
+    return { ok: true, completed: false };
+  }
+
+  const [watched] = await db()
+    .update(users)
+    .set({ offerWatchedAt: now, unlockedAt: user.unlockedAt ?? now })
+    .where(and(eq(users.id, user.id), isNull(users.offerWatchedAt)))
+    .returning({ id: users.id });
+  if (watched) {
+    await logEvent("offer_video_complete", {
+      userId: user.id,
+      visitorId: user.visitorId,
+      meta: { videoId: video!.id },
+    });
+    await syncSegment(user.id, now).catch((error) => console.error("Segment sync failed:", error));
+    await refreshUserLeadCards(user.id).catch((error) =>
+      console.error("Lead offer video update failed:", error),
+    );
+  }
+  return { ok: true, completed: true };
 }

@@ -9,7 +9,8 @@ import type {
   LeadItem,
 } from "@funnel/shared";
 import { db } from "@/db";
-import { env } from "@/env";
+import { watchedPercent } from "@/leads/card";
+import { notAdminTelegramId } from "@/telegram/admins";
 import { formatTashkentDate, listDaysInRange } from "./dates";
 
 const FUNNEL_STEP_NAMES: Record<string, string> = {
@@ -33,6 +34,8 @@ const ORDERED_FUNNEL_STEPS = [
   "video_complete",
   "channel_click",
 ] as const;
+
+const leadUser = () => notAdminTelegramId(sql`u.telegram_id`);
 
 export type QueryFilters = {
   from: string;
@@ -60,7 +63,8 @@ export async function getFunnelAndKpis(filters: QueryFilters): Promise<{
       FROM events e
       LEFT JOIN users u ON u.id = e.user_id
       WHERE
-        (e.created_at AT TIME ZONE 'Asia/Tashkent')::date >= ${filters.from}::date
+        ${leadUser()}
+        AND (e.created_at AT TIME ZONE 'Asia/Tashkent')::date >= ${filters.from}::date
         AND (e.created_at AT TIME ZONE 'Asia/Tashkent')::date <= ${filters.to}::date
         AND e.type IN ('landing_view', 'cta_click', 'lead_submitted', 'bot_start', 'registered', 'video_start', 'video_complete', 'channel_click')
         AND (
@@ -139,7 +143,8 @@ export async function getDailySeries(filters: QueryFilters): Promise<DailyStat[]
     FROM events e
     JOIN users u ON u.id = e.user_id
     WHERE
-      e.type IN ('registered', 'video_complete')
+      ${leadUser()}
+      AND e.type IN ('registered', 'video_complete')
       AND (e.created_at AT TIME ZONE 'Asia/Tashkent')::date >= ${filters.from}::date
       AND (e.created_at AT TIME ZONE 'Asia/Tashkent')::date <= ${filters.to}::date
       AND (${filters.source ?? null}::text IS NULL OR u.utm_source = ${filters.source ?? null})
@@ -188,7 +193,8 @@ export async function getCampaignStats(filters: QueryFilters): Promise<CampaignS
     FROM events e
     JOIN users u ON u.id = e.user_id
     WHERE
-      (e.created_at AT TIME ZONE 'Asia/Tashkent')::date >= ${filters.from}::date
+      ${leadUser()}
+      AND (e.created_at AT TIME ZONE 'Asia/Tashkent')::date >= ${filters.from}::date
       AND (e.created_at AT TIME ZONE 'Asia/Tashkent')::date <= ${filters.to}::date
       AND (${filters.source ?? null}::text IS NULL OR u.utm_source = ${filters.source ?? null})
       AND (${filters.campaign ?? null}::text IS NULL OR u.utm_campaign = ${filters.campaign ?? null})
@@ -216,7 +222,6 @@ export async function getCampaignStats(filters: QueryFilters): Promise<CampaignS
 }
 
 export async function getWatchDropoff(filters: QueryFilters): Promise<DropoffStat[]> {
-  const duration = env.VIDEO_DURATION_SEC;
   const [row] = await db().execute<{
     total_registered: string | number;
     p10: string | number;
@@ -232,20 +237,22 @@ export async function getWatchDropoff(filters: QueryFilters): Promise<DropoffSta
   }>(sql`
     SELECT
       count(u.id) AS total_registered,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.1 * ${duration} THEN 1 END) AS p10,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.2 * ${duration} THEN 1 END) AS p20,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.3 * ${duration} THEN 1 END) AS p30,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.4 * ${duration} THEN 1 END) AS p40,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.5 * ${duration} THEN 1 END) AS p50,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.6 * ${duration} THEN 1 END) AS p60,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.7 * ${duration} THEN 1 END) AS p70,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.8 * ${duration} THEN 1 END) AS p80,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.9 * ${duration} THEN 1 END) AS p90,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 1.0 * ${duration} THEN 1 END) AS p100
+      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.1 * v.duration THEN 1 END) AS p10,
+      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.2 * v.duration THEN 1 END) AS p20,
+      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.3 * v.duration THEN 1 END) AS p30,
+      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.4 * v.duration THEN 1 END) AS p40,
+      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.5 * v.duration THEN 1 END) AS p50,
+      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.6 * v.duration THEN 1 END) AS p60,
+      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.7 * v.duration THEN 1 END) AS p70,
+      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.8 * v.duration THEN 1 END) AS p80,
+      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.9 * v.duration THEN 1 END) AS p90,
+      count(CASE WHEN coalesce(wp.max_position, 0) >= 1.0 * v.duration THEN 1 END) AS p100
     FROM users u
     LEFT JOIN watch_progress wp ON wp.user_id = u.id
+    LEFT JOIN videos v ON v.id = u.video_id
     WHERE
       u.registered_at IS NOT NULL
+      AND ${leadUser()}
       AND (u.registered_at AT TIME ZONE 'Asia/Tashkent')::date >= ${filters.from}::date
       AND (u.registered_at AT TIME ZONE 'Asia/Tashkent')::date <= ${filters.to}::date
       AND (${filters.source ?? null}::text IS NULL OR u.utm_source = ${filters.source ?? null})
@@ -289,8 +296,8 @@ export async function getHealthStats(): Promise<AdminStatsResponse["health"]> {
     last_event_at: string | null;
   }>(sql`
     SELECT
-      (SELECT count(*)::int FROM leads WHERE notify_version > sheets_synced_version AND sheets_attempts < 10) AS sheets_backlog,
-      (SELECT count(*)::int FROM leads WHERE notify_version > sheets_synced_version AND sheets_attempts >= 10) AS sheets_failures,
+      (SELECT count(*)::int FROM leads l LEFT JOIN users u ON u.id = l.user_id WHERE l.notify_version > l.sheets_synced_version AND l.sheets_attempts < 10 AND ${leadUser()}) AS sheets_backlog,
+      (SELECT count(*)::int FROM leads l LEFT JOIN users u ON u.id = l.user_id WHERE l.notify_version > l.sheets_synced_version AND l.sheets_attempts >= 10 AND ${leadUser()}) AS sheets_failures,
       (SELECT to_char(max(created_at), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') FROM events WHERE type = 'bot_start') AS last_bot_start_at,
       (SELECT to_char(max(created_at), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') FROM events) AS last_event_at
   `);
@@ -308,7 +315,6 @@ export async function getLeads(
   page = 1,
   pageSize = 50,
 ): Promise<AdminLeadsResponse> {
-  const duration = env.VIDEO_DURATION_SEC;
   const offset = (page - 1) * pageSize;
 
   const [countRow] = await db().execute<{ total: string | number }>(sql`
@@ -316,6 +322,7 @@ export async function getLeads(
     FROM users u
     WHERE
       u.registered_at IS NOT NULL
+      AND ${leadUser()}
       AND (u.registered_at AT TIME ZONE 'Asia/Tashkent')::date >= ${filters.from}::date
       AND (u.registered_at AT TIME ZONE 'Asia/Tashkent')::date <= ${filters.to}::date
       AND (${filters.source ?? null}::text IS NULL OR u.utm_source = ${filters.source ?? null})
@@ -332,6 +339,7 @@ export async function getLeads(
     source: string | null;
     campaign: string | null;
     max_position: string | number;
+    duration: number | null;
     completed: boolean;
     channel_clicked: boolean;
   }>(sql`
@@ -344,12 +352,15 @@ export async function getLeads(
       u.utm_source AS source,
       u.utm_campaign AS campaign,
       coalesce(wp.max_position, 0) AS max_position,
+      v.duration AS duration,
       coalesce(u.completed_at IS NOT NULL OR wp.completed IS TRUE, false) AS completed,
       (u.channel_click_at IS NOT NULL) AS channel_clicked
     FROM users u
     LEFT JOIN watch_progress wp ON wp.user_id = u.id
+    LEFT JOIN videos v ON v.id = u.video_id
     WHERE
       u.registered_at IS NOT NULL
+      AND ${leadUser()}
       AND (u.registered_at AT TIME ZONE 'Asia/Tashkent')::date >= ${filters.from}::date
       AND (u.registered_at AT TIME ZONE 'Asia/Tashkent')::date <= ${filters.to}::date
       AND (${filters.source ?? null}::text IS NULL OR u.utm_source = ${filters.source ?? null})
@@ -360,7 +371,7 @@ export async function getLeads(
 
   const leads: LeadItem[] = rows.map((r) => {
     const maxPos = Number(r.max_position) || 0;
-    const progressPercent = duration > 0 ? Math.min(100, Math.round((maxPos / duration) * 100)) : 0;
+    const progressPercent = watchedPercent(maxPos, r.duration ?? 0);
     return {
       id: Number(r.id),
       registeredAt: r.registered_at,
@@ -394,7 +405,6 @@ function escapeCsvCell(val: unknown): string {
 }
 
 export async function getLeadsCsv(filters: QueryFilters): Promise<string> {
-  const duration = env.VIDEO_DURATION_SEC;
   const rows = await db().execute<{
     id: number;
     registered_at: string;
@@ -404,6 +414,7 @@ export async function getLeadsCsv(filters: QueryFilters): Promise<string> {
     source: string | null;
     campaign: string | null;
     max_position: string | number;
+    duration: number | null;
     completed: boolean;
     channel_clicked: boolean;
   }>(sql`
@@ -416,12 +427,15 @@ export async function getLeadsCsv(filters: QueryFilters): Promise<string> {
       u.utm_source AS source,
       u.utm_campaign AS campaign,
       coalesce(wp.max_position, 0) AS max_position,
+      v.duration AS duration,
       coalesce(u.completed_at IS NOT NULL OR wp.completed IS TRUE, false) AS completed,
       (u.channel_click_at IS NOT NULL) AS channel_clicked
     FROM users u
     LEFT JOIN watch_progress wp ON wp.user_id = u.id
+    LEFT JOIN videos v ON v.id = u.video_id
     WHERE
       u.registered_at IS NOT NULL
+      AND ${leadUser()}
       AND (u.registered_at AT TIME ZONE 'Asia/Tashkent')::date >= ${filters.from}::date
       AND (u.registered_at AT TIME ZONE 'Asia/Tashkent')::date <= ${filters.to}::date
       AND (${filters.source ?? null}::text IS NULL OR u.utm_source = ${filters.source ?? null})
@@ -445,7 +459,7 @@ export async function getLeadsCsv(filters: QueryFilters): Promise<string> {
 
   for (const r of rows) {
     const maxPos = Number(r.max_position) || 0;
-    const progressPercent = duration > 0 ? Math.min(100, Math.round((maxPos / duration) * 100)) : 0;
+    const progressPercent = watchedPercent(maxPos, r.duration ?? 0);
     const line = [
       formatTashkentDate(r.registered_at),
       r.name ?? "",

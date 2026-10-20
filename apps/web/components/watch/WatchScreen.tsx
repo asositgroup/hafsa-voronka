@@ -4,13 +4,29 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { PLAYBACK_RATES, type ProgressEvent, type ProgressResponse } from "@funnel/shared";
 import { miniAppBeacon, miniAppPost } from "@/lib/api";
 import { watchUz } from "@/lib/i18n/watch";
-import { getTelegramWebApp, hapticSuccess } from "@/lib/telegram";
+import { getTelegramWebApp, hapticSuccess, readStartMode } from "@/lib/telegram";
 import { attachVideoSource } from "@/lib/video/hls";
 import { formatTime } from "@/lib/video/format";
+import {
+  isSeekLocked as computeSeekLocked,
+  effectiveStartMode,
+  mergeResume,
+  resumeTarget,
+  shouldSendClosingBeat,
+  shouldShowResumeOverlay,
+} from "@/lib/video/resume";
+import {
+  readCloudResume,
+  readLocalResume,
+  writeCloudResume,
+  writeLocalResume,
+} from "@/lib/video/resumeStore";
+import { useResumeSeek } from "@/lib/video/useResumeSeek";
 import { useMiniApp } from "@/components/miniapp/MiniAppProvider";
 import { HarakatWord } from "@/components/brand/HarakatWord";
 import { ProgressBar } from "./ProgressBar";
 import { ProceedButton } from "./ProceedButton";
+import { ResumeOverlay } from "./ResumeOverlay";
 import { Toast } from "./Toast";
 
 export function WatchScreen() {
@@ -27,17 +43,41 @@ export function WatchScreen() {
   const [toastVisible, setToastVisible] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [speedMenuOpen, setSpeedMenuOpen] = useState(false);
+  const [startMode] = useState(() => effectiveStartMode(readStartMode(), session.startsAtCourse));
+  const [resumeFrom, setResumeFrom] = useState(() =>
+    mergeResume(
+      {
+        videoId: session.videoId,
+        lastPosition: session.progress.lastPosition,
+        maxPosition: session.progress.maxPosition,
+      },
+      readLocalResume(),
+    ),
+  );
+  const [overlayOpen, setOverlayOpen] = useState(() =>
+    shouldShowResumeOverlay({ startMode, resumeFrom, completed: session.completed }),
+  );
+  const [seekTarget, setSeekTarget] = useState(() => {
+    if (startMode === "offer") return session.startAt;
+    return shouldShowResumeOverlay({ startMode, resumeFrom, completed: session.completed })
+      ? 0
+      : resumeFrom;
+  });
   const [unlockAnchor, setUnlockAnchor] = useState({
     remainingSecs: session.progress.remainingSecs,
     position: session.progress.lastPosition,
   });
 
+  const initialResumeRef = useRef(resumeFrom);
+  const playbackStartedRef = useRef(false);
+  const lastClosingBeatRef = useRef<number | null>(null);
   const maxReachedRef = useRef(session.progress.maxPosition || 0);
   const hasSentStartRef = useRef(false);
   const tickIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isCompletedRef = useRef(session.completed);
+  const isUnlockedRef = useRef(session.unlocked);
   const playbackRateRef = useRef(1);
   const speedMenuRef = useRef<HTMLDivElement>(null);
 
@@ -45,8 +85,19 @@ export function WatchScreen() {
     isCompletedRef.current = session.completed;
   }, [session.completed]);
 
-  const isSeekLocked = session.config.seekLock && !session.completed;
-  const isUnlocked = !session.config.gateProceed || session.completed;
+  useEffect(() => {
+    isUnlockedRef.current = session.unlocked;
+  }, [session.unlocked]);
+
+  const isSeekLocked = computeSeekLocked({
+    seekLock: session.config.seekLock,
+    completed: session.completed,
+    priceSec: session.priceSec,
+    maxReached,
+  });
+  const { markUserSeeked, isPositionPending } = useResumeSeek(videoRef, seekTarget);
+  const reachedUnlockAt = session.unlockAt !== null && maxReached >= session.unlockAt;
+  const isUnlocked = !session.config.gateProceed || session.unlocked || reachedUnlockAt;
 
   const triggerToast = useCallback(() => {
     setToastVisible(true);
@@ -77,6 +128,8 @@ export function WatchScreen() {
 
   const sendProgress = useCallback(
     async (position: number, event: ProgressEvent) => {
+      if (event !== "ended" && isPositionPending()) return;
+      writeLocalResume(session.videoId, position);
       try {
         const res = await miniAppPost("/app/progress", initData, {
           position,
@@ -92,19 +145,32 @@ export function WatchScreen() {
           if (typeof data.remainingSecs === "number") {
             setUnlockAnchor({ remainingSecs: data.remainingSecs, position });
           }
-          if (data.completed && !isCompletedRef.current) {
+          const completedNow = data.completed && !isCompletedRef.current;
+          const unlockedNow = data.unlocked && !isUnlockedRef.current;
+          if (completedNow || unlockedNow) {
             hapticSuccess();
-            setSession({ ...session, completed: true });
-            const tg = getTelegramWebApp();
-            tg?.disableClosingConfirmation?.();
+            setSession({
+              ...session,
+              completed: session.completed || data.completed,
+              unlocked: session.unlocked || data.unlocked,
+            });
+          }
+          if (completedNow) {
+            getTelegramWebApp()?.disableClosingConfirmation?.();
           }
         }
       } catch {
         return;
       }
     },
-    [initData, session, setSession],
+    [initData, isPositionPending, session, setSession],
   );
+
+  useEffect(() => {
+    if (!reachedUnlockAt || isUnlockedRef.current) return;
+    const video = videoRef.current;
+    if (video) void sendProgress(video.currentTime, "tick");
+  }, [reachedUnlockAt, sendProgress]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -121,26 +187,66 @@ export function WatchScreen() {
   }, [session.config.videoUrl]);
 
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "hidden") {
-        const video = videoRef.current;
-        if (video && !video.paused) {
-          video.pause();
-        }
-        if (video) {
-          miniAppBeacon("/app/progress", initData, {
-            position: video.currentTime,
-            event: "pause",
-          });
-        }
-      }
+    const sendClosingBeat = () => {
+      const video = videoRef.current;
+      if (!video || isPositionPending()) return;
+      if (!shouldSendClosingBeat(lastClosingBeatRef.current, Date.now())) return;
+      lastClosingBeatRef.current = Date.now();
+      writeLocalResume(session.videoId, video.currentTime);
+      writeCloudResume(session.videoId, video.currentTime);
+      miniAppBeacon("/app/progress", initData, {
+        position: video.currentTime,
+        event: "pause",
+      });
     };
 
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "hidden") return;
+      const video = videoRef.current;
+      if (video && !video.paused) {
+        video.pause();
+      }
+      sendClosingBeat();
+    };
+
+    const tg = getTelegramWebApp();
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", sendClosingBeat);
+    tg?.onEvent?.("deactivated", sendClosingBeat);
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", sendClosingBeat);
+      tg?.offEvent?.("deactivated", sendClosingBeat);
     };
-  }, [initData]);
+  }, [initData, isPositionPending, session.videoId]);
+
+  useEffect(() => {
+    let active = true;
+    void readCloudResume().then((cloud) => {
+      if (!active || playbackStartedRef.current || cloud === null) return;
+      const merged = mergeResume(
+        {
+          videoId: session.videoId,
+          lastPosition: session.progress.lastPosition,
+          maxPosition: session.progress.maxPosition,
+        },
+        cloud,
+      );
+      if (merged <= initialResumeRef.current) return;
+      initialResumeRef.current = merged;
+      const showOverlay = shouldShowResumeOverlay({
+        startMode,
+        resumeFrom: merged,
+        completed: session.completed,
+      });
+      setResumeFrom(merged);
+      setOverlayOpen(showOverlay);
+      if (startMode !== "offer") setSeekTarget(showOverlay ? 0 : merged);
+    });
+    return () => {
+      active = false;
+    };
+  }, [session.videoId, session.progress.lastPosition, session.progress.maxPosition, session.completed, startMode]);
 
   useEffect(() => {
     return () => {
@@ -159,10 +265,10 @@ export function WatchScreen() {
       setDuration(video.duration);
     }
 
-    const resumePos = session.progress.lastPosition;
-    if (resumePos > 0 && resumePos < video.duration) {
-      video.currentTime = resumePos;
-      setCurrentTime(resumePos);
+    const startPos = session.startAt;
+    if (startMode === "offer" && startPos > maxReachedRef.current && startPos < video.duration) {
+      maxReachedRef.current = startPos;
+      setMaxReached(startPos);
     }
   };
 
@@ -214,10 +320,10 @@ export function WatchScreen() {
     resetControlsTimeout();
   };
 
-  const unlockRemainingSecs = Math.max(
-    0,
-    unlockAnchor.remainingSecs - Math.max(0, currentTime - unlockAnchor.position),
-  );
+  const unlockRemainingSecs =
+    session.unlockAt === null
+      ? Math.max(0, unlockAnchor.remainingSecs - Math.max(0, currentTime - unlockAnchor.position))
+      : Math.max(0, session.unlockAt - maxReached);
 
   const handlePlay = () => {
     const video = videoRef.current;
@@ -225,6 +331,8 @@ export function WatchScreen() {
 
     setIsPlaying(true);
     resetControlsTimeout();
+
+    playbackStartedRef.current = true;
 
     if (!hasSentStartRef.current) {
       hasSentStartRef.current = true;
@@ -243,7 +351,7 @@ export function WatchScreen() {
       if (v && !v.paused) {
         void sendProgress(v.currentTime, "tick");
       }
-    }, 10000);
+    }, 5000);
   };
 
   const handlePause = () => {
@@ -256,6 +364,7 @@ export function WatchScreen() {
     if (tickIntervalRef.current) clearInterval(tickIntervalRef.current);
 
     getTelegramWebApp()?.disableClosingConfirmation?.();
+    writeCloudResume(session.videoId, video.currentTime);
     void sendProgress(video.currentTime, "pause");
   };
 
@@ -297,8 +406,31 @@ export function WatchScreen() {
   const handleSeek = (targetTime: number) => {
     const video = videoRef.current;
     if (!video) return;
+    markUserSeeked();
     video.currentTime = targetTime;
     setCurrentTime(targetTime);
+  };
+
+  const handleResumeContinue = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    const target = resumeTarget(resumeFrom);
+    setOverlayOpen(false);
+    setSeekTarget(target);
+    video.currentTime = target;
+    setCurrentTime(target);
+    void video.play().catch(() => {});
+  };
+
+  const handleResumeRestart = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    markUserSeeked();
+    setOverlayOpen(false);
+    setSeekTarget(0);
+    video.currentTime = 0;
+    setCurrentTime(0);
+    void video.play().catch(() => {});
   };
 
   const targetGateSecs = duration > 0 ? duration * 0.7 : 1;
@@ -324,6 +456,14 @@ export function WatchScreen() {
           }
         >
           <Toast message={watchUz.seekLockedToast} visible={toastVisible} />
+
+          {overlayOpen && (
+            <ResumeOverlay
+              position={resumeFrom}
+              onContinue={handleResumeContinue}
+              onRestart={handleResumeRestart}
+            />
+          )}
 
           <video
             ref={videoRef}

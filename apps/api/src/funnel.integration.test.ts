@@ -2,17 +2,22 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { sessionResponseSchema } from "@funnel/shared";
 import { closeDb, db } from "./db";
-import { events, users } from "./db/schema";
+import { events, users, watchProgress } from "./db/schema";
 import { runMigrations } from "./db/migrate";
 import { signInitData } from "./telegram/initData";
+import { isolatedDatabase } from "./test/isolatedDb";
+import { createTestVideo, ensureActiveTestVideo } from "./test/videos";
 
-const testDbUrl = process.env.TEST_DATABASE_URL;
+const isolatedDb = isolatedDatabase("vf_funnel");
+const testDbUrl = isolatedDb.url;
 const BOT_TOKEN = "123456:TEST-token";
 
 describe.skipIf(!testDbUrl)("Funnel Integration Tests", () => {
   let createApp: typeof import("./app").createApp;
+  let activeVideo: Awaited<ReturnType<typeof ensureActiveTestVideo>>;
 
   beforeAll(async () => {
+    await isolatedDb.create();
     Object.assign(process.env, {
       BOT_TOKEN,
       BOT_USERNAME: "test_bot",
@@ -21,18 +26,18 @@ describe.skipIf(!testDbUrl)("Funnel Integration Tests", () => {
       WEB_URL: "https://example.com",
       DATABASE_URL: testDbUrl,
       CHANNEL_URL: "https://t.me/example",
-      VIDEO_URL: "https://video.example.com/master.mp4",
       VIDEO_POSTER_URL: "https://video.example.com/poster.webp",
-      VIDEO_DURATION_SEC: "900",
     });
 
     await runMigrations(testDbUrl!);
+    activeVideo = await ensureActiveTestVideo();
     const appModule = await import("./app");
     createApp = appModule.createApp;
   });
 
   afterAll(async () => {
     await closeDb();
+    await isolatedDb.drop();
   });
 
   function makeAuthHeader(userId: number, startParam?: string) {
@@ -76,6 +81,7 @@ describe.skipIf(!testDbUrl)("Funnel Integration Tests", () => {
     expect(sessionJson.registered).toBe(false);
     expect(sessionJson.phoneSet).toBe(false);
     expect(sessionJson.config.duration).toBe(900);
+    expect(sessionJson.config.videoUrl).toBe(activeVideo.fileUrl);
 
     const [createdUser] = await db()
       .select()
@@ -85,6 +91,7 @@ describe.skipIf(!testDbUrl)("Funnel Integration Tests", () => {
 
     expect(createdUser).toBeDefined();
     expect(createdUser.visitorId).toBe(visitorId);
+    expect(createdUser.videoId).toBe(activeVideo.id);
     expect(createdUser.utmSource).toBe("fb_ad");
     expect(createdUser.utmCampaign).toBe("promo_2026");
     expect(createdUser.utmContent).toBe("banner_1");
@@ -134,5 +141,104 @@ describe.skipIf(!testDbUrl)("Funnel Integration Tests", () => {
       (e) => e.type === "app_open",
     );
     expect(opens.length).toBe(1);
+  });
+
+  describe("link expiry and start position", () => {
+    async function sessionUser(
+      overrides: Partial<typeof users.$inferInsert> = {},
+      videoMarks: Parameters<typeof createTestVideo>[0] = { courseStartSec: 300, priceSec: 600 },
+    ) {
+      const video = await createTestVideo(videoMarks);
+      const telegramId = Math.floor(Math.random() * 1000000) + 6000000;
+      const registeredAt = new Date(Date.now() - 3_600_000);
+      const [user] = await db()
+        .insert(users)
+        .values({
+          telegramId,
+          firstName: "TestUser",
+          registeredAt,
+          linkGivenAt: registeredAt,
+          linkExpiresAt: new Date(Date.now() + 3_600_000),
+          videoId: video.id,
+          ...overrides,
+        })
+        .returning();
+      return user;
+    }
+
+    async function session(telegramId: number, body?: unknown) {
+      const res = await createApp().request("/app/session", {
+        method: "POST",
+        headers: { authorization: makeAuthHeader(telegramId), "content-type": "application/json" },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      expect(res.status).toBe(200);
+      return sessionResponseSchema.parse(await res.json());
+    }
+
+    it("stamps link_given_at and link_expires_at 24 hours out on registration", async () => {
+      const { completeRegistration } = await import("./funnel/registration");
+      const video = await createTestVideo();
+      const [created] = await db()
+        .insert(users)
+        .values({ telegramId: Math.floor(Math.random() * 1000000) + 7000000, firstName: "Reg", videoId: video.id })
+        .returning();
+      const registered = await completeRegistration(
+        created,
+        { name: "Reg User", phone: "+998901234567", phoneVerified: true },
+        { actionSource: "chat" },
+      );
+      expect(registered?.linkGivenAt).toEqual(registered?.registeredAt);
+      const { linkExpiryFor } = await import("./messages/plan");
+      expect(registered!.linkExpiresAt).toEqual(linkExpiryFor(registered!.linkGivenAt!, 24));
+    });
+
+    it("reports expired only after the deadline and while neither completed nor written to admin", async () => {
+      const live = await sessionUser();
+      expect((await session(live.telegramId)).expired).toBe(false);
+
+      const past = new Date(Date.now() - 1000);
+      const lapsed = await sessionUser({ linkExpiresAt: past });
+      expect((await session(lapsed.telegramId)).expired).toBe(true);
+
+      const completed = await sessionUser({ linkExpiresAt: past, completedAt: new Date() });
+      expect((await session(completed.telegramId)).expired).toBe(false);
+
+      const clicked = await sessionUser({ linkExpiresAt: past, wroteAdminAt: new Date() });
+      expect((await session(clicked.telegramId)).expired).toBe(false);
+    });
+
+    it("marks the session response as not cacheable", async () => {
+      const user = await sessionUser();
+      const res = await createApp().request("/app/session", {
+        method: "POST",
+        headers: { authorization: makeAuthHeader(user.telegramId), "content-type": "application/json" },
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get("cache-control")).toBe("no-store");
+    });
+
+    it("returns the resume position by default and the course start for offer", async () => {
+      const user = await sessionUser();
+      await db().insert(watchProgress).values({ userId: user.id, lastPosition: 120, maxPosition: 150 });
+
+      expect((await session(user.telegramId)).startAt).toBe(120);
+      expect((await session(user.telegramId, { start: "resume" })).startAt).toBe(120);
+      expect((await session(user.telegramId, { start: "offer" })).startAt).toBe(300);
+      expect((await session(user.telegramId, { start: "bogus" })).startAt).toBe(120);
+    });
+
+    it("exposes the video id and price point to the player", async () => {
+      const user = await sessionUser({}, { priceSec: 600 });
+      const body = await session(user.telegramId);
+      expect(body.priceSec).toBe(600);
+      expect(typeof body.videoId).toBe("number");
+    });
+
+    it("falls back to the resume position for offer when the video has no course start", async () => {
+      const user = await sessionUser({}, { priceSec: 600 });
+      await db().insert(watchProgress).values({ userId: user.id, lastPosition: 45, maxPosition: 45 });
+      expect((await session(user.telegramId, { start: "offer" })).startAt).toBe(45);
+    });
   });
 });

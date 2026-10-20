@@ -9,6 +9,7 @@ import { env } from "@/env";
 import { adminRoutes } from "@/routes/admin";
 import { leadRoutes } from "@/routes/leads";
 import { miniappRoutes } from "@/routes/miniapp";
+import { redirectRoutes } from "@/routes/redirect";
 import { trackRoutes } from "@/routes/track";
 import { videoRoutes } from "@/routes/video";
 import { bot } from "@/telegram/bot";
@@ -71,12 +72,14 @@ export function createApp() {
   app.use("/leads", publicCors);
   app.route("/leads", leadRoutes);
 
+  app.route("/r", redirectRoutes);
+
   app.use(
     "/admin/*",
     cors({
       origin: originFor,
       allowHeaders: ["Content-Type", "Authorization", "x-admin-session"],
-      allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       credentials: true,
       maxAge: 86400,
     }),

@@ -1,7 +1,9 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import type { EventType } from "@funnel/shared";
 import { events, users } from "@/db/schema";
+import { insertGrant } from "@/links/service";
+import { linkTtlHours } from "@/settings/service";
 import { resolveAttribution } from "./attribution";
 
 export type TelegramProfile = {
@@ -48,6 +50,7 @@ export async function upsertUser(
       utmCampaign: attribution.utm_campaign ?? null,
       utmContent: attribution.utm_content ?? null,
       fbclid: attribution.fbclid ?? null,
+      videoId: sql`(select id from videos where is_active)`,
     })
     .onConflictDoUpdate({ target: users.telegramId, set: profileFields })
     .returning();
@@ -68,16 +71,27 @@ export async function markRegistered(
   userId: number,
   fields: { name: string; phone: string; phoneVerified: boolean },
 ) {
-  const [updated] = await db()
-    .update(users)
-    .set({ ...fields, registeredAt: new Date() })
-    .where(and(eq(users.id, userId), isNull(users.registeredAt)))
-    .returning();
-  return updated;
+  const now = new Date();
+  const ttlHours = await linkTtlHours();
+  return db().transaction(async (tx) => {
+    const [updated] = await tx
+      .update(users)
+      .set({ ...fields, registeredAt: now })
+      .where(and(eq(users.id, userId), isNull(users.registeredAt)))
+      .returning();
+    if (!updated) return undefined;
+    const grant = await insertGrant(tx, userId, { kind: "initial", offerFirst: false, now, ttlHours });
+    return { ...updated, linkId: grant.id, linkGivenAt: grant.givenAt, linkExpiresAt: grant.expiresAt };
+  });
 }
 
 export async function setBotBlocked(telegramId: number, blocked: boolean) {
-  await db().update(users).set({ botBlocked: blocked }).where(eq(users.telegramId, telegramId));
+  const [updated] = await db()
+    .update(users)
+    .set({ botBlocked: blocked })
+    .where(eq(users.telegramId, telegramId))
+    .returning({ id: users.id });
+  return updated;
 }
 
 export async function findByTelegramId(telegramId: number) {

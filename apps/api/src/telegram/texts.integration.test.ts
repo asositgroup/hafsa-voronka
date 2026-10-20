@@ -18,6 +18,7 @@ describe.skipIf(!testDbUrl)("Editable bot texts", () => {
   let api: ReturnType<typeof import("./bot").bot>["api"];
   let cookie: string;
   const calls: ApiCall[] = [];
+  let mediaChatMissing = false;
 
   beforeAll(async () => {
     setTestEnv({
@@ -32,6 +33,9 @@ describe.skipIf(!testDbUrl)("Editable bot texts", () => {
     api = (await import("./bot")).bot().api;
     api.config.use(async (_prev, method, payload) => {
       calls.push({ method, payload: payload as Record<string, unknown> });
+      if (mediaChatMissing && (method === "sendPhoto" || method === "sendVideo")) {
+        return { ok: false, error_code: 400, description: "Bad Request: chat not found" } as never;
+      }
       if (method === "sendPhoto") {
         return { ok: true, result: { message_id: 501, photo: [{ file_id: "photo-small" }, { file_id: "photo-big" }] } } as never;
       }
@@ -50,6 +54,7 @@ describe.skipIf(!testDbUrl)("Editable bot texts", () => {
 
   beforeEach(async () => {
     calls.length = 0;
+    mediaChatMissing = false;
     await db().delete(botTexts);
     texts.invalidateBotTexts();
   });
@@ -81,7 +86,7 @@ describe.skipIf(!testDbUrl)("Editable bot texts", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.mediaEnabled).toBe(true);
-    expect(body.items).toHaveLength(11);
+    expect(body.items).toHaveLength(30);
     const welcome = body.items.find((item: { key: string }) => item.key === "welcome");
     expect(welcome).toMatchObject({ kind: "message", placeholders: ["name"], text: null, media: null });
     expect(welcome.defaultText).toContain("{name}");
@@ -92,8 +97,39 @@ describe.skipIf(!testDbUrl)("Editable bot texts", () => {
 
     await texts.sendBotText(api, 42, "welcome", { name: "Aziza" });
     expect(calls).toEqual([
-      { method: "sendMessage", payload: expect.objectContaining({ chat_id: 42, text: "Xush kelibsiz, Aziza!" }) },
+      { method: "sendMessage", payload: expect.objectContaining({ chat_id: 42, text: "Xush kelibsiz, Aziza!", parse_mode: "HTML" }) },
     ]);
+  });
+
+  it("sends formatting as Telegram HTML and escapes the substituted name", async () => {
+    expect((await putText("welcome", "<b>Salom</b>, {name}!")).status).toBe(200);
+
+    await texts.sendBotText(api, 42, "welcome", { name: "A<i>&Z" });
+    expect(calls[0]).toMatchObject({
+      method: "sendMessage",
+      payload: { text: "<b>Salom</b>, A&lt;i&gt;&amp;Z!", parse_mode: "HTML" },
+    });
+  });
+
+  it("sends a caption as HTML when media is attached", async () => {
+    await putText("welcome", "<i>Salom</i> {name}");
+    await upload("welcome", new File([new Uint8Array([1])], "a.png", { type: "image/png" }));
+    calls.length = 0;
+    await texts.sendBotText(api, 42, "welcome", { name: "Ali" });
+    expect(calls[0]).toMatchObject({ method: "sendPhoto", payload: { caption: "<i>Salom</i> Ali", parse_mode: "HTML" } });
+  });
+
+  it("rejects badly nested formatting for messages but stores buttons as plain text", async () => {
+    expect(await (await putText("welcome", "<b><code>x</code></b>")).json()).toEqual({ error: "invalid_nesting" });
+    expect(await (await putText("welcome", "<b>Salom")).json()).toEqual({ error: "unbalanced_tag" });
+    expect((await putText("watchButton", "A <b> B")).status).toBe(200);
+    expect(await texts.botText("watchButton")).toBe("A <b> B");
+  });
+
+  it("treats a legacy text with literal angle brackets as escaped after migration", async () => {
+    expect((await putText("fallback", "1 &lt; 2 &amp; 3")).status).toBe(200);
+    await texts.sendBotText(api, 1, "fallback");
+    expect(calls[0].payload).toMatchObject({ text: "1 &lt; 2 &amp; 3" });
   });
 
   it("rejects invalid text and keeps the previous value", async () => {
@@ -139,6 +175,13 @@ describe.skipIf(!testDbUrl)("Editable bot texts", () => {
     calls.length = 0;
     await texts.sendBotText(api, 7, "completion");
     expect(calls[0]).toMatchObject({ method: "sendVideo", payload: { video: "video-id", supports_streaming: true } });
+  });
+
+  it("explains that the media chat is unreachable instead of failing", async () => {
+    mediaChatMissing = true;
+    const res = await upload("askContact", new File([new Uint8Array([1, 2, 3])], "a.jpg", { type: "image/jpeg" }));
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: "media_chat_unavailable" });
   });
 
   it("rejects unsupported files and media on buttons", async () => {

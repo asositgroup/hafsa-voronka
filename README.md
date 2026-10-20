@@ -23,7 +23,7 @@ A high-converting video lead generation funnel built for Telegram, combining a N
                          ┌──────────────────────────────┼──────────────────────────────┐
                          ▼                              ▼                              ▼
                  [ Video Stream ]                 [ Hono API ]                 [ Telegram Client ]
-              (Cloudflare R2 CDN)            (Coolify / Oracle VM)           (WebApp SDK / initData)
+              (Cloudflare R2 CDN)            (Docker Compose VPS)            (WebApp SDK / initData)
              video.yourdomain.uz               api.yourdomain.uz
                                                         │
                                        ┌────────────────┼────────────────┐
@@ -37,7 +37,7 @@ A high-converting video lead generation funnel built for Telegram, combining a N
 - **`apps/web` (Next.js 16.4, React 19, Tailwind CSS 4):**
   Deployed to Vercel. Contains the public landing page, admin analytics dashboard, and the Telegram Mini App shell mounted at `/app`. Communicates with the API over HTTPS.
 - **`apps/api` (Hono, grammY, Drizzle ORM, postgres.js):**
-  Deployed via Docker to Coolify on an Oracle Cloud ARM VM. Handles webhook updates from Telegram, validates Telegram `initData` cryptographically, manages user progression and watch state, queues leads for Google Sheets sync, sends Meta Conversions API events, and serves admin API routes.
+  Deployed with Docker Compose on a VPS. Handles webhook updates from Telegram, validates Telegram `initData` cryptographically, manages user progression and watch state, queues leads for Google Sheets sync, sends Meta Conversions API events, and serves admin API routes.
 - **`packages/shared` (`@funnel/shared`):**
   Shared TypeScript zod schemas, phone normalization utilities, and shared constants.
 - **Video Delivery (Cloudflare R2):**
@@ -176,4 +176,4 @@ pnpm --filter @funnel/api set-webhook
 
 ## Production Deployment
 
-For complete end-to-end instructions on configuring Cloudflare DNS, Oracle Cloud VM, Cloudflare R2, Coolify, Vercel, Telegram BotFather, Google Sheets, Meta CAPI, and rollback procedures, refer to the [Production Deployment Runbook](docs/DEPLOY.md).
+For complete end-to-end instructions on configuring Cloudflare DNS, the VPS API server, Cloudflare R2, Vercel, Telegram BotFather, Google Sheets, Meta CAPI, and rollback procedures, refer to the [Production Deployment Runbook](docs/DEPLOY.md).

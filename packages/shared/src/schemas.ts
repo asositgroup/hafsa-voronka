@@ -1,7 +1,10 @@
 import { z } from "zod";
+import { startModes } from "./funnel";
 
 export const sessionRequestSchema = z.object({
   reason: z.enum(["open", "poll"]).default("open"),
+  start: z.enum(startModes).optional().catch(undefined),
+  sentMessageId: z.number().int().positive().optional().catch(undefined),
 });
 
 export type SessionRequest = z.input<typeof sessionRequestSchema>;
@@ -11,6 +14,15 @@ export const sessionResponseSchema = z.object({
   name: z.string().nullable(),
   phoneSet: z.boolean(),
   completed: z.boolean(),
+  unlocked: z.boolean(),
+  unlockAt: z.number().nullable(),
+  videoId: z.number(),
+  priceSec: z.number().nullable(),
+  expired: z.boolean(),
+  secondChance: z.boolean(),
+  startAt: z.number(),
+  startsAtCourse: z.boolean(),
+  offerFirst: z.object({ url: z.string(), duration: z.number() }).nullable(),
   progress: z.object({
     lastPosition: z.number(),
     maxPosition: z.number(),

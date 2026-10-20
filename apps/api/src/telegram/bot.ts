@@ -10,14 +10,20 @@ import {
   setBotBlocked,
   upsertUser,
 } from "@/funnel/users";
+import { syncSegment } from "@/funnel/segments";
 import { uz } from "@/i18n/uz";
 import { applyLeadAction } from "@/leads/actions";
 import type { LeadAction } from "@/leads/card";
 import { findMatchingWebLead } from "@/leads/service";
+import { markBlockedByTelegramId } from "@/telegram/blocked";
+import { adminVideoComposer } from "@/telegram/admin-video/handlers";
+import { adminHomeComposer } from "@/telegram/adminHome";
+import { reminderComposer } from "@/telegram/reminders";
+import { watchAppUrl } from "@/telegram/watchUrl";
 import { botText, sendBotText } from "@/telegram/texts";
 
 async function watchKeyboard(completed: boolean) {
-  const keyboard = new InlineKeyboard().webApp(await botText("watchButton"), `${env.WEB_URL}/app`);
+  const keyboard = new InlineKeyboard().webApp(await botText("watchButton"), watchAppUrl());
   return completed ? keyboard.row().url(await botText("channelButton"), env.CHANNEL_URL) : keyboard;
 }
 
@@ -44,7 +50,7 @@ function isLeadsChat(chat: { id: number; username?: string } | undefined) {
 }
 
 function createBot() {
-  const root = new Bot(env.BOT_TOKEN);
+  const root = new Bot(env.BOT_TOKEN, { client: { apiRoot: env.BOT_API_ROOT } });
 
   root.chatType(["group", "supergroup"]).command("chatid", async (ctx) => {
     const thread = ctx.msg.is_topic_message ? `\nLEADS_THREAD_ID=${ctx.msg.message_thread_id}` : "";
@@ -53,7 +59,7 @@ function createBot() {
     });
   });
 
-  root.callbackQuery(/^lead:(claim|won|lost):(\d+)$/, async (ctx) => {
+  root.callbackQuery(/^lead:(claim|won|lost|wrote):(\d+)$/, async (ctx) => {
     if (!isLeadsChat(ctx.chat)) {
       await ctx.answerCallbackQuery();
       return;
@@ -68,6 +74,10 @@ function createBot() {
   });
 
   const bot = root.chatType("private");
+
+  bot.use(adminVideoComposer);
+  bot.use(reminderComposer);
+  bot.use(adminHomeComposer);
 
   bot.command("start", async (ctx) => {
     if (!ctx.from) return;
@@ -115,8 +125,16 @@ function createBot() {
 
   bot.on("my_chat_member", async (ctx) => {
     const status = ctx.myChatMember.new_chat_member.status;
-    if (status === "kicked") await setBotBlocked(ctx.myChatMember.from.id, true);
-    if (status === "member") await setBotBlocked(ctx.myChatMember.from.id, false);
+    const telegramId = ctx.myChatMember.from.id;
+    if (status === "kicked") {
+      await markBlockedByTelegramId(telegramId).catch((error) => console.error("Segment sync failed:", error));
+    }
+    if (status === "member") {
+      const unblocked = await setBotBlocked(telegramId, false);
+      if (unblocked) {
+        await syncSegment(unblocked.id).catch((error) => console.error("Segment sync failed:", error));
+      }
+    }
   });
 
   root.catch((err) => {

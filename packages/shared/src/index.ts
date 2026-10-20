@@ -11,6 +11,18 @@ export const eventTypes = [
   "progress_75",
   "video_complete",
   "channel_click",
+  "reminder_when_open",
+  "reminder_when_answer",
+  "reminder_later",
+  "message_click",
+  "price_reached",
+  "offer_video_complete",
+  "second_chance_offer",
+  "second_chance_again",
+  "second_chance_later",
+  "later_scheduled",
+  "later_reopened",
+  "later_reminded",
 ] as const;
 
 export type EventType = (typeof eventTypes)[number];
@@ -29,3 +41,10 @@ export * from "./track";
 export * from "./admin";
 export * from "./lead";
 export * from "./botTexts";
+export * from "./funnel";
+export * from "./time";
+export * from "./adminVideos";
+export * from "./messages";
+export * from "./richText";
+export * from "./reports";
+export * from "./adminSettings";

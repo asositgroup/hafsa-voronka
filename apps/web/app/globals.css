@@ -20,3 +20,116 @@
   --font-sans: var(--font-golos), system-ui, -apple-system, sans-serif;
   --font-arabic: var(--font-scheherazade), serif;
 }
+
+.tg-editor .ProseMirror {
+  min-height: 176px;
+  padding: 12px;
+  outline: none;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--color-siyoh);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.tg-editor .ProseMirror > * + * {
+  margin-top: 2px;
+}
+
+.tg-editor p {
+  margin: 0;
+}
+
+.tg-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: color-mix(in srgb, var(--color-qalam) 60%, transparent);
+}
+
+.tg-editor .tg-spoiler {
+  border-radius: 4px;
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-qalam) 15%, transparent) 0 4px,
+    color-mix(in srgb, var(--color-qalam) 5%, transparent) 4px 8px
+  );
+}
+
+.tg-editor blockquote {
+  position: relative;
+  margin-inline: 0;
+  padding: 2px 0 2px 12px;
+  border-left: 3px solid var(--color-siyoh);
+}
+
+.tg-editor blockquote[data-expandable]::after {
+  content: "";
+  position: absolute;
+  right: 4px;
+  bottom: 8px;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid var(--color-qalam);
+  border-bottom: 2px solid var(--color-qalam);
+  transform: rotate(45deg);
+}
+
+.tg-editor pre {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--color-varaq);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.tg-editor pre code {
+  font: inherit;
+  background: none;
+  padding: 0;
+}
+
+.tg-editor code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--color-varaq);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+
+.tg-editor .tg-variable {
+  display: inline-block;
+  padding: 0 8px;
+  border-radius: 9999px;
+  background: var(--color-varaq);
+  color: var(--color-siyoh);
+  font-size: 0.9em;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.tg-editor .tg-variable.ProseMirror-selectednode {
+  outline: 2px solid var(--color-siyoh);
+  outline-offset: 1px;
+}
+
+.tg-editor a {
+  color: #2a7bd0;
+  text-decoration: underline;
+}
+
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}

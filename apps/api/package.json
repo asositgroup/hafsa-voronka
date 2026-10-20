@@ -12,22 +12,26 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file-if-exists=.env src/db/migrate-cli.ts",
     "set-webhook": "tsx --env-file-if-exists=.env scripts/set-webhook.ts",
-    "hash-password": "tsx scripts/hash-password.ts"
+    "hash-password": "tsx scripts/hash-password.ts",
+    "seed:templates": "tsx --env-file-if-exists=.env scripts/seed-templates.ts"
   },
   "dependencies": {
     "@funnel/shared": "workspace:*",
     "@hono/node-server": "^2.1.4",
+    "aws4fetch": "1.0.20",
     "drizzle-orm": "^0.45.4",
     "google-auth-library": "^11.2.0",
     "grammy": "^1.46.0",
     "hono": "^4.13.13",
     "postgres": "^3.4.9",
+    "write-excel-file": "4.1.1",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/node": "^24",
     "drizzle-kit": "^0.31.11",
     "esbuild": "^0.28.2",
+    "read-excel-file": "9.3.10",
     "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^5.0.3"

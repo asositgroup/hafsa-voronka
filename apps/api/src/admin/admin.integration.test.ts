@@ -12,9 +12,12 @@ import {
   users,
   watchProgress,
 } from "@/db/schema";
+import { isolatedDatabase } from "@/test/isolatedDb";
+import { ensureActiveTestVideo } from "@/test/videos";
 import { hashPassword } from "./auth";
 
-const testDbUrl = process.env.TEST_DATABASE_URL;
+const isolatedDb = isolatedDatabase("vf_admin");
+const testDbUrl = isolatedDb.url;
 const TEST_PASSWORD = "test-admin-password-2026";
 const SESSION_SECRET = "supersecret-session-secret-key-32chars!!";
 
@@ -24,6 +27,7 @@ describe.skipIf(!testDbUrl)("Admin Integration Tests", () => {
   let adminSessionCookie: string;
 
   beforeAll(async () => {
+    await isolatedDb.create();
     testPasswordHash = await hashPassword(TEST_PASSWORD);
 
     Object.assign(process.env, {
@@ -34,9 +38,7 @@ describe.skipIf(!testDbUrl)("Admin Integration Tests", () => {
       WEB_URL: "https://example.com",
       DATABASE_URL: testDbUrl,
       CHANNEL_URL: "https://t.me/example",
-      VIDEO_URL: "https://video.example.com/master.mp4",
       VIDEO_POSTER_URL: "https://video.example.com/poster.webp",
-      VIDEO_DURATION_SEC: "900",
       ADMIN_PASSWORD_HASH: testPasswordHash,
       SESSION_SECRET,
     });
@@ -55,6 +57,7 @@ describe.skipIf(!testDbUrl)("Admin Integration Tests", () => {
 
   afterAll(async () => {
     await closeDb();
+    await isolatedDb.drop();
   });
 
   it("returns 503 when admin credentials or secret are missing", async () => {
@@ -125,14 +128,18 @@ describe.skipIf(!testDbUrl)("Admin Integration Tests", () => {
       body: JSON.stringify({ password: TEST_PASSWORD }),
     });
     expect(goodLoginRes.status).toBe(200);
-    expect(await goodLoginRes.json()).toEqual({ ok: true });
+    const loginBody = (await goodLoginRes.json()) as { ok: boolean; token: string };
+    expect(loginBody.ok).toBe(true);
+    expect(typeof loginBody.token).toBe("string");
+    expect(loginBody.token.length).toBeGreaterThan(0);
 
     const cookieHeader = goodLoginRes.headers.get("set-cookie");
     expect(cookieHeader).toBeDefined();
     expect(cookieHeader).toContain("admin_session=");
     expect(cookieHeader).toContain("HttpOnly");
-    expect(cookieHeader).toContain("SameSite=Lax");
-    expect(cookieHeader).toContain("Path=/admin");
+    expect(cookieHeader).toContain("SameSite=None");
+    expect(cookieHeader).toContain("Secure");
+    expect(cookieHeader).toContain("Path=/");
     expect(cookieHeader).toContain("Max-Age=604800");
 
     const cookieMatch = cookieHeader?.match(/admin_session=[^;]+/);
@@ -194,10 +201,13 @@ describe.skipIf(!testDbUrl)("Admin Integration Tests", () => {
     const tgId2 = baseTelegramId + 2;
     const tgId3 = baseTelegramId + 3;
 
+    const video = await ensureActiveTestVideo();
+
     const [u1] = await db()
       .insert(users)
       .values({
         telegramId: tgId1,
+        videoId: video.id,
         name: "Ali Valiyev",
         phone: "+998901111111",
         username: "ali_valiyev",
@@ -215,6 +225,7 @@ describe.skipIf(!testDbUrl)("Admin Integration Tests", () => {
       .insert(users)
       .values({
         telegramId: tgId2,
+        videoId: video.id,
         name: "Bobur Karimov",
         phone: "+998902222222",
         username: "bobur_k",
@@ -230,6 +241,7 @@ describe.skipIf(!testDbUrl)("Admin Integration Tests", () => {
       .insert(users)
       .values({
         telegramId: tgId3,
+        videoId: video.id,
         name: "Charos Rahimova",
         phone: "+998903333333",
         username: "charos_r",
@@ -399,9 +411,11 @@ describe.skipIf(!testDbUrl)("Admin Integration Tests", () => {
     expect(leadsJson.leads[2].completed).toBe(true);
     expect(leadsJson.leads[2].channelClicked).toBe(true);
 
+    const video = await ensureActiveTestVideo();
     const extraUsersBase = Math.floor(Math.random() * 10000000) + 20000000;
     const extraUsers = Array.from({ length: 50 }, (_, i) => ({
       telegramId: extraUsersBase + i,
+      videoId: video.id,
       name: `User ${i}`,
       registeredAt: new Date("2026-05-07T08:00:00.000Z"),
       createdAt: new Date("2026-05-07T08:00:00.000Z"),

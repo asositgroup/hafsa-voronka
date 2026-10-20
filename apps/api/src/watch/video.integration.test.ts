@@ -4,6 +4,7 @@ import { closeDb, db } from "@/db";
 import { events, users, watchProgress } from "@/db/schema";
 import { runMigrations } from "@/db/migrate";
 import { signInitData } from "@/telegram/initData";
+import { createTestVideo } from "@/test/videos";
 import { recordProgress, recordVideoEvent } from "./service";
 
 const testDbUrl = process.env.TEST_DATABASE_URL;
@@ -21,9 +22,7 @@ describe.skipIf(!testDbUrl)("Video Integration Tests", () => {
       WEB_URL: "https://example.com",
       DATABASE_URL: testDbUrl,
       CHANNEL_URL: "https://t.me/example",
-      VIDEO_URL: "https://video.example.com/master.mp4",
       VIDEO_POSTER_URL: "https://video.example.com/poster.webp",
-      VIDEO_DURATION_SEC: "100",
       COMPLETE_THRESHOLD: "0.95",
     });
 
@@ -55,6 +54,7 @@ describe.skipIf(!testDbUrl)("Video Integration Tests", () => {
   }
 
   async function createRegisteredUser(telegramId: number) {
+    const video = await createTestVideo({ duration: 100 });
     const [user] = await db()
       .insert(users)
       .values({
@@ -64,10 +64,21 @@ describe.skipIf(!testDbUrl)("Video Integration Tests", () => {
         phone: "+998901234567",
         phoneVerified: true,
         registeredAt: new Date(),
+        videoId: video.id,
       })
       .returning();
     return user;
   }
+
+  it("uses the duration of the user's video when no config is passed", async () => {
+    const telegramId = Math.floor(Math.random() * 1000000) + 800000;
+    await createRegisteredUser(telegramId);
+
+    const res = await recordProgress(telegramId, { position: 0, event: "play" }, new Date(1700000000000));
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.remainingSecs).toBe(95);
+  });
 
   it("handles a full playthrough via simulated beats with controlled time and logs milestones", async () => {
     const telegramId = Math.floor(Math.random() * 1000000) + 100000;
@@ -137,6 +148,50 @@ describe.skipIf(!testDbUrl)("Video Integration Tests", () => {
       .where(eq(events.userId, user.id));
     const completeEvents = allEvents.filter((e) => e.type === "video_complete");
     expect(completeEvents.length).toBe(1);
+  });
+
+  async function priceReachedEvents(userId: number) {
+    return db()
+      .select()
+      .from(events)
+      .where(and(eq(events.userId, userId), eq(events.type, "price_reached")));
+  }
+
+  async function walkTo(telegramId: number, positions: number[], resume = false) {
+    const start = new Date(1700000000000);
+    if (!resume) await recordProgress(telegramId, { position: 0, event: "play" }, start);
+    for (const position of positions) {
+      await recordProgress(telegramId, { position, event: "tick" }, new Date(start.getTime() + position * 1000));
+    }
+  }
+
+  it("logs price_reached exactly once when the position first crosses the price mark", async () => {
+    const telegramId = Math.floor(Math.random() * 1000000) + 2000000;
+    const video = await createTestVideo({ duration: 100, courseStartSec: 20, priceSec: 50 });
+    const [user] = await db()
+      .insert(users)
+      .values({ telegramId, firstName: "Price", registeredAt: new Date(), videoId: video.id })
+      .returning();
+
+    await walkTo(telegramId, [10, 20, 30, 40]);
+    expect(await priceReachedEvents(user.id)).toHaveLength(0);
+
+    await walkTo(telegramId, [50, 60], true);
+    const logged = await priceReachedEvents(user.id);
+    expect(logged).toHaveLength(1);
+    expect(logged[0].meta).toMatchObject({ videoId: video.id, priceSec: 50 });
+  });
+
+  it("does not log price_reached for a video without a price mark", async () => {
+    const telegramId = Math.floor(Math.random() * 1000000) + 3000000;
+    const video = await createTestVideo({ duration: 100 });
+    const [user] = await db()
+      .insert(users)
+      .values({ telegramId, firstName: "NoPrice", registeredAt: new Date(), videoId: video.id })
+      .returning();
+
+    await walkTo(telegramId, [10, 20, 30, 40, 50, 60]);
+    expect(await priceReachedEvents(user.id)).toHaveLength(0);
   });
 
   it("sets completed_at exactly once even with subsequent beats", async () => {
@@ -219,6 +274,7 @@ describe.skipIf(!testDbUrl)("Video Integration Tests", () => {
 
     const [user1] = await db().select().from(users).where(eq(users.id, user.id));
     expect(user1.channelClickAt).toEqual(t1);
+    expect(user1.wroteAdminAt).toEqual(t1);
 
     const t2 = new Date(1700001000000);
     const res2 = await recordVideoEvent(telegramId, "channel_click", t2);
@@ -226,11 +282,26 @@ describe.skipIf(!testDbUrl)("Video Integration Tests", () => {
 
     const [user2] = await db().select().from(users).where(eq(users.id, user.id));
     expect(user2.channelClickAt).toEqual(t1);
+    expect(user2.wroteAdminAt).toEqual(t1);
 
     const clickEvents = (
       await db().select().from(events).where(eq(events.userId, user.id))
     ).filter((e) => e.type === "channel_click");
     expect(clickEvents.length).toBe(2);
+  });
+
+  it("marks the progress response as not cacheable", async () => {
+    const telegramId = Math.floor(Math.random() * 1000000) + 450000;
+    await createRegisteredUser(telegramId);
+
+    const res = await createApp().request("/app/progress", {
+      method: "POST",
+      headers: { authorization: makeAuthHeader(telegramId), "content-type": "application/json" },
+      body: JSON.stringify({ position: 10, event: "tick" }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("no-store");
   });
 
   it("returns 404 for an unregistered user", async () => {

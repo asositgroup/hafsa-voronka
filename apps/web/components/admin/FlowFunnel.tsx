@@ -1,7 +1,9 @@
 "use client";
 
 import { useId, useState } from "react";
-import { ArrowRightIcon, FunnelIcon } from "@/components/icons";
+import type { ReactNode } from "react";
+import { ArrowRightIcon } from "@/components/icons";
+import { Section } from "@/components/admin/ui/Section";
 import { adminUz } from "@/lib/i18n/admin";
 
 export type FlowStage = {
@@ -47,13 +49,19 @@ function bandPath(heights: number[]) {
   return `${path} Z`;
 }
 
+function BareFrame({ children }: { title?: string; description?: string; children?: ReactNode }) {
+  return <div className="flex flex-col gap-3">{children}</div>;
+}
+
 type FlowFunnelProps = {
   title: string;
   subtitle?: string;
   stages: FlowStage[];
+  bare?: boolean;
+  compact?: boolean;
 };
 
-export function FlowFunnel({ title, subtitle, stages }: FlowFunnelProps) {
+export function FlowFunnel({ title, subtitle, stages, bare = false, compact = false }: FlowFunnelProps) {
   const gradientId = useId();
   const [active, setActive] = useState<number | null>(null);
 
@@ -64,22 +72,14 @@ export function FlowFunnel({ title, subtitle, stages }: FlowFunnelProps) {
   const width = stages.length * COLUMN_WIDTH;
   const path = bandPath(stages.map((stage) => bandHeight(stage.count, max)));
 
-  return (
-    <section className="bg-white rounded-[16px] p-5 sm:p-6 flex flex-col gap-5">
-      <header className="flex items-center gap-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-varaq text-zumrad">
-          <FunnelIcon className="h-[18px] w-[18px]" />
-        </span>
-        <div className="min-w-0">
-          <h2 className="m-0 text-[16px] font-semibold text-siyoh">{title}</h2>
-          {subtitle && <p className="m-0 text-xs text-qalam">{subtitle}</p>}
-        </div>
-      </header>
+  const Frame = bare ? BareFrame : Section;
 
+  return (
+    <Frame title={title} description={subtitle}>
       <div className="overflow-x-auto">
         <div
           className="relative"
-          style={{ minWidth: `${stages.length * 84}px` }}
+          style={{ minWidth: compact ? undefined : `${stages.length * 84}px` }}
           onMouseLeave={() => setActive(null)}
         >
           <div
@@ -89,12 +89,12 @@ export function FlowFunnel({ title, subtitle, stages }: FlowFunnelProps) {
             {stages.map((stage, i) => (
               <div
                 key={stage.key}
-                className={`flex flex-col gap-1.5 pr-2 pb-4 ${i > 0 ? "pl-2.5" : ""}`}
+                className={`flex flex-col gap-1.5 pb-4 ${compact ? "pr-1" : "pr-2"} ${i > 0 ? (compact ? "pl-1.5" : "pl-2.5") : ""}`}
               >
-                <span className="line-clamp-2 min-h-[2lh] text-xs leading-[1.35] text-qalam" title={stage.label}>
+                <span className={`text-qalam leading-[1.35] ${compact ? "line-clamp-3 min-h-[3lh] text-[11px] sm:line-clamp-2 sm:min-h-[2lh] sm:text-xs" : "line-clamp-2 min-h-[2lh] text-xs"}`} title={stage.label}>
                   {stage.label}
                 </span>
-                <span className="text-[20px] font-bold leading-none text-siyoh tabular-nums">
+                <span className={`font-bold leading-none text-siyoh tabular-nums ${compact ? "text-[17px] sm:text-[20px]" : "text-[20px]"}`}>
                   {countFormat.format(stage.count)}
                 </span>
               </div>
@@ -131,7 +131,7 @@ export function FlowFunnel({ title, subtitle, stages }: FlowFunnelProps) {
               <span
                 key={stage.key}
                 aria-hidden="true"
-                className="pointer-events-none absolute top-1/2 z-[1] flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-siyoh tabular-nums shadow-[0_1px_4px_rgba(18,59,51,.18)]"
+                className={`pointer-events-none absolute top-1/2 z-[1] flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 whitespace-nowrap rounded-full bg-white py-1 font-semibold ${compact ? "px-1.5 text-[11px] sm:px-2.5 sm:text-xs" : "px-2.5 text-xs"} text-siyoh tabular-nums shadow-[0_1px_4px_rgba(18,59,51,.18)]`}
                 style={{ left: `${((index + 1) / stages.length) * 100}%` }}
               >
                 {percentOf(stage.count, stages[index].count)}
@@ -157,7 +157,7 @@ export function FlowFunnel({ title, subtitle, stages }: FlowFunnelProps) {
               <div
                 key={stage.key}
                 tabIndex={0}
-                className="relative outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-siyoh/40 rounded-[6px]"
+                className="relative outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-siyoh/40 rounded-[10px]"
                 onMouseEnter={() => setActive(i)}
                 onFocus={() => setActive(i)}
                 onBlur={() => setActive(null)}
@@ -208,6 +208,6 @@ export function FlowFunnel({ title, subtitle, stages }: FlowFunnelProps) {
           ))}
         </tbody>
       </table>
-    </section>
+    </Frame>
   );
 }

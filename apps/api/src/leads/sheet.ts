@@ -1,8 +1,9 @@
 import { and, asc, eq, gt, lt, sql } from "drizzle-orm";
 import { db, rawClient } from "@/db";
-import { type Lead, leads, type User, users, watchProgress } from "@/db/schema";
+import { type Lead, leads, type User, users, videos, watchProgress } from "@/db/schema";
 import { env } from "@/env";
 import { appendRows, formatTashkentDate, readColumn, sheetPhone, writeRanges } from "@/sheets";
+import { notAdminTelegramId } from "@/telegram/admins";
 import { assigneeLabel, outcomeLabels, watchedPercent } from "./card";
 
 const SHEETS_LOCK_KEY = 849204812;
@@ -48,7 +49,11 @@ function dateCell(date: Date | null | undefined) {
   return date ? formatTashkentDate(date) : "";
 }
 
-export function renderLeadRow(lead: Lead, user: SheetUser | null, maxPosition: number | null) {
+export function renderLeadRow(
+  lead: Lead,
+  user: SheetUser | null,
+  progress: { maxPosition: number | null; duration: number | null } | null,
+) {
   const registered = user?.registeredAt ? user : null;
   const username = registered?.username ? `@${registered.username.replace(/^@/, "")}` : "";
 
@@ -63,7 +68,7 @@ export function renderLeadRow(lead: Lead, user: SheetUser | null, maxPosition: n
     username,
     registered ? String(registered.telegramId) : "",
     dateCell(registered?.registeredAt),
-    registered ? `${watchedPercent(maxPosition ?? 0, env.VIDEO_DURATION_SEC)}%` : "",
+    registered ? `${watchedPercent(progress?.maxPosition ?? 0, progress?.duration ?? 0)}%` : "",
     dateCell(registered?.completedAt),
     lead.assigneeTelegramId !== null ? assigneeLabel(lead) : "",
     lead.outcome ? outcomeLabels[lead.outcome] : "",
@@ -79,11 +84,23 @@ function rowRange(rowNumber: number) {
 
 async function syncPending() {
   const pending = await db()
-    .select({ lead: leads, user: users, maxPosition: watchProgress.maxPosition })
+    .select({
+      lead: leads,
+      user: users,
+      maxPosition: watchProgress.maxPosition,
+      duration: videos.duration,
+    })
     .from(leads)
     .leftJoin(users, eq(users.id, leads.userId))
     .leftJoin(watchProgress, eq(watchProgress.userId, leads.userId))
-    .where(and(gt(leads.notifyVersion, leads.sheetsSyncedVersion), lt(leads.sheetsAttempts, MAX_ATTEMPTS)))
+    .leftJoin(videos, eq(videos.id, users.videoId))
+    .where(
+      and(
+        gt(leads.notifyVersion, leads.sheetsSyncedVersion),
+        lt(leads.sheetsAttempts, MAX_ATTEMPTS),
+        notAdminTelegramId(users.telegramId),
+      ),
+    )
     .orderBy(asc(leads.id))
     .limit(BATCH_SIZE);
 
@@ -97,8 +114,8 @@ async function syncPending() {
     ];
     const appends: unknown[][] = [];
 
-    for (const { lead, user, maxPosition } of pending) {
-      const row = renderLeadRow(lead, user, maxPosition);
+    for (const { lead, user, maxPosition, duration } of pending) {
+      const row = renderLeadRow(lead, user, { maxPosition, duration });
       const rowNumber = rowByLeadId.get(String(lead.id));
       if (rowNumber) updates.push({ range: rowRange(rowNumber), values: [row] });
       else appends.push(row);

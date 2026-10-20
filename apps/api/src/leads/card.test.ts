@@ -48,6 +48,8 @@ const user: CardUser = {
   phoneVerified: true,
   registeredAt: new Date("2026-10-12T09:35:00Z"),
   completedAt: null,
+  wroteAdminAt: null,
+  wroteAdminBy: null,
 };
 
 describe("renderLeadCard", () => {
@@ -119,6 +121,33 @@ describe("renderLeadCard", () => {
   });
 });
 
+describe("renderLeadCard wrote-admin mark", () => {
+  const linked: Lead = { ...webLead, userId: 5 };
+  const wroteAt = new Date("2026-10-12T10:00:00Z");
+
+  it("shows the mark with the admin who set it and the time", () => {
+    const card = renderLeadCard(
+      { ...linked, assigneeTelegramId: 42, assigneeName: "Sardor" },
+      { ...user, wroteAdminAt: wroteAt, wroteAdminBy: 42 },
+    );
+    expect(card).toContain("✍️ Adminga yozdi · Sardor · 2026-10-12 15:00 (Toshkent)");
+  });
+
+  it("falls back to the telegram id for an admin who is not the assignee", () => {
+    const card = renderLeadCard(linked, { ...user, wroteAdminAt: wroteAt, wroteAdminBy: 77 });
+    expect(card).toContain("✍️ Adminga yozdi · ID 77 · 2026-10-12 15:00 (Toshkent)");
+  });
+
+  it("omits the who part when the user wrote on their own", () => {
+    const card = renderLeadCard(linked, { ...user, wroteAdminAt: wroteAt });
+    expect(card).toContain("✍️ Adminga yozdi · 2026-10-12 15:00 (Toshkent)");
+  });
+
+  it("shows nothing before the mark", () => {
+    expect(renderLeadCard(linked, user)).not.toContain("Adminga yozdi");
+  });
+});
+
 describe("watchedPercent", () => {
   it("rounds and clamps to 0..100", () => {
     expect(watchedPercent(150, 600)).toBe(25);
@@ -129,7 +158,7 @@ describe("watchedPercent", () => {
 
 describe("renderLeadKeyboard", () => {
   const buttons = (lead: Lead) =>
-    renderLeadKeyboard(lead).inline_keyboard.map((row) =>
+    renderLeadKeyboard(lead, null).inline_keyboard.map((row) =>
       row.map((b) => `${b.text}|${"callback_data" in b ? b.callback_data : ""}`),
     );
 
@@ -148,5 +177,78 @@ describe("renderLeadKeyboard", () => {
 
   it("removes the buttons once an outcome is set", () => {
     expect(buttons({ ...webLead, assigneeTelegramId: 42, outcome: "lost" })).toEqual([]);
+  });
+
+  const linkedLead: Lead = { ...webLead, userId: 5 };
+  const linkedButtons = (lead: Lead, cardUser: CardUser | null) =>
+    renderLeadKeyboard(lead, cardUser).inline_keyboard.map((row) =>
+      row.map((b) => `${b.text}|${"callback_data" in b ? b.callback_data : ""}`),
+    );
+
+  it("adds the wrote button for a linked lead whose user has not written to admin", () => {
+    expect(linkedButtons(linkedLead, user)).toEqual([
+      ["🙋 Men olaman|lead:claim:1"],
+      ["✅ Muvaffaqiyatli|lead:won:1", "❌ Yo'qotildi|lead:lost:1"],
+      ["✍️ Yozdi|lead:wrote:1"],
+    ]);
+  });
+
+  it("keeps the wrote button after an outcome is set", () => {
+    expect(linkedButtons({ ...linkedLead, assigneeTelegramId: 42, outcome: "lost" }, user)).toEqual([
+      ["✍️ Yozdi|lead:wrote:1"],
+    ]);
+  });
+
+  it("hides the wrote button once the user wrote to admin", () => {
+    const wrote = { ...user, wroteAdminAt: new Date("2026-10-12T10:00:00Z") };
+    expect(linkedButtons(linkedLead, wrote)).toEqual([
+      ["🙋 Men olaman|lead:claim:1"],
+      ["✅ Muvaffaqiyatli|lead:won:1", "❌ Yo'qotildi|lead:lost:1"],
+    ]);
+    expect(linkedButtons({ ...linkedLead, outcome: "won" }, wrote)).toEqual([]);
+  });
+
+  it("hides the wrote button for a lead without a user row", () => {
+    expect(linkedButtons(webLead, null)).toEqual([
+      ["🙋 Men olaman|lead:claim:1"],
+      ["✅ Muvaffaqiyatli|lead:won:1", "❌ Yo'qotildi|lead:lost:1"],
+    ]);
+  });
+});
+
+describe("renderLeadCard second chance line", () => {
+  const linked: Lead = { ...webLead, userId: 5 };
+
+  it("shows how many second chances went out and the latest answer", () => {
+    const waiting = renderLeadCard(linked, { ...user, secondChance: { offered: 2, answer: null, exhausted: false } });
+    expect(waiting).toContain("🔁 Qayta imkon: 2/7 · javob kutilmoqda");
+    const again = renderLeadCard(linked, { ...user, secondChance: { offered: 1, answer: "again", exhausted: false } });
+    expect(again).toContain("🔁 Qayta imkon: 1/7 · «Ha» bosdi");
+    const later = renderLeadCard(linked, { ...user, secondChance: { offered: 3, answer: "later", exhausted: false } });
+    expect(later).toContain("🔁 Qayta imkon: 3/7 · «Keyinroq» bosdi");
+    const done = renderLeadCard(linked, { ...user, secondChance: { offered: 7, answer: null, exhausted: true } });
+    expect(done).toContain("🔁 Qayta imkon: 7/7 · imkon tugadi");
+  });
+
+  it("shows the chosen time while an appointment is pending", () => {
+    const appointmentAt = new Date("2026-10-21T03:00:00Z");
+    const card = renderLeadCard(linked, {
+      ...user,
+      secondChance: { offered: 1, answer: "later", exhausted: false, appointmentAt },
+    });
+    expect(card).toContain("🔁 Qayta imkon: 1/7 · «Keyinroq» bosdi");
+    expect(card).toContain("⏰ Tanlangan vaqt: 2026-10-21 08:00 (Toshkent)");
+    const remind = renderLeadCard(linked, {
+      ...user,
+      secondChance: { offered: 0, answer: null, exhausted: false, appointmentAt },
+    });
+    expect(remind).toContain("⏰ Tanlangan vaqt: 2026-10-21 08:00 (Toshkent)");
+    expect(remind).not.toContain("🔁");
+  });
+
+  it("shows nothing before the first second chance", () => {
+    expect(renderLeadCard(linked, { ...user, secondChance: { offered: 0, answer: null, exhausted: false } })).not.toContain(
+      "Qayta imkon",
+    );
   });
 });

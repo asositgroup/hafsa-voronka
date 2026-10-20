@@ -9,9 +9,7 @@ beforeAll(() => {
     WEB_URL: "https://example.com",
     DATABASE_URL: "postgres://user:pass@localhost:1/none",
     CHANNEL_URL: "https://t.me/example",
-    VIDEO_URL: "https://video.example.com/master.mp4",
     VIDEO_POSTER_URL: "https://video.example.com/poster.webp",
-    VIDEO_DURATION_SEC: "900",
   });
 });
 
@@ -37,5 +35,21 @@ describe("POST /bot", () => {
       body: JSON.stringify({ update_id: 1 }),
     });
     expect(response.status).toBe(401);
+  });
+});
+
+describe("admin CORS", () => {
+  it.each(["PUT", "PATCH", "DELETE"])("allows %s preflight from the web origin", async (method) => {
+    const { createApp } = await import("./app");
+    const response = await createApp().request("/admin/videos/1", {
+      method: "OPTIONS",
+      headers: {
+        origin: "https://example.com",
+        "access-control-request-method": method,
+        "access-control-request-headers": "authorization,content-type",
+      },
+    });
+    expect(response.headers.get("access-control-allow-origin")).toBe("https://example.com");
+    expect(response.headers.get("access-control-allow-methods")?.split(",")).toContain(method);
   });
 });

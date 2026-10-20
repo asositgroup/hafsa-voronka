@@ -20,6 +20,36 @@ services:
         limits:
           memory: 512M
 
+  telegram-bot-api-volume:
+    image: aiogram/telegram-bot-api:10.3
+    user: "0:0"
+    entrypoint: ["chown", "-R", "1000:1000", "/var/lib/telegram-bot-api"]
+    volumes:
+      - tgbotapi:/var/lib/telegram-bot-api
+
+  telegram-bot-api:
+    image: aiogram/telegram-bot-api:10.3
+    restart: unless-stopped
+    user: "1000:1000"
+    entrypoint:
+      - telegram-bot-api
+      - --local
+      - --http-port=8081
+      - --dir=/var/lib/telegram-bot-api
+      - --temp-dir=/tmp
+    environment:
+      TELEGRAM_API_ID: ${TELEGRAM_API_ID}
+      TELEGRAM_API_HASH: ${TELEGRAM_API_HASH}
+    volumes:
+      - tgbotapi:/var/lib/telegram-bot-api
+    depends_on:
+      telegram-bot-api-volume:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
   api:
     build:
       context: ..
@@ -30,9 +60,13 @@ services:
     env_file: .env.prod
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-funnel}:${POSTGRES_PASSWORD:-funnel}@postgres:5432/${POSTGRES_DB:-funnel}
+    volumes:
+      - tgbotapi:/var/lib/telegram-bot-api
     depends_on:
       postgres:
         condition: service_healthy
+      telegram-bot-api:
+        condition: service_started
     deploy:
       resources:
         limits:
@@ -59,5 +93,6 @@ services:
 
 volumes:
   pgdata:
+  tgbotapi:
   caddy_data:
   caddy_config:

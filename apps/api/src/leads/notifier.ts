@@ -1,8 +1,10 @@
 import { and, asc, eq, gt, lt, sql } from "drizzle-orm";
 import { GrammyError, type InlineKeyboard } from "grammy";
+import type { OfferAnswer } from "@funnel/shared";
 import { db, rawClient } from "@/db";
-import { type Lead, leads, users, watchProgress } from "@/db/schema";
+import { type Lead, leads, users, videos, watchProgress } from "@/db/schema";
 import { env } from "@/env";
+import { notAdminTelegramId } from "@/telegram/admins";
 import { bot } from "@/telegram/bot";
 import {
   type CardUser,
@@ -91,7 +93,7 @@ export function leadSender(): LeadSender | undefined {
 
 export async function syncLeadCard(lead: Lead, user: CardUser | null, sender: LeadSender) {
   const text = renderLeadCard(lead, user);
-  const keyboard = renderLeadKeyboard(lead);
+  const keyboard = renderLeadKeyboard(lead, user);
   let messageId = lead.notifyMessageId;
   if (messageId === null) {
     messageId = await sender.send(text, { keyboard });
@@ -108,25 +110,42 @@ export async function syncLeadCard(lead: Lead, user: CardUser | null, sender: Le
 
 async function flushPending(sender: LeadSender) {
   const pending = await db()
-    .select({ lead: leads, user: users, maxPosition: watchProgress.maxPosition })
+    .select({
+      lead: leads,
+      user: users,
+      maxPosition: watchProgress.maxPosition,
+      duration: videos.duration,
+      offered: sql<number>`(select count(*) from second_chance_offers o where o.user_id = ${leads.userId} and o.sent_message_id is not null)::int`,
+      lastAnswer: sql<OfferAnswer | null>`(select o.answer from second_chance_offers o where o.user_id = ${leads.userId} and o.sent_message_id is not null order by o.occasion desc limit 1)`,
+      exhausted: sql<boolean>`exists (select 1 from segment_runs r where r.user_id = ${leads.userId} and r.end_reason = 'offers_exhausted')`,
+      appointmentAt: sql<Date | null>`(select a.chosen_at from watch_appointments a where a.user_id = ${leads.userId} and a.fired_at is null and a.cancelled_at is null limit 1)`,
+    })
     .from(leads)
     .leftJoin(users, eq(users.id, leads.userId))
     .leftJoin(watchProgress, eq(watchProgress.userId, leads.userId))
+    .leftJoin(videos, eq(videos.id, users.videoId))
     .where(
       and(
         gt(leads.notifyVersion, leads.notifiedVersion),
         lt(leads.notifyAttempts, MAX_ATTEMPTS),
         sql`${leads.createdAt} > now() - make_interval(days => ${MAX_AGE_DAYS})`,
+        notAdminTelegramId(users.telegramId),
       ),
     )
     .orderBy(asc(leads.id))
     .limit(BATCH_SIZE);
 
-  for (const { lead, user, maxPosition } of pending) {
+  for (const { lead, user, maxPosition, duration, offered, lastAnswer, exhausted, appointmentAt } of pending) {
     try {
       const cardUser = user && {
         ...user,
-        watchedPercent: watchedPercent(maxPosition ?? 0, env.VIDEO_DURATION_SEC),
+        watchedPercent: watchedPercent(maxPosition ?? 0, duration ?? 0),
+        secondChance: {
+          offered,
+          answer: lastAnswer,
+          exhausted,
+          appointmentAt: appointmentAt && new Date(appointmentAt),
+        },
       };
       await syncLeadCard(lead, cardUser, sender);
       await db()

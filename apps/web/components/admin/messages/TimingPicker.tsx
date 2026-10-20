@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   dayForTiming,
   isExpiryTiming,
@@ -14,6 +15,7 @@ import {
   type TimingType,
   timingTypes,
 } from "@funnel/shared";
+import { Button } from "@/components/admin/ui/Button";
 import { Field, Input } from "@/components/admin/ui/Field";
 import { Select } from "@/components/admin/ui/Select";
 import { TimePicker } from "@/components/admin/ui/TimePicker";
@@ -25,7 +27,18 @@ export function defaultTiming(type: TimingType, day: number): TemplateTiming {
   if (type === "after_entry") return { type, value: (day - 1) * MINUTES_PER_DAY + 60 };
   if (type === "day_time") return { type, value: 9 * 60 };
   if (type === "night_notice" || type === "occasion") return { type, value: 0 };
-  return { type, value: MINUTES_PER_DAY };
+  return { type, value: 3 * 60 };
+}
+
+const stageTimingTypes: Record<FunnelSegment, TimingType> = {
+  A: "before_expiry",
+  B: "after_entry",
+  C: "after_entry",
+  D: "occasion",
+};
+
+export function stageTiming(segment: FunnelSegment): TemplateTiming {
+  return defaultTiming(stageTimingTypes[segment], 1);
 }
 
 function timeString(minutes: number) {
@@ -85,9 +98,9 @@ const dayOptions = Array.from({ length: TEMPLATE_DAYS }, (_, index) => ({
   label: adminUz.messages.dayLabel.replace("{n}", String(index + 1)),
 }));
 
-function timingTypeOptions(segment: FunnelSegment) {
+function timingTypeOptions(segment: FunnelSegment, current: TimingType) {
   return timingTypes
-    .filter((type) => type !== "occasion" && (type !== "night_notice" || linkBoundSegments.includes(segment)))
+    .filter((type) => type !== "occasion" && (type !== "night_notice" || (current === "night_notice" && linkBoundSegments.includes(segment))))
     .map((type) => ({ value: type, label: typeLabel(type, segment) }));
 }
 
@@ -112,6 +125,9 @@ export function TimingPicker({ day, timing, segment, onChange, error }: TimingPi
   const entryHours = Math.floor((timing.value % MINUTES_PER_DAY) / 60);
   const entryMinutes = timing.value % 60;
 
+  const standard = stageTimingTypes[segment];
+  const [custom, setCustom] = useState(timing.type !== standard);
+
   const message = error ? `${typeLabel(timing.type, segment)}: ${adminUz.messages.errors[error]}` : null;
 
   function change(next: TemplateTiming, fallbackDay = day) {
@@ -123,20 +139,30 @@ export function TimingPicker({ day, timing, segment, onChange, error }: TimingPi
     change({ type: "after_entry", value });
   }
 
+  function toggleCustom() {
+    if (custom && timing.type !== standard) change(defaultTiming(standard, day));
+    setCustom(!custom);
+  }
+
   return (
     <div className="flex flex-col gap-3">
-      <Field label={copy.timingKind} hideLabel>
-        {({ id }) => (
-          <Select
-            id={id}
-            value={timing.type}
-            onValueChange={(next) => change(defaultTiming(next as TimingType, day))}
-            options={timingTypeOptions(segment)}
-          />
-        )}
-      </Field>
-
-      <p className="m-0 text-[13px] text-qalam/70">{typeExample(timing.type, segment)}</p>
+      {custom ? (
+        <>
+          <Field label={copy.timingKind} hideLabel>
+            {({ id }) => (
+              <Select
+                id={id}
+                value={timing.type}
+                onValueChange={(next) => change(defaultTiming(next as TimingType, day))}
+                options={timingTypeOptions(segment, timing.type)}
+              />
+            )}
+          </Field>
+          <p className="m-0 text-[13px] text-qalam/70">{typeExample(timing.type, segment)}</p>
+        </>
+      ) : (
+        <p className="m-0 text-sm font-medium text-siyoh">{typeLabel(timing.type, segment)}</p>
+      )}
 
       {timing.type === "after_entry" && (
         <div className="flex flex-wrap items-start gap-3">
@@ -229,6 +255,12 @@ export function TimingPicker({ day, timing, segment, onChange, error }: TimingPi
       )}
 
       <p className="m-0 text-[13px] text-qalam">{timingSummary(day, timing, segment)}</p>
+
+      <div>
+        <Button variant="ghost" size="sm" onClick={toggleCustom} className="-ml-3">
+          {custom ? copy.standardTiming : copy.customTiming}
+        </Button>
+      </div>
 
       {message && (
         <p role="alert" className="m-0 text-[13px] text-anor">

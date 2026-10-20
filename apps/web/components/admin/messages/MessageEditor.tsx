@@ -4,7 +4,6 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import {
   attemptTargetSegments,
-  defaultButtonFor,
   type FunnelSegment,
   type MessageTemplate,
   type MessageTemplateInput,
@@ -27,12 +26,12 @@ import { Disclosure } from "@/components/admin/ui/Disclosure";
 import { Notice } from "@/components/admin/ui/Notice";
 import { Segmented } from "@/components/admin/ui/Segmented";
 import { Switch } from "@/components/admin/ui/Switch";
-import { AttemptPicker } from "@/components/admin/messages/AttemptPicker";
+import { AttemptPicker, attemptsLabel } from "@/components/admin/messages/AttemptPicker";
 import { ButtonsEditor } from "@/components/admin/messages/ButtonsEditor";
 import { MessagePreview } from "@/components/admin/messages/MessagePreview";
-import { StopPointPicker, type VideoMarks } from "@/components/admin/messages/StopPointPicker";
+import { StopPointPicker, stopPointLabel, type VideoMarks } from "@/components/admin/messages/StopPointPicker";
 import { TextEditor } from "@/components/admin/messages/editor/TextEditor";
-import { defaultTiming, TimingPicker, timingSummary } from "@/components/admin/messages/TimingPicker";
+import { stageTiming, TimingPicker, timingSummary } from "@/components/admin/messages/TimingPicker";
 import {
   createMessage,
   deleteMessage,
@@ -49,6 +48,39 @@ const copy = adminUz.messages.editor;
 const errors = adminUz.messages.errors;
 const mediaIcons = { photo: PhotoIcon, video: VideoIcon, voice: VoiceIcon };
 const acceptedMedia = Object.values(TEMPLATE_MEDIA_MIME_TYPES).flat().join(",");
+const extraErrorCodes = new Set([
+  "statuses_invalid",
+  "attempts_invalid",
+  "button_not_allowed",
+  "unsupported_type",
+  "too_large",
+  "media_not_configured",
+  "media_chat_unavailable",
+]);
+
+function usesExtras(segment: FunnelSegment, draft: MessageTemplateInput) {
+  return (
+    draft.media !== null ||
+    !draft.isActive ||
+    draft.attempts !== null ||
+    (statusTargetSegments.includes(segment) && draft.statuses !== null) ||
+    (segment !== SECOND_CHANCE_SEGMENT && draft.buttons.length > 0)
+  );
+}
+
+function extrasSummary(segment: FunnelSegment, draft: MessageTemplateInput, videoMarks: VideoMarks) {
+  return [
+    draft.media ? adminUz.messages.mediaBadge[draft.media.type] : null,
+    draft.buttons.length > 0 ? adminUz.messages.buttonsCount.replace("{n}", String(draft.buttons.length)) : null,
+    statusTargetSegments.includes(segment) && draft.statuses
+      ? draft.statuses.map((status) => stopPointLabel(status, videoMarks)).join(", ")
+      : null,
+    draft.attempts ? attemptsLabel(draft.attempts) : null,
+    draft.isActive ? null : adminUz.messages.inactive,
+  ]
+    .filter((part): part is string => part !== null)
+    .join(" · ");
+}
 
 function errorText(code: string | undefined, variable?: string) {
   const template = errors[code as keyof typeof errors] ?? errors.generic;
@@ -111,7 +143,7 @@ export function MessageEditor({
           day: preset?.day ?? 1,
           text: preset?.text ?? "",
           media: null,
-          timing: preset?.timing ?? defaultTiming("after_entry", 1),
+          timing: preset?.timing ?? stageTiming(segment),
           buttons: preset?.buttons ?? [],
           isActive: true,
           statuses: preset?.statuses ?? null,
@@ -127,7 +159,7 @@ export function MessageEditor({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [tab, setTab] = useState<"edit" | "preview">("edit");
   const [timingOpen, setTimingOpen] = useState(() => !item || window.matchMedia("(min-width: 1024px)").matches);
-  const [buttonsOpen, setButtonsOpen] = useState(() => (item?.buttons.length ?? preset?.buttons?.length ?? 0) > 0);
+  const [extrasOpen, setExtrasOpen] = useState(() => usesExtras(segment, draft));
   const secondChance = segment === SECOND_CHANCE_SEGMENT;
   const [pickerOpen, setPickerOpen] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -160,6 +192,7 @@ export function MessageEditor({
     setBusy(null);
     if (!result.ok) {
       setError(errorText(result.error, result.variable));
+      if (result.error && extraErrorCodes.has(result.error)) setExtrasOpen(true);
       return;
     }
     after(result.data);
@@ -215,9 +248,8 @@ export function MessageEditor({
       {error && <Notice tone="danger">{error}</Notice>}
       {testNote && <Notice tone="success">{testNote}</Notice>}
       {admins.length === 0 && <p className="m-0 text-[13px] text-qalam">{copy.testNoAdmins}</p>}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Switch checked={draft.isActive} onChange={(isActive) => patch({ isActive })} label={copy.active} showLabel />
-        <div className="ml-auto flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex items-center gap-2">
           <Button
             variant="secondary"
             disabled={!canSubmit || admins.length === 0}
@@ -255,17 +287,6 @@ export function MessageEditor({
 
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-x-8">
             <div className={`${tab === "edit" ? "flex" : "hidden"} flex-col gap-5 lg:flex`}>
-              {statusTargetSegments.includes(segment) && (
-                <StopPointPicker
-                  segment={segment}
-                  value={draft.statuses}
-                  marks={videoMarks}
-                  onChange={(statuses) => patch({ statuses })}
-                />
-              )}
-              {attemptTargetSegments.includes(segment) && (
-                <AttemptPicker value={draft.attempts} onChange={(attempts) => patch({ attempts })} />
-              )}
               <TextEditor
                 value={draft.text}
                 onChange={(text) => patch({ text })}
@@ -306,85 +327,91 @@ export function MessageEditor({
                   if (file) void upload(file);
                 }}
               />
-              <div className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 rounded-[12px] border border-chiziq px-3 py-1">
-                <span className="flex min-w-0 flex-1 items-center gap-2 text-[15px] font-semibold text-siyoh">
-                  {MediaIcon && draft.media ? (
-                    <>
-                      <MediaIcon className="h-5 w-5 shrink-0 text-qalam" />
-                      <span className="truncate">{adminUz.messages.mediaBadge[draft.media.type]}</span>
-                    </>
-                  ) : (
-                    copy.media
-                  )}
-                </span>
-                {!mediaEnabled ? (
-                  <span className="text-[13px] text-qalam">{copy.mediaDisabled}</span>
-                ) : hasMedia ? (
-                  <span className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={busy !== null}
-                      loading={busy === "upload"}
-                      loadingLabel={copy.uploading}
-                      onClick={() => fileInput.current?.click()}
-                    >
-                      {copy.replaceMedia}
-                    </Button>
-                    <Button
-                      variant="dangerGhost"
-                      size="sm"
-                      disabled={busy !== null}
-                      onClick={() => {
-                        setLocalMedia(null);
-                        patch({ media: null });
-                      }}
-                    >
-                      {copy.removeMedia}
-                    </Button>
-                  </span>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={busy !== null}
-                    loading={busy === "upload"}
-                    loadingLabel={copy.uploading}
-                    icon={<PlusIcon className="h-4 w-4" />}
-                    onClick={() => fileInput.current?.click()}
-                  >
-                    {copy.add}
-                  </Button>
-                )}
-              </div>
-
               <Disclosure
-                title={copy.buttonsTitle}
-                summary={draft.buttons.length > 0 ? String(draft.buttons.length) : undefined}
-                open={buttonsOpen}
-                onOpenChange={setButtonsOpen}
-                action={
-                  !buttonsOpen && draft.buttons.length === 0 ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      icon={<PlusIcon className="h-4 w-4" />}
-                      onClick={() => {
-                        patch({ buttons: [defaultButtonFor(segment)] });
-                        setButtonsOpen(true);
-                      }}
-                    >
-                      {copy.add}
-                    </Button>
-                  ) : undefined
-                }
+                title={copy.extraTitle}
+                summary={extrasSummary(segment, draft, videoMarks) || undefined}
+                open={extrasOpen || !buttonsValid}
+                onOpenChange={setExtrasOpen}
               >
-                <ButtonsEditor
-                  segment={segment}
-                  buttons={draft.buttons}
-                  onChange={(buttons) => patch({ buttons })}
-                  prefillSupported={prefillSupported}
-                />
+                <div className="flex flex-col gap-5">
+                  <div className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 rounded-[12px] border border-chiziq px-3 py-1">
+                    <span className="flex min-w-0 flex-1 items-center gap-2 text-[15px] font-semibold text-siyoh">
+                      {MediaIcon && draft.media ? (
+                        <>
+                          <MediaIcon className="h-5 w-5 shrink-0 text-qalam" />
+                          <span className="truncate">{adminUz.messages.mediaBadge[draft.media.type]}</span>
+                        </>
+                      ) : (
+                        copy.media
+                      )}
+                    </span>
+                    {!mediaEnabled ? (
+                      <span className="text-[13px] text-qalam">{copy.mediaDisabled}</span>
+                    ) : hasMedia ? (
+                      <span className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={busy !== null}
+                          loading={busy === "upload"}
+                          loadingLabel={copy.uploading}
+                          onClick={() => fileInput.current?.click()}
+                        >
+                          {copy.replaceMedia}
+                        </Button>
+                        <Button
+                          variant="dangerGhost"
+                          size="sm"
+                          disabled={busy !== null}
+                          onClick={() => {
+                            setLocalMedia(null);
+                            patch({ media: null });
+                          }}
+                        >
+                          {copy.removeMedia}
+                        </Button>
+                      </span>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={busy !== null}
+                        loading={busy === "upload"}
+                        loadingLabel={copy.uploading}
+                        icon={<PlusIcon className="h-4 w-4" />}
+                        onClick={() => fileInput.current?.click()}
+                      >
+                        {copy.add}
+                      </Button>
+                    )}
+                  </div>
+
+                  <section aria-labelledby="extras-buttons" className="flex flex-col gap-2">
+                    <h3 id="extras-buttons" className="m-0 text-sm font-medium text-siyoh">
+                      {copy.buttonsTitle}
+                    </h3>
+                    <ButtonsEditor
+                      segment={segment}
+                      buttons={draft.buttons}
+                      onChange={(buttons) => patch({ buttons })}
+                      prefillSupported={prefillSupported}
+                    />
+                  </section>
+
+                  {statusTargetSegments.includes(segment) && (
+                    <StopPointPicker
+                      segment={segment}
+                      value={draft.statuses}
+                      marks={videoMarks}
+                      onChange={(statuses) => patch({ statuses })}
+                    />
+                  )}
+                  {attemptTargetSegments.includes(segment) && (
+                    <AttemptPicker value={draft.attempts} onChange={(attempts) => patch({ attempts })} />
+                  )}
+
+                  <Switch checked={draft.isActive} onChange={(isActive) => patch({ isActive })} label={copy.active} showLabel />
+                </div>
               </Disclosure>
 
               {item && (

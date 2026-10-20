@@ -193,6 +193,22 @@ export function ChevronDownIcon({ className }: IconProps) {
   );
 }
 
+export function ChevronLeftIcon({ className }: IconProps) {
+  return (
+    <StrokeIcon className={className} strokeWidth={1.8}>
+      <path d="m15 6-6 6 6 6" />
+    </StrokeIcon>
+  );
+}
+
+export function ChevronRightIcon({ className }: IconProps) {
+  return (
+    <StrokeIcon className={className} strokeWidth={1.8}>
+      <path d="m9 6 6 6-6 6" />
+    </StrokeIcon>
+  );
+}
+
 export function ChevronUpIcon({ className }: IconProps) {
   return (
     <StrokeIcon className={className} strokeWidth={1.8}>

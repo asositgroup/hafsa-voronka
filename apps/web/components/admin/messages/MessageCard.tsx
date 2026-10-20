@@ -43,9 +43,8 @@ export function MessageCard({ item, videoMarks, onEdit, onToggle, onMoveUp, onMo
           {timelineLabel(item.timing)}
         </span>
         <span className={`flex min-w-0 flex-1 flex-col gap-1 ${item.isActive ? "" : "opacity-60"}`}>
-          {(item.timing.type === "night_notice" || item.statuses || item.attempts) && (
+          {(item.statuses || item.attempts) && (
             <span className="flex flex-wrap gap-1">
-              {item.timing.type === "night_notice" && <Badge tone="attention">{copy.nightNotice.badge}</Badge>}
               {item.statuses?.map((status) => (
                 <Badge key={status}>{stopPointLabel(status, videoMarks)}</Badge>
               ))}

@@ -5,8 +5,6 @@ Complete step-by-step production deployment guide for the Telegram Video Funnel.
 Official documentation links for reference:
 - [Cloudflare DNS Documentation](https://developers.cloudflare.com/dns/)
 - [Cloudflare R2 Documentation](https://developers.cloudflare.com/r2/)
-- [Coolify Documentation](https://coolify.io/docs/)
-- [Oracle Cloud Always Free Documentation](https://www.oracle.com/cloud/free/)
 - [Telegram Bot API & Mini Apps Documentation](https://core.telegram.org/bots/webapps)
 - [Vercel Deployment Documentation](https://vercel.com/docs)
 
@@ -22,69 +20,22 @@ The apex domain and DNS management reside on Cloudflare.
 | --- | --- | --- | --- | --- |
 | CNAME | `yourdomain.uz` | `cname.vercel-dns.com` | DNS only (Grey cloud) | Web frontend on Vercel |
 | CNAME | `www` | `cname.vercel-dns.com` | DNS only (Grey cloud) | Web frontend alternative |
-| A | `api` | `<ORACLE_VPS_PUBLIC_IP>` | DNS only (Grey cloud) | Backend API on Coolify |
+| A | `api` | `<VPS_PUBLIC_IP>` | DNS only (Grey cloud) | Backend API on the VPS |
 | CNAME | `video` | `<BUCKET_NAME>.r2.cloudflarestorage.com` | Proxied (Orange cloud) | Video CDN on Cloudflare R2 |
 
 ### API TLS Trade-Off: Proxied vs DNS-Only
 
-Coolify uses Traefik as its reverse proxy to manage automatic Let's Encrypt TLS certificates.
+Caddy (the `caddy` profile in `deploy/docker-compose.prod.yml`) or a host Nginx with certbot terminates TLS and manages automatic Let's Encrypt certificates.
 
 - **DNS-Only (Grey cloud - Recommended for initial setup):**
-  Traefik terminates TLS directly by responding to Let's Encrypt HTTP-01 challenges. There is no double-proxying, webhook delivery from Telegram arrives directly, and WebSocket connections work without Cloudflare buffer interference.
+  The proxy terminates TLS directly by responding to Let's Encrypt HTTP-01 challenges. There is no double-proxying, webhook delivery from Telegram arrives directly, and WebSocket connections work without Cloudflare buffer interference.
 - **Proxied (Orange cloud):**
-  Provides Cloudflare DDoS protection, WAF rules, and edge IP masking. If proxying is enabled, Cloudflare SSL/TLS encryption mode **must** be set to **Full (Strict)**. If set to Flexible or Full, Traefik and Cloudflare can trigger infinite redirect loops or 525 SSL Handshake errors. In addition, Let's Encrypt HTTP-01 challenges through Cloudflare may fail unless Traefik is configured with a Cloudflare DNS-01 API token.
+  Provides Cloudflare DDoS protection, WAF rules, and edge IP masking. If proxying is enabled, Cloudflare SSL/TLS encryption mode **must** be set to **Full (Strict)**. If set to Flexible or Full, the proxy and Cloudflare can trigger infinite redirect loops or 525 SSL Handshake errors. In addition, Let's Encrypt HTTP-01 challenges through Cloudflare may fail unless the proxy is configured with a Cloudflare DNS-01 API token.
 - **Recommendation:** Keep `api.yourdomain.uz` as DNS-only during setup and verification. If DDoS mitigation is needed later, switch Cloudflare SSL/TLS to Full (Strict) before enabling the proxy.
 
 ---
 
-## 2. Oracle Cloud Infrastructure (OCI) Setup
-
-The backend API, Telegram bot, and PostgreSQL run on an Oracle Cloud Always Free ARM VM.
-
-### Upgrade to Pay As You Go (PAYG)
-
-Oracle automatically reclaims Always Free compute instances that are classified as idle (low CPU or network utilization). Upgrading the tenancy to Pay As You Go exempts instances from idle reclamation. The Always Free resource allowances (up to 4 ARM Ampere A1 OCPUs, 24 GB RAM, 200 GB block storage) remain free ($0/month) as long as usage remains within the free tier thresholds.
-
-### Architecture
-
-The instance runs on an **ARM (aarch64)** host (Ampere A1). All Docker images must support `linux/arm64`. The provided `apps/api/Dockerfile` uses `node:24-alpine`, which provides native multi-arch ARM support.
-
-### Open Firewall Ports (80 and 443)
-
-Traffic must pass both the OCI Virtual Cloud Network (VCN) security list and the OS-level iptables.
-
-#### VCN Security List
-
-1. Open OCI Console -> Networking -> Virtual Cloud Networks -> Select your VCN.
-2. Select Security Lists -> Default Security List -> Add Ingress Rules.
-3. Configure ingress rule:
-   - Source Type: `CIDR`
-   - Source CIDR: `0.0.0.0/0`
-   - IP Protocol: `TCP`
-   - Source Port Range: All
-   - Destination Port Range: `80,443`
-4. Save the rule.
-
-#### Ubuntu Host iptables
-
-Oracle Ubuntu images contain default iptables rules that reject incoming traffic on ports other than 22. Run the following commands on the VPS:
-
-```bash
-sudo iptables -I INPUT 6 -p tcp --dport 80 -j ACCEPT
-sudo iptables -I INPUT 6 -p tcp --dport 443 -j ACCEPT
-sudo apt-get update && sudo apt-get install -y iptables-persistent
-sudo netfilter-persistent save
-```
-
-Verify the open rules:
-
-```bash
-sudo iptables -L INPUT -n --line-numbers
-```
-
----
-
-## 3. Cloudflare R2 Video Hosting & CDN
+## 2. Cloudflare R2 Video Hosting & CDN
 
 Video assets and posters are served from a Cloudflare R2 bucket mapped to `video.yourdomain.uz`.
 
@@ -191,68 +142,56 @@ cf-cache-status: HIT
 
 ---
 
-## 4. Coolify Setup (Postgres & API)
+## 3. API Server (VPS with Docker Compose)
 
-Log in to the Coolify dashboard on the Oracle VM (`http://<ORACLE_VPS_PUBLIC_IP>:8000`).
+Runs the API, Postgres and the local Telegram Bot API server with Docker Compose on any Linux VPS (e.g. Hetzner CAX11). TLS is terminated by Caddy (automatic HTTPS, `docker compose --profile caddy up -d`) or by a host Nginx. Images are multi-arch, so x86_64 and ARM64 hosts both work (`apps/api/Dockerfile` uses `node:24-alpine`). The web app stays on Vercel; only `NEXT_PUBLIC_API_URL` must point at the VPS domain. Files live in `deploy/`.
 
-### PostgreSQL 17 Resource
+### One-time server setup
 
-1. Navigate to Projects -> Default -> New Resource -> Database -> PostgreSQL.
-2. Settings:
-   - Image: `postgres:17-alpine`
-   - Database Name: `funnel`
-   - Database User: `funnel`
-   - Database Password: `<SECURE_PASSWORD>`
-3. Note the internal container service name (e.g., `postgresql` or resource UUID).
+1. Ubuntu 24.04 (or similar), Docker Engine with the Compose plugin, `git`, `curl`, `rclone`.
+2. Firewall: allow only 22, 80, 443 (`ufw allow OpenSSH && ufw allow 80 && ufw allow 443/tcp && ufw allow 443/udp && ufw enable`).
+3. DNS: `A` record for the API domain → VPS IP, **DNS only** (grey cloud), so Caddy (or certbot on a host Nginx) can issue the certificate.
+4. Clone and configure:
+   ```bash
+   git clone https://github.com/estoyse/video-funnel.git /opt/video-funnel
+   cd /opt/video-funnel
+   cp deploy/.env.prod.example deploy/.env.prod
+   chmod 600 deploy/.env.prod
+   ```
+   Fill `deploy/.env.prod`. Keep `ADMIN_PASSWORD_HASH` and `GOOGLE_SA_KEY` in **single quotes**: Docker Compose expands `$` in env files, and the hash contains `$`. `DATABASE_URL` is built from the `POSTGRES_*` values, do not set it.
+5. First start: `./deploy/deploy.sh`. Migrations run when the API starts; the script waits for `https://<API_DOMAIN>/health`.
+6. Point the bot at the server (once, and after any domain change), using the running container's env:
+   ```bash
+   docker compose --env-file deploy/.env.prod -f deploy/docker-compose.prod.yml exec api node -e "fetch('https://api.telegram.org/bot'+process.env.BOT_TOKEN+'/setWebhook',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({url:process.env.API_URL+'/bot',secret_token:process.env.WEBHOOK_SECRET,allowed_updates:['message','my_chat_member','callback_query']})}).then(r=>r.json()).then(console.log)"
+   ```
+   Or run `scripts/set-webhook.ts` from a machine with the repo and the same env.
 
-### Scheduled Backups to R2
+### Deploying updates
 
-1. In the PostgreSQL resource, go to Backups (label may differ).
-2. Configure S3-compatible storage:
-   - Endpoint: `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`
-   - Bucket: `funnel-backups`
-   - Access Key ID: `<R2_ACCESS_KEY_ID>`
-   - Secret Access Key: `<R2_SECRET_ACCESS_KEY>`
-   - Region: `auto`
-   - Schedule: Daily at 03:00 UTC (`0 3 * * *`)
-3. Test backup execution to verify the dump upload to R2.
+- By hand on the server: `./deploy/deploy.sh` (pulls `main`, rebuilds the API image, restarts it, checks health, prunes old images).
+- From GitHub: Actions → **Deploy API to VPS** → Run workflow. Needs repository secrets `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_APP_DIR` (e.g. `/opt/video-funnel`). It is manual on purpose.
+- Expect ~5–10 s of API downtime per deploy; Telegram retries webhook deliveries, so no updates are lost.
 
-### Restore Drill
+### Backups
 
-To restore PostgreSQL from an R2 backup dump:
-
-Coolify stores Postgres backups as `pg_dump` custom-format archives, so restore them with `pg_restore`, not `psql`. Find the exact object path with `rclone ls r2:funnel-backups`.
+Daily `pg_dump` (custom format) to R2, keeping 30 days:
 
 ```bash
-rclone copyto "r2:funnel-backups/<PATH_TO_BACKUP_FILE>" ./backup.dmp
-docker exec -i <COOLIFY_POSTGRES_CONTAINER_ID> pg_restore -U funnel -d funnel --clean --if-exists --no-owner < ./backup.dmp
+crontab -e
+0 3 * * * /opt/video-funnel/deploy/backup.sh r2:funnel-backups/hafsa >> /var/log/hafsa-backup.log 2>&1
 ```
 
-Run the drill once against a scratch database (`-d funnel_restore_test`, created first with `createdb`) before launch, so a real restore is never the first one.
+Restore with `pg_restore` as in the Disaster Recovery section (Section 11), using `docker compose ... exec -T postgres pg_restore -U funnel -d funnel --clean --if-exists --no-owner < backup.dump`.
 
-### API Application Settings
+### Day-to-day
 
-1. Navigate to New Resource -> Application -> Git Repository (select repository).
-2. General Settings:
-   - Branch: `main`
-   - Build Pack: `Dockerfile`
-   - Base Directory: `/`
-   - Dockerfile Path: `apps/api/Dockerfile`
-   - Port: `3001`
-   - Domain: `https://api.yourdomain.uz`
-   - Healthcheck Path: `/health` (interval: 30s)
-   - Auto-deploy: Enabled (deploy on git push)
-3. Connect Database:
-   Set `DATABASE_URL` using the internal container network address:
-   ```
-   DATABASE_URL=postgres://funnel:<SECURE_PASSWORD>@<INTERNAL_POSTGRES_HOST>:5432/funnel
-   ```
-4. Set all API environment variables (reference Section 13).
-5. Trigger initial deployment. Migrations run automatically on container startup.
+- Logs: `docker compose --env-file deploy/.env.prod -f deploy/docker-compose.prod.yml logs -f api`
+- Restart API: same prefix with `restart api`.
+- OS security updates: `apt install unattended-upgrades`.
 
 ---
 
-## 5. Vercel Web App Deployment
+## 4. Vercel Web App Deployment
 
 The Next.js 16 web app is deployed on Vercel.
 
@@ -271,7 +210,7 @@ The Next.js 16 web app is deployed on Vercel.
 
 ---
 
-## 6. Telegram BotFather Configuration & Webhook Setup
+## 5. Telegram BotFather Configuration & Webhook Setup
 
 ### Test Bot vs Production Bot
 
@@ -326,9 +265,7 @@ curl https://api.telegram.org/bot<PRODUCTION_BOT_TOKEN>/getWebhookInfo
 
 ### Local Bot API Server (Admin Video Uploads from Telegram)
 
-Admins in `ADMIN_TELEGRAM_IDS` can send a video to the bot and replace the lesson video. Files larger than 20 MB need the self-hosted `aiogram/telegram-bot-api` container (`telegram-bot-api` service in `deploy/docker-compose.prod.yml`, pinned to `10.3`, run with `TELEGRAM_LOCAL=1`). The `api` and `telegram-bot-api` services share the `tgbotapi` volume at `/var/lib/telegram-bot-api`; the API reads downloaded files straight from disk and deletes them after the R2 upload.
-
-On Coolify the separate-resource setup cannot easily share a volume: deploy `api` and `telegram-bot-api` together as one Docker Compose resource using this compose file.
+Admins in `ADMIN_TELEGRAM_IDS` can send a video to the bot and replace the lesson video. Files larger than 20 MB need the self-hosted `aiogram/telegram-bot-api` container (`telegram-bot-api` service in `deploy/docker-compose.prod.yml`, pinned to `10.3`, run with `--local`). The `api` and `telegram-bot-api` services share the `tgbotapi` volume at `/var/lib/telegram-bot-api`; the API reads downloaded files straight from disk and deletes them after the R2 upload. The server writes files readable only by its own user, so it runs as uid 1000 (the API image's `node` user) instead of the image's default user, and the one-off `telegram-bot-api-volume` service hands the volume to that uid before it starts. Keep both uids in sync if the API image's user changes.
 
 Cutover:
 
@@ -350,7 +287,7 @@ Cutover:
 
 ---
 
-## 7. Google Sheets Lead Synchronization
+## 6. Google Sheets Lead Synchronization
 
 Leads are queued in Postgres and synced to Google Sheets in-process.
 
@@ -367,11 +304,9 @@ From the downloaded JSON key file:
 - `client_email` -> Set as `GOOGLE_SA_EMAIL`.
 - `private_key` -> Set as `GOOGLE_SA_KEY`.
 
-#### Pasting Multiline Key into Coolify
+#### Multiline Key in `deploy/.env.prod`
 
-In Coolify's environment variable interface:
-- You can paste the complete multiline PEM string directly (including `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----`).
-- Or paste the single-line string with literal `\n`. The API (`apps/api/src/env.ts`) automatically transforms `\n` substrings into real newlines.
+- Paste the single-line string with literal `\n`, in single quotes. The API (`apps/api/src/env.ts`) automatically transforms `\n` substrings into real newlines.
 
 ### Google Spreadsheet Configuration
 
@@ -393,7 +328,7 @@ In Coolify's environment variable interface:
 
 ---
 
-## 8. Meta Pixel & Conversions API (CAPI) Integration
+## 7. Meta Pixel & Conversions API (CAPI) Integration
 
 ### Meta Events Manager Configuration
 
@@ -415,7 +350,7 @@ In Coolify's environment variable interface:
 
 ---
 
-## 9. Admin Security & Credentials
+## 8. Admin Security & Credentials
 
 ### Password Hash Generation
 
@@ -425,7 +360,7 @@ Generate a secure hash for the admin dashboard password:
 pnpm --filter @funnel/api hash-password
 ```
 
-Set the output hash as `ADMIN_PASSWORD_HASH` on Coolify.
+Set the output hash as `ADMIN_PASSWORD_HASH` in `deploy/.env.prod`.
 
 ### Session Secret Generation
 
@@ -435,11 +370,11 @@ Generate a cryptographically secure random session secret (minimum 32 characters
 openssl rand -base64 48
 ```
 
-Set the generated string as `SESSION_SECRET` on Coolify.
+Set the generated string as `SESSION_SECRET` in `deploy/.env.prod`.
 
 ---
 
-## 10. Local Development with Cloudflare Tunnels
+## 9. Local Development with Cloudflare Tunnels
 
 Telegram Mini Apps require valid HTTPS to load inside Telegram mobile clients.
 
@@ -488,7 +423,7 @@ curl -F "url=https://<API_TUNNEL>.trycloudflare.com/bot" \
 
 ---
 
-## 11. Smoke Test & Launch Checklist
+## 10. Smoke Test & Launch Checklist
 
 Execute the complete end-to-end user journey:
 
@@ -523,9 +458,9 @@ Execute the complete end-to-end user journey:
 - [ ] Migrations 0006-0011 run automatically at API startup; nothing to run by hand
 - [ ] Keep `VIDEO_URL` and `VIDEO_DURATION_SEC` set on the first deploy: they seed the initial active video
 - [ ] In `/admin/videos`, set the `course_start` and `price` marks on the seeded video (without a price mark it cannot be activated)
-- [ ] R2 API token has write access and the five `R2_*` variables are set; the bucket CORS policy allows `PUT` from the admin origin (Section 3)
+- [ ] R2 API token has write access and the five `R2_*` variables are set; the bucket CORS policy allows `PUT` from the admin origin (Section 2)
 - [ ] `ADMIN_TELEGRAM_IDS` is set to the admins allowed to replace the video from the bot
-- [ ] For uploads over 20 MB, complete the cutover in "Local Bot API Server" (Section 6)
+- [ ] For uploads over 20 MB, complete the cutover in "Local Bot API Server" (Section 5)
 - [ ] Migrations 0014-0016 (`wrote_admin`, night rules, segment B targeting) also run at API startup; nothing to run by hand
 - [ ] `LINK_TTL_HOURS` is a panel setting, not an env variable. The code default is now 24h, but a production row saved earlier may still say 72: open Sozlamalar and set it to 24 explicitly
 - [ ] `MESSAGE_CAPS` is also a panel setting (Sozlamalar, per audience A/B/C: daily and total). Defaults: A and C 10 per day with no total, B 4 per day and 7 total. Review them before launch
@@ -544,13 +479,14 @@ Execute the complete end-to-end user journey:
 
 ---
 
-## 12. Disaster Recovery & Rollback Runbook
+## 11. Disaster Recovery & Rollback Runbook
 
-### Coolify API Rollback
+### API Rollback
 
-1. In Coolify dashboard, navigate to the API Application -> Deployments (label may differ).
-2. Locate the previous stable build.
-3. Click Redeploy on the selected commit to revert the container image immediately.
+1. On the VPS, find the previous stable commit or tag: `git log --oneline` in `/opt/video-funnel`.
+2. Check it out (`git checkout <COMMIT_OR_TAG>`) and rerun `./deploy/deploy.sh`. The script runs `git pull --ff-only || true`, so a detached checkout is left in place.
+3. Migrations are forward-only. If a migration must be undone, also restore the database from a backup taken before it (see below).
+4. Return to `main` afterwards (`git checkout main`) before the next regular deploy.
 
 ### Vercel Instant Rollback
 
@@ -568,13 +504,13 @@ To restore the PostgreSQL database from a scheduled dump:
    ```
 2. Restore the database inside the PostgreSQL container:
    ```bash
-   docker exec -i <COOLIFY_POSTGRES_CONTAINER_ID> pg_restore -U funnel -d funnel --clean --if-exists --no-owner < ./backup.dmp
+   docker compose --env-file deploy/.env.prod -f deploy/docker-compose.prod.yml exec -T postgres pg_restore -U funnel -d funnel --clean --if-exists --no-owner < ./backup.dmp
    ```
-3. Restart the API container in Coolify to clear in-memory caches and run any pending startup checks.
+3. Restart the API (`docker compose --env-file deploy/.env.prod -f deploy/docker-compose.prod.yml restart api`) to clear in-memory caches and run any pending startup checks.
 
 ---
 
-## 13. Environment Variables Reference Table
+## 12. Environment Variables Reference Table
 
 Comprehensive reference for all environment variables used by the API and Web applications.
 
@@ -586,7 +522,7 @@ Comprehensive reference for all environment variables used by the API and Web ap
 | `WEBHOOK_SECRET` | API (`apps/api`) | Required | `secret-token-32-chars-long` | Secret token (16-256 chars) to validate Telegram webhooks |
 | `API_URL` | API (`apps/api`) | Required | `https://api.yourdomain.uz` | Public HTTPS base URL of the API |
 | `WEB_URL` | API (`apps/api`) | Required | `https://yourdomain.uz` | Public HTTPS base URL of the Web app |
-| `DATABASE_URL` | API (`apps/api`) | Required | `postgres://funnel:pwd@postgresql:5432/funnel` | PostgreSQL 17 connection string |
+| `DATABASE_URL` | API (`apps/api`) | Required | `postgres://funnel:pwd@postgres:5432/funnel` | PostgreSQL 17 connection string |
 | `CHANNEL_URL` | API (`apps/api`) | Required | `https://t.me/yourchannel` | Destination Telegram channel URL after completion |
 | `VIDEO_URL` | API (`apps/api`) | Optional, first-deploy seed only: creates the initial active video when the videos table is empty | `https://video.yourdomain.uz/lesson-1/master.mp4` | URL to master video file (MP4 or HLS master.m3u8) |
 | `VIDEO_POSTER_URL` | API (`apps/api`) | Required | `https://video.yourdomain.uz/lesson-1/poster.webp` | URL to video poster image |
@@ -621,59 +557,3 @@ Comprehensive reference for all environment variables used by the API and Web ap
 | `NEXT_PUBLIC_BOT_USERNAME` | Web (`apps/web`) | Required | `your_bot` | Telegram bot username (without @) for deep linking |
 | `NEXT_PUBLIC_APP_URL` | Web (`apps/web`) | Required | `https://hafsa.azeemov.uz` | Public site URL; makes the link-preview (OG) image URL absolute |
 | `TEST_DATABASE_URL` | Test Runner | Optional (CI / Tests) | `postgres://funnel:funnel@localhost:5432/funnel_test` | Isolated database URL for running integration tests |
-
----
-
-## 14. Bare VPS Deployment (without Coolify)
-
-Runs the API, Postgres and Caddy (automatic HTTPS) with Docker Compose on any Linux VPS (e.g. Hetzner CAX11). The web app stays on Vercel; only `NEXT_PUBLIC_API_URL` must point at the VPS domain. Files live in `deploy/`.
-
-### One-time server setup
-
-1. Ubuntu 24.04, Docker Engine with the Compose plugin, `git`, `curl`, `rclone`.
-2. Firewall: allow only 22, 80, 443 (`ufw allow OpenSSH && ufw allow 80 && ufw allow 443/tcp && ufw allow 443/udp && ufw enable`).
-3. DNS: `A` record for the API domain → VPS IP, **DNS only** (grey cloud), so Caddy can issue the certificate.
-4. Clone and configure:
-   ```bash
-   git clone https://github.com/estoyse/video-funnel.git /opt/video-funnel
-   cd /opt/video-funnel
-   cp deploy/.env.prod.example deploy/.env.prod
-   chmod 600 deploy/.env.prod
-   ```
-   Fill `deploy/.env.prod`. Keep `ADMIN_PASSWORD_HASH` and `GOOGLE_SA_KEY` in **single quotes**: Docker Compose expands `$` in env files, and the hash contains `$`. `DATABASE_URL` is built from the `POSTGRES_*` values, do not set it.
-5. First start: `./deploy/deploy.sh`. Migrations run when the API starts; the script waits for `https://<API_DOMAIN>/health`.
-6. Point the bot at the server (once, and after any domain change), using the running container's env:
-   ```bash
-   docker compose --env-file deploy/.env.prod -f deploy/docker-compose.prod.yml exec api node -e "fetch('https://api.telegram.org/bot'+process.env.BOT_TOKEN+'/setWebhook',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({url:process.env.API_URL+'/bot',secret_token:process.env.WEBHOOK_SECRET,allowed_updates:['message','my_chat_member','callback_query']})}).then(r=>r.json()).then(console.log)"
-   ```
-   Or run `scripts/set-webhook.ts` from a machine with the repo and the same env.
-
-### Deploying updates
-
-- By hand on the server: `./deploy/deploy.sh` (pulls `main`, rebuilds the API image, restarts it, checks health, prunes old images).
-- From GitHub: Actions → **Deploy API to VPS** → Run workflow. Needs repository secrets `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_APP_DIR` (e.g. `/opt/video-funnel`). It is manual on purpose so it never competes with Coolify.
-- Expect ~5–10 s of API downtime per deploy; Telegram retries webhook deliveries, so no updates are lost.
-
-### Backups
-
-Daily `pg_dump` (custom format) to R2, keeping 30 days:
-
-```bash
-crontab -e
-0 3 * * * /opt/video-funnel/deploy/backup.sh r2:funnel-backups/hafsa >> /var/log/hafsa-backup.log 2>&1
-```
-
-Restore with `pg_restore` as in the Disaster Recovery section, using `docker compose ... exec -T postgres pg_restore -U funnel -d funnel --clean --if-exists --no-owner < backup.dump`.
-
-### Day-to-day
-
-- Logs: `docker compose --env-file deploy/.env.prod -f deploy/docker-compose.prod.yml logs -f api`
-- Restart API: same prefix with `restart api`.
-- OS security updates: `apt install unattended-upgrades`.
-
-### Moving from Coolify
-
-1. `pg_dump -Fc` the Coolify database and `pg_restore` it into the new Postgres before switching.
-2. Switch the API DNS record to the VPS, wait for Caddy to get the certificate (`curl https://<API_DOMAIN>/health`).
-3. Re-run the webhook step so Telegram calls the new server.
-4. Stop the Coolify API so two servers never process the same updates.

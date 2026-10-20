@@ -2,6 +2,8 @@ import {
   type FunnelStatus,
   MORNING_SEND_MINUTE,
   type OfferAnswer,
+  offerVariantFor,
+  offerVariantOf,
   SECOND_CHANCE_INTERVAL_HOURS,
   SECOND_CHANCE_OCCASIONS,
   SECOND_CHANCE_WINDOW_DAYS,
@@ -83,14 +85,13 @@ export function pickOfferTemplate<T extends OfferTemplate>(
   status: FunnelStatus | null,
 ): T | null {
   if (status === null) return null;
-  const matching = templates
-    .filter(
-      (template) =>
-        template.timingType === "occasion" &&
-        template.day === occasion &&
-        template.statuses !== null &&
-        template.statuses.includes(status),
-    )
+  const variant = offerVariantFor(status);
+  if (variant === null) return null;
+  const pages = templates
+    .filter((template) => template.timingType === "occasion" && template.day === occasion && template.statuses !== null)
     .sort((a, b) => a.position - b.position || a.id - b.id);
-  return matching[0] ?? null;
+  const own = pages.find((template) => template.statuses?.includes(status));
+  if (own) return own;
+  if (variant === "not_opened") return null;
+  return pages.find((template) => offerVariantOf(template.statuses) === "not_opened") ?? null;
 }

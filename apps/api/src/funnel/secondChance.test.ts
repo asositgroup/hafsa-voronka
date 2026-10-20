@@ -171,8 +171,14 @@ describe("pickOfferTemplate", () => {
     expect(pickOfferTemplate(templates, 2, "link_berildi")?.id).toBe(3);
   });
 
+  it("falls back to the main page when the day has no §3.8 variant", () => {
+    expect(pickOfferTemplate([notOpened, noPrice, second], 2, "sotuvda_toxtadi")?.id).toBe(3);
+    expect(pickOfferTemplate([notOpened], 1, "korishni_boshladi")?.id).toBe(1);
+  });
+
   it("returns nothing for an empty page", () => {
-    expect(pickOfferTemplate([notOpened, noPrice, second], 2, "sotuvda_toxtadi")).toBeNull();
+    expect(pickOfferTemplate([noPrice], 1, "link_berildi")).toBeNull();
+    expect(pickOfferTemplate([notOpened, noPrice, second], 3, "sotuvda_toxtadi")).toBeNull();
     expect(pickOfferTemplate([notOpened], 3, "link_berildi")).toBeNull();
     expect(pickOfferTemplate([notOpened, noPrice], 1, "narxni_kurdi")).toBeNull();
   });

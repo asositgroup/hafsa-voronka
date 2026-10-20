@@ -7,6 +7,7 @@ import { uz } from "@/i18n/uz";
 import { uploadStream } from "@/storage/r2";
 import { openTelegramFile, removeLocalTelegramFile } from "@/telegram/files";
 import { activateDraft } from "./activate";
+import { TEXT_STEPS } from "./machine";
 
 const PROGRESS_INTERVAL_MS = 5000;
 const STALE_CLAIM_MINUTES = 10;
@@ -17,11 +18,66 @@ export async function awaitUploads() {
   while (running.size > 0) await Promise.all([...running]);
 }
 
-function objectKey(draft: BotVideoDraft) {
-  const fromName = extname(draft.fileName ?? "").slice(1).toLowerCase();
-  const fromMime = draft.mimeType?.split("/")[1]?.toLowerCase();
+export function trackUpload(work: Promise<void>, label: string) {
+  const task = work
+    .catch((error) => console.error(`${label} crashed:`, error))
+    .finally(() => {
+      running.delete(task);
+    });
+  running.add(task);
+  return task;
+}
+
+type TelegramUploadSource = {
+  fileUniqueId: string;
+  fileId: string;
+  fileName: string | null;
+  mimeType: string | null;
+  fileSize: number | null;
+};
+
+export function botObjectKey(source: Pick<TelegramUploadSource, "fileUniqueId" | "fileName" | "mimeType">, suffix = "") {
+  const fromName = extname(source.fileName ?? "").slice(1).toLowerCase();
+  const fromMime = source.mimeType?.split("/")[1]?.toLowerCase();
   const extension = [fromName, fromMime, "mp4"].find((value) => value && /^[a-z0-9]{2,5}$/.test(value));
-  return `videos/bot/${draft.fileUniqueId}.${extension}`;
+  return `videos/bot/${source.fileUniqueId}${suffix}.${extension}`;
+}
+
+export async function streamTelegramFileToR2(
+  api: Api,
+  chatId: number,
+  source: TelegramUploadSource & { key: string },
+  hooks: { onStart?: (progressMessageId: number) => Promise<unknown>; onHeartbeat?: () => void } = {},
+) {
+  const texts = uz.bot.adminVideo;
+  const progressText = (percent: number) => texts.progress.replace("{percent}", String(percent));
+  const progressMessage = await api.sendMessage(chatId, progressText(0));
+  await hooks.onStart?.(progressMessage.message_id);
+
+  const file = await openTelegramFile(api, source.fileId);
+  const totalBytes = source.fileSize ?? file.size;
+
+  let lastTick = Date.now();
+  let lastPercent = 0;
+  const result = await uploadStream({
+    key: source.key,
+    body: file.stream,
+    contentType: source.mimeType ?? "video/mp4",
+    contentLength: totalBytes ?? undefined,
+    onProgress: (bytes) => {
+      if (Date.now() - lastTick < PROGRESS_INTERVAL_MS) return;
+      lastTick = Date.now();
+      hooks.onHeartbeat?.();
+      const percent = totalBytes ? Math.min(99, Math.floor((bytes / totalBytes) * 100)) : 0;
+      if (percent === lastPercent) return;
+      lastPercent = percent;
+      void api.editMessageText(chatId, progressMessage.message_id, progressText(percent)).catch(() => {});
+    },
+  });
+
+  await removeLocalTelegramFile(file.localPath);
+  await api.editMessageText(chatId, progressMessage.message_id, texts.uploadDone).catch(() => {});
+  return result;
 }
 
 async function claimDraft(draftId: number): Promise<BotVideoDraft | undefined> {
@@ -50,52 +106,31 @@ async function performUpload(api: Api, draftId: number) {
 
   const chatId = draft.adminTelegramId;
   const texts = uz.bot.adminVideo;
-  const progressText = (percent: number) => texts.progress.replace("{percent}", String(percent));
-  let localPath: string | undefined;
   let activateAfterUpload = false;
 
   try {
-    const progressMessage = await api.sendMessage(chatId, progressText(0));
-    await db()
-      .update(botVideoDrafts)
-      .set({ progressMessageId: progressMessage.message_id })
-      .where(eq(botVideoDrafts.id, draftId));
-
-    const file = await openTelegramFile(api, draft.fileId);
-    localPath = file.localPath;
-    const totalBytes = draft.fileSize ?? file.size;
-
-    let lastTick = Date.now();
-    let lastPercent = 0;
-    const result = await uploadStream({
-      key: objectKey(draft),
-      body: file.stream,
-      contentType: draft.mimeType ?? "video/mp4",
-      contentLength: totalBytes ?? undefined,
-      onProgress: (bytes) => {
-        if (Date.now() - lastTick < PROGRESS_INTERVAL_MS) return;
-        lastTick = Date.now();
-        void db()
-          .update(botVideoDrafts)
-          .set({ uploadClaimedAt: new Date() })
-          .where(eq(botVideoDrafts.id, draftId))
-          .catch((error) => console.error("Upload claim refresh failed:", error));
-        const percent = totalBytes ? Math.min(99, Math.floor((bytes / totalBytes) * 100)) : 0;
-        if (percent === lastPercent) return;
-        lastPercent = percent;
-        void api
-          .editMessageText(chatId, progressMessage.message_id, progressText(percent))
-          .catch(() => {});
+    const result = await streamTelegramFileToR2(
+      api,
+      chatId,
+      { ...draft, key: botObjectKey(draft) },
+      {
+        onStart: (progressMessageId) =>
+          db().update(botVideoDrafts).set({ progressMessageId }).where(eq(botVideoDrafts.id, draftId)),
+        onHeartbeat: () => {
+          void db()
+            .update(botVideoDrafts)
+            .set({ uploadClaimedAt: new Date() })
+            .where(eq(botVideoDrafts.id, draftId))
+            .catch((error) => console.error("Upload claim refresh failed:", error));
+        },
       },
-    });
+    );
 
     const [done] = await db()
       .update(botVideoDrafts)
       .set({ uploadStatus: "done", fileUrl: result.url, r2Key: result.key, uploadError: null, updatedAt: new Date() })
       .where(eq(botVideoDrafts.id, draftId))
       .returning();
-    await removeLocalTelegramFile(localPath);
-    await api.editMessageText(chatId, progressMessage.message_id, texts.uploadDone).catch(() => {});
 
     activateAfterUpload = done.activateOnUpload;
   } catch (error) {
@@ -106,7 +141,7 @@ async function performUpload(api: Api, draftId: number) {
       .set({ uploadStatus: "failed", uploadError: message, updatedAt: new Date() })
       .where(eq(botVideoDrafts.id, draftId));
     await api
-      .sendMessage(chatId, texts.uploadFailed.replace("{error}", message), {
+      .sendMessage(chatId, texts.uploadFailed, {
         reply_markup: new InlineKeyboard().text(texts.retry, `vup:retry:${draftId}`),
       })
       .catch((sendError) => console.error("Upload failure notice failed:", sendError));
@@ -117,13 +152,7 @@ async function performUpload(api: Api, draftId: number) {
 }
 
 export function runUpload(api: Api, draftId: number) {
-  const task = performUpload(api, draftId)
-    .catch((error) => console.error("Bot video upload crashed:", error))
-    .finally(() => {
-      running.delete(task);
-    });
-  running.add(task);
-  return task;
+  return trackUpload(performUpload(api, draftId), "Bot video upload");
 }
 
 export async function resumeBotUploads(api: Api) {
@@ -133,7 +162,7 @@ export async function resumeBotUploads(api: Api) {
     .where(
       and(
         inArray(botVideoDrafts.uploadStatus, ["pending", "uploading"]),
-        inArray(botVideoDrafts.step, ["duration", "course", "price", "summary"]),
+        inArray(botVideoDrafts.step, [...TEXT_STEPS, "summary"]),
       ),
     )
     .returning({ id: botVideoDrafts.id });

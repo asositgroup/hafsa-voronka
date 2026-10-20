@@ -17,6 +17,7 @@ import type { LeadAction } from "@/leads/card";
 import { findMatchingWebLead } from "@/leads/service";
 import { markBlockedByTelegramId } from "@/telegram/blocked";
 import { adminVideoComposer } from "@/telegram/admin-video/handlers";
+import { adminHomeComposer } from "@/telegram/adminHome";
 import { reminderComposer } from "@/telegram/reminders";
 import { watchAppUrl } from "@/telegram/watchUrl";
 import { botText, sendBotText } from "@/telegram/texts";
@@ -76,6 +77,7 @@ function createBot() {
 
   bot.use(adminVideoComposer);
   bot.use(reminderComposer);
+  bot.use(adminHomeComposer);
 
   bot.command("start", async (ctx) => {
     if (!ctx.from) return;

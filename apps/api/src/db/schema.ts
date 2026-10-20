@@ -33,7 +33,17 @@ import {
   type Utm,
 } from "@funnel/shared";
 
-export const botVideoSteps = ["confirm", "duration", "course", "price", "summary", "done", "cancelled"] as const;
+export const botVideoSteps = [
+  "confirm",
+  "duration",
+  "course",
+  "price",
+  "intro",
+  "unlock",
+  "summary",
+  "done",
+  "cancelled",
+] as const;
 export type BotVideoStep = (typeof botVideoSteps)[number];
 
 export const botVideoUploadStatuses = ["idle", "pending", "uploading", "done", "failed"] as const;
@@ -267,6 +277,9 @@ export const botVideoDrafts = pgTable(
     step: text("step", { enum: botVideoSteps }).notNull().default("confirm"),
     courseStartSec: integer("course_start_sec"),
     priceSec: integer("price_sec"),
+    introEndSec: integer("intro_end_sec"),
+    unlockSec: integer("unlock_sec"),
+    sentAsVideo: boolean("sent_as_video").default(false).notNull(),
     uploadStatus: text("upload_status", { enum: botVideoUploadStatuses }).notNull().default("idle"),
     uploadClaimedAt: timestamp("upload_claimed_at", { withTimezone: true }),
     progressMessageId: bigint("progress_message_id", { mode: "number" }),
@@ -286,6 +299,32 @@ export const botVideoDrafts = pgTable(
 );
 
 export type BotVideoDraft = typeof botVideoDrafts.$inferSelect;
+
+export const botAdminInputKinds = ["mark", "shortVideo"] as const;
+export type BotAdminInputKind = (typeof botAdminInputKinds)[number];
+
+export const videoMarkFields = ["introEndSec", "courseStartSec", "priceSec", "unlockSec"] as const;
+export type VideoMarkField = (typeof videoMarkFields)[number];
+
+export const botAdminInputs = pgTable("bot_admin_inputs", {
+  adminTelegramId: bigint("admin_telegram_id", { mode: "number" }).primaryKey(),
+  kind: text("kind", { enum: botAdminInputKinds }).notNull(),
+  videoId: bigint("video_id", { mode: "number" })
+    .notNull()
+    .references(() => videos.id, { onDelete: "cascade" }),
+  mark: text("mark", { enum: videoMarkFields }),
+  shortFileUniqueId: text("short_file_unique_id"),
+  shortDuration: integer("short_duration"),
+  shortFileUrl: text("short_file_url"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type BotAdminInput = typeof botAdminInputs.$inferSelect;
+
+export const botAdminTestModes = pgTable("bot_admin_test_modes", {
+  adminTelegramId: bigint("admin_telegram_id", { mode: "number" }).primaryKey(),
+  startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+});
 
 export const videoImports = pgTable(
   "video_imports",

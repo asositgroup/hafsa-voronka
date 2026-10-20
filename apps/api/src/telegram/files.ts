@@ -1,19 +1,32 @@
-import { createReadStream } from "node:fs";
-import { unlink } from "node:fs/promises";
+import { open, unlink } from "node:fs/promises";
 import { isAbsolute } from "node:path";
 import { Readable } from "node:stream";
-import type { Api } from "grammy";
+import { Api } from "grammy";
 import { env } from "@/env";
 
 export type TelegramFile = { stream: Readable; size?: number; localPath?: string };
 
+const LOCAL_SERVER_DOWNLOAD_TIMEOUT_SECONDS = 3600;
+
+let localServerApi: Api | undefined;
+
+function downloadApi(api: Api) {
+  if (!env.BOT_API_ROOT) return api;
+  localServerApi ??= new Api(env.BOT_TOKEN, {
+    apiRoot: env.BOT_API_ROOT,
+    timeoutSeconds: LOCAL_SERVER_DOWNLOAD_TIMEOUT_SECONDS,
+  });
+  return localServerApi;
+}
+
 export async function openTelegramFile(api: Api, fileId: string): Promise<TelegramFile> {
-  const file = await api.getFile(fileId);
+  const file = await downloadApi(api).getFile(fileId);
   if (!file.file_path) throw new Error("Telegram returned no file path");
 
   if (isAbsolute(file.file_path)) {
+    const handle = await open(file.file_path, "r");
     return {
-      stream: createReadStream(file.file_path),
+      stream: handle.createReadStream(),
       size: file.file_size,
       localPath: file.file_path,
     };

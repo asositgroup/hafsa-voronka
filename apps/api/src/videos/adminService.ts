@@ -48,15 +48,8 @@ function hasPublicUrl(url: string | null | undefined) {
   return url == null || keyFromPublicUrl(url) !== null;
 }
 
-export async function listAdminVideos(): Promise<AdminVideoItem[]> {
-  const rows = await db()
-    .select({ video: videos, userCount: count(users.id) })
-    .from(videos)
-    .leftJoin(users, eq(users.videoId, videos.id))
-    .groupBy(videos.id)
-    .orderBy(desc(videos.isActive), sql`${videos.archivedAt} asc nulls first`, desc(videos.createdAt), asc(videos.id));
-
-  return rows.map(({ video, userCount }) => ({
+function adminVideoItem(video: Video, userCount: number): AdminVideoItem {
+  return {
     id: video.id,
     title: video.title,
     fileUrl: video.fileUrl,
@@ -71,7 +64,23 @@ export async function listAdminVideos(): Promise<AdminVideoItem[]> {
     archivedAt: video.archivedAt?.toISOString() ?? null,
     createdAt: video.createdAt.toISOString(),
     userCount,
-  }));
+  };
+}
+
+export async function listAdminVideos(): Promise<AdminVideoItem[]> {
+  const rows = await db()
+    .select({ video: videos, userCount: count(users.id) })
+    .from(videos)
+    .leftJoin(users, eq(users.videoId, videos.id))
+    .groupBy(videos.id)
+    .orderBy(desc(videos.isActive), sql`${videos.archivedAt} asc nulls first`, desc(videos.createdAt), asc(videos.id));
+
+  return rows.map(({ video, userCount }) => adminVideoItem(video, userCount));
+}
+
+export async function findAdminVideo(id: number): Promise<AdminVideoItem | undefined> {
+  const video = await findVideo(id);
+  return video && adminVideoItem(video, await countUsers(id));
 }
 
 export async function createVideo(

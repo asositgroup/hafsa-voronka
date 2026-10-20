@@ -10,8 +10,11 @@ import {
   type VideoReportRow,
 } from "@funnel/shared";
 import { db } from "@/db";
+import { notAdminTelegramId } from "@/telegram/admins";
 
 type DateRange = { from: string; to: string };
+
+const leadUser = () => notAdminTelegramId(sql`u.telegram_id`);
 
 export async function getVideoReport({ from, to }: DateRange): Promise<VideoReportRow[]> {
   const rows = await db().execute<{
@@ -51,6 +54,7 @@ export async function getVideoReport({ from, to }: DateRange): Promise<VideoRepo
       WHERE e.user_id = u.id AND e.type = 'app_open'
     ) ao ON true
     WHERE coalesce(first_link.given_at, u.link_given_at) IS NOT NULL
+      AND ${leadUser()}
       AND (coalesce(first_link.given_at, u.link_given_at) AT TIME ZONE 'Asia/Tashkent')::date >= ${from}::date
       AND (coalesce(first_link.given_at, u.link_given_at) AT TIME ZONE 'Asia/Tashkent')::date <= ${to}::date
     GROUP BY v.id
@@ -95,7 +99,8 @@ export async function getMessageReport({ from, to }: DateRange): Promise<Message
                     WHERE n.user_id = sm.user_id AND n.sent_at > sm.sent_at), 'infinity'::timestamptz)
         ) AS window_end
       FROM sent_messages sm
-      WHERE sm.template_id IS NOT NULL AND sm.telegram_message_id IS NOT NULL AND sm.sent_at IS NOT NULL
+      JOIN users u ON u.id = sm.user_id
+      WHERE sm.template_id IS NOT NULL AND ${leadUser()} AND sm.telegram_message_id IS NOT NULL AND sm.sent_at IS NOT NULL
         AND (sm.sent_at AT TIME ZONE 'Asia/Tashkent')::date >= ${from}::date
         AND (sm.sent_at AT TIME ZONE 'Asia/Tashkent')::date <= ${to}::date
     ),
@@ -162,8 +167,10 @@ export async function getSecondChanceReport({ from, to }: DateRange): Promise<Se
       )) AS reached_price
     FROM second_chance_offers o
     JOIN sent_messages sm ON sm.id = o.sent_message_id
+    JOIN users u ON u.id = o.user_id
     LEFT JOIN link_grants g ON g.id = o.granted_link_id
     WHERE sm.sent_at IS NOT NULL
+      AND ${leadUser()}
       AND (sm.sent_at AT TIME ZONE 'Asia/Tashkent')::date >= ${from}::date
       AND (sm.sent_at AT TIME ZONE 'Asia/Tashkent')::date <= ${to}::date
   `);

@@ -6,6 +6,7 @@ import { loadEnv } from "@/env";
 import { failInterruptedImports } from "@/drive/imports";
 import { startLeadNotifyLoop } from "@/leads/notifier";
 import { startMessageDispatchLoop } from "@/messages/dispatch";
+import { resumeShortUploads } from "@/telegram/admin-video/shortVideo";
 import { resumeBotUploads } from "@/telegram/admin-video/upload";
 import { bot } from "@/telegram/bot";
 import { seedVideoFromEnv } from "@/videos/service";
@@ -16,6 +17,7 @@ await runMigrations(env.DATABASE_URL);
 await seedVideoFromEnv({ url: env.VIDEO_URL, duration: env.VIDEO_DURATION_SEC });
 await bot().init();
 await resumeBotUploads(bot().api);
+await resumeShortUploads(bot().api);
 await failInterruptedImports();
 
 const stopLeadNotify = env.LEADS_CHAT_ID || env.SHEETS_ENABLED ? startLeadNotifyLoop() : undefined;

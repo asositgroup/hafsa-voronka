@@ -31,20 +31,70 @@ export function defaultLessonStartSec(
   return Math.max(0, Math.min(DEFAULT_LESSON_START_SEC, lessonEnd - 1));
 }
 
+export const videoMarkKeys = ["introEndSec", "courseStartSec", "priceSec", "unlockSec"] as const;
+export type VideoMarkKey = (typeof videoMarkKeys)[number];
+
+export type VideoMarkRange = {
+  min: number;
+  max: number;
+  after: VideoMarkKey | null;
+  before: VideoMarkKey | null;
+};
+
+function firstSet(marks: VideoMarks, keys: VideoMarkKey[]): VideoMarkKey | null {
+  return keys.find((key) => marks[key] != null) ?? null;
+}
+
+const markNeighbours: Record<VideoMarkKey, { after: VideoMarkKey[]; before: VideoMarkKey[]; floor: number }> = {
+  introEndSec: { after: [], before: ["courseStartSec", "priceSec"], floor: 0 },
+  courseStartSec: { after: ["introEndSec"], before: ["priceSec"], floor: 1 },
+  priceSec: { after: ["courseStartSec", "introEndSec"], before: [], floor: 0 },
+  unlockSec: { after: [], before: [], floor: 1 },
+};
+
+export function markRange(mark: VideoMarkKey, marks: VideoMarks, duration: number): VideoMarkRange {
+  const neighbours = markNeighbours[mark];
+  const after = firstSet(marks, neighbours.after);
+  const before = firstSet(marks, neighbours.before);
+  return {
+    min: after ? marks[after]! + 1 : neighbours.floor,
+    max: (before ? marks[before]! : duration) - 1,
+    after,
+    before,
+  };
+}
+
+export function isInMarkRange(range: VideoMarkRange, value: number) {
+  return value >= range.min && value <= range.max;
+}
+
+const markOrderErrors: Record<VideoMarkKey, VideoMarkError> = {
+  priceSec: "price_after_duration",
+  unlockSec: "unlock_out_of_range",
+  courseStartSec: "course_after_price",
+  introEndSec: "intro_after_course",
+};
+
+const markFloorErrors: Record<VideoMarkKey, VideoMarkError> = {
+  priceSec: "mark_negative",
+  unlockSec: "unlock_out_of_range",
+  courseStartSec: "mark_negative",
+  introEndSec: "mark_negative",
+};
+
 export function validateVideoMarks(
   marks: VideoMarks,
   duration: number,
   options: { requirePrice: boolean },
 ): VideoMarkError | "price_required" | null {
-  const { introEndSec, courseStartSec, priceSec, unlockSec } = marks;
-  const values = [introEndSec, courseStartSec, priceSec, unlockSec];
-  if (values.some((value) => value != null && value < 0) || courseStartSec === 0) return "mark_negative";
-  if (options.requirePrice && priceSec == null) return "price_required";
-  if (priceSec != null && priceSec >= duration) return "price_after_duration";
-  if (unlockSec != null && (unlockSec <= 0 || unlockSec >= duration)) return "unlock_out_of_range";
-  if (courseStartSec != null && priceSec != null && courseStartSec >= priceSec) return "course_after_price";
-  if (introEndSec != null && introEndSec >= (courseStartSec ?? priceSec ?? duration)) {
-    return "intro_after_course";
+  if (videoMarkKeys.some((key) => marks[key] != null && marks[key] < 0)) return "mark_negative";
+  if (options.requirePrice && marks.priceSec == null) return "price_required";
+  for (const key of ["priceSec", "unlockSec", "courseStartSec", "introEndSec"] as const) {
+    const value = marks[key];
+    if (value == null) continue;
+    const range = markRange(key, marks, duration);
+    if (value > range.max) return markOrderErrors[key];
+    if (range.after === null && value < range.min) return markFloorErrors[key];
   }
   return null;
 }

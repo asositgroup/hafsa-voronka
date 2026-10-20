@@ -3,6 +3,7 @@ import { db, rawClient } from "@/db";
 import { type Lead, leads, type User, users, videos, watchProgress } from "@/db/schema";
 import { env } from "@/env";
 import { appendRows, formatTashkentDate, readColumn, sheetPhone, writeRanges } from "@/sheets";
+import { notAdminTelegramId } from "@/telegram/admins";
 import { assigneeLabel, outcomeLabels, watchedPercent } from "./card";
 
 const SHEETS_LOCK_KEY = 849204812;
@@ -93,7 +94,13 @@ async function syncPending() {
     .leftJoin(users, eq(users.id, leads.userId))
     .leftJoin(watchProgress, eq(watchProgress.userId, leads.userId))
     .leftJoin(videos, eq(videos.id, users.videoId))
-    .where(and(gt(leads.notifyVersion, leads.sheetsSyncedVersion), lt(leads.sheetsAttempts, MAX_ATTEMPTS)))
+    .where(
+      and(
+        gt(leads.notifyVersion, leads.sheetsSyncedVersion),
+        lt(leads.sheetsAttempts, MAX_ATTEMPTS),
+        notAdminTelegramId(users.telegramId),
+      ),
+    )
     .orderBy(asc(leads.id))
     .limit(BATCH_SIZE);
 

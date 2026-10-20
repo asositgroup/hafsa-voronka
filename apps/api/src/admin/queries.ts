@@ -10,6 +10,7 @@ import type {
 } from "@funnel/shared";
 import { db } from "@/db";
 import { watchedPercent } from "@/leads/card";
+import { notAdminTelegramId } from "@/telegram/admins";
 import { formatTashkentDate, listDaysInRange } from "./dates";
 
 const FUNNEL_STEP_NAMES: Record<string, string> = {
@@ -33,6 +34,8 @@ const ORDERED_FUNNEL_STEPS = [
   "video_complete",
   "channel_click",
 ] as const;
+
+const leadUser = () => notAdminTelegramId(sql`u.telegram_id`);
 
 export type QueryFilters = {
   from: string;
@@ -60,7 +63,8 @@ export async function getFunnelAndKpis(filters: QueryFilters): Promise<{
       FROM events e
       LEFT JOIN users u ON u.id = e.user_id
       WHERE
-        (e.created_at AT TIME ZONE 'Asia/Tashkent')::date >= ${filters.from}::date
+        ${leadUser()}
+        AND (e.created_at AT TIME ZONE 'Asia/Tashkent')::date >= ${filters.from}::date
         AND (e.created_at AT TIME ZONE 'Asia/Tashkent')::date <= ${filters.to}::date
         AND e.type IN ('landing_view', 'cta_click', 'lead_submitted', 'bot_start', 'registered', 'video_start', 'video_complete', 'channel_click')
         AND (
@@ -139,7 +143,8 @@ export async function getDailySeries(filters: QueryFilters): Promise<DailyStat[]
     FROM events e
     JOIN users u ON u.id = e.user_id
     WHERE
-      e.type IN ('registered', 'video_complete')
+      ${leadUser()}
+      AND e.type IN ('registered', 'video_complete')
       AND (e.created_at AT TIME ZONE 'Asia/Tashkent')::date >= ${filters.from}::date
       AND (e.created_at AT TIME ZONE 'Asia/Tashkent')::date <= ${filters.to}::date
       AND (${filters.source ?? null}::text IS NULL OR u.utm_source = ${filters.source ?? null})
@@ -188,7 +193,8 @@ export async function getCampaignStats(filters: QueryFilters): Promise<CampaignS
     FROM events e
     JOIN users u ON u.id = e.user_id
     WHERE
-      (e.created_at AT TIME ZONE 'Asia/Tashkent')::date >= ${filters.from}::date
+      ${leadUser()}
+      AND (e.created_at AT TIME ZONE 'Asia/Tashkent')::date >= ${filters.from}::date
       AND (e.created_at AT TIME ZONE 'Asia/Tashkent')::date <= ${filters.to}::date
       AND (${filters.source ?? null}::text IS NULL OR u.utm_source = ${filters.source ?? null})
       AND (${filters.campaign ?? null}::text IS NULL OR u.utm_campaign = ${filters.campaign ?? null})
@@ -246,6 +252,7 @@ export async function getWatchDropoff(filters: QueryFilters): Promise<DropoffSta
     LEFT JOIN videos v ON v.id = u.video_id
     WHERE
       u.registered_at IS NOT NULL
+      AND ${leadUser()}
       AND (u.registered_at AT TIME ZONE 'Asia/Tashkent')::date >= ${filters.from}::date
       AND (u.registered_at AT TIME ZONE 'Asia/Tashkent')::date <= ${filters.to}::date
       AND (${filters.source ?? null}::text IS NULL OR u.utm_source = ${filters.source ?? null})
@@ -289,8 +296,8 @@ export async function getHealthStats(): Promise<AdminStatsResponse["health"]> {
     last_event_at: string | null;
   }>(sql`
     SELECT
-      (SELECT count(*)::int FROM leads WHERE notify_version > sheets_synced_version AND sheets_attempts < 10) AS sheets_backlog,
-      (SELECT count(*)::int FROM leads WHERE notify_version > sheets_synced_version AND sheets_attempts >= 10) AS sheets_failures,
+      (SELECT count(*)::int FROM leads l LEFT JOIN users u ON u.id = l.user_id WHERE l.notify_version > l.sheets_synced_version AND l.sheets_attempts < 10 AND ${leadUser()}) AS sheets_backlog,
+      (SELECT count(*)::int FROM leads l LEFT JOIN users u ON u.id = l.user_id WHERE l.notify_version > l.sheets_synced_version AND l.sheets_attempts >= 10 AND ${leadUser()}) AS sheets_failures,
       (SELECT to_char(max(created_at), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') FROM events WHERE type = 'bot_start') AS last_bot_start_at,
       (SELECT to_char(max(created_at), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') FROM events) AS last_event_at
   `);
@@ -315,6 +322,7 @@ export async function getLeads(
     FROM users u
     WHERE
       u.registered_at IS NOT NULL
+      AND ${leadUser()}
       AND (u.registered_at AT TIME ZONE 'Asia/Tashkent')::date >= ${filters.from}::date
       AND (u.registered_at AT TIME ZONE 'Asia/Tashkent')::date <= ${filters.to}::date
       AND (${filters.source ?? null}::text IS NULL OR u.utm_source = ${filters.source ?? null})
@@ -352,6 +360,7 @@ export async function getLeads(
     LEFT JOIN videos v ON v.id = u.video_id
     WHERE
       u.registered_at IS NOT NULL
+      AND ${leadUser()}
       AND (u.registered_at AT TIME ZONE 'Asia/Tashkent')::date >= ${filters.from}::date
       AND (u.registered_at AT TIME ZONE 'Asia/Tashkent')::date <= ${filters.to}::date
       AND (${filters.source ?? null}::text IS NULL OR u.utm_source = ${filters.source ?? null})
@@ -426,6 +435,7 @@ export async function getLeadsCsv(filters: QueryFilters): Promise<string> {
     LEFT JOIN videos v ON v.id = u.video_id
     WHERE
       u.registered_at IS NOT NULL
+      AND ${leadUser()}
       AND (u.registered_at AT TIME ZONE 'Asia/Tashkent')::date >= ${filters.from}::date
       AND (u.registered_at AT TIME ZONE 'Asia/Tashkent')::date <= ${filters.to}::date
       AND (${filters.source ?? null}::text IS NULL OR u.utm_source = ${filters.source ?? null})

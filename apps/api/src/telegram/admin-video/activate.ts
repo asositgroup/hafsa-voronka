@@ -57,9 +57,10 @@ async function resolveActivation(draftId: number, allowDone: boolean): Promise<O
         title: draftTitle(draft.caption),
         fileUrl: draft.fileUrl,
         duration: draft.duration!,
-        introEndSec: defaultLessonStartSec(draft, draft.duration!),
+        introEndSec: draft.introEndSec ?? defaultLessonStartSec(draft, draft.duration!),
         courseStartSec: draft.courseStartSec,
         priceSec: draft.priceSec,
+        unlockSec: draft.unlockSec,
       });
       if (!created.ok) return { kind: "failed", code: created.code, chatId };
       videoId = created.video.id;

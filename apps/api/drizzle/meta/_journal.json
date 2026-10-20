@@ -148,6 +148,20 @@
       "when": 1792414918173,
       "tag": "0020_short_offer",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1792474113570,
+      "tag": "0021_bot_video_library",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1792480903700,
+      "tag": "0022_admin_test_mode",
+      "breakpoints": true
     }
   ]
 }

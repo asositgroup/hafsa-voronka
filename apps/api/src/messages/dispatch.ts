@@ -35,6 +35,7 @@ import { pendingAppointmentUserIds } from "@/links/appointmentStore";
 import { offerHistories } from "@/links/offers";
 import { insertGrant } from "@/links/service";
 import { linkTtlHours, messageCaps } from "@/settings/service";
+import { isAdminTelegramId, notAdminTelegramId } from "@/telegram/admins";
 import { bot } from "@/telegram/bot";
 import { isBlockedError, markBlocked } from "@/telegram/blocked";
 import { botText, sendBotText } from "@/telegram/texts";
@@ -164,6 +165,7 @@ async function loadCandidates(now: Date, userId?: number): Promise<Candidate[]> 
         isNull(segmentRuns.endedAt),
         eq(users.botBlocked, false),
         isNull(users.wroteAdminAt),
+        notAdminTelegramId(users.telegramId),
         gt(segmentRuns.enteredAt, since),
         userId === undefined ? undefined : eq(segmentRuns.userId, userId),
       ),
@@ -514,7 +516,7 @@ type AppointmentRow = {
 };
 
 function appointmentStillValid({ appointment, user, offer, lastBeatAt }: AppointmentRow, now: Date): boolean {
-  if (user.botBlocked || user.wroteAdminAt !== null) return false;
+  if (user.botBlocked || user.wroteAdminAt !== null || isAdminTelegramId(user.telegramId)) return false;
   if (appointment.purpose === "reopen") {
     return offer !== null && offer.answer !== "again" && user.linkId === offer.expiredLinkId;
   }

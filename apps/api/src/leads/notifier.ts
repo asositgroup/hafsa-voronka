@@ -4,6 +4,7 @@ import type { OfferAnswer } from "@funnel/shared";
 import { db, rawClient } from "@/db";
 import { type Lead, leads, users, videos, watchProgress } from "@/db/schema";
 import { env } from "@/env";
+import { notAdminTelegramId } from "@/telegram/admins";
 import { bot } from "@/telegram/bot";
 import {
   type CardUser,
@@ -128,6 +129,7 @@ async function flushPending(sender: LeadSender) {
         gt(leads.notifyVersion, leads.notifiedVersion),
         lt(leads.notifyAttempts, MAX_ATTEMPTS),
         sql`${leads.createdAt} > now() - make_interval(days => ${MAX_AGE_DAYS})`,
+        notAdminTelegramId(users.telegramId),
       ),
     )
     .orderBy(asc(leads.id))

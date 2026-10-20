@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { defaultLessonStartSec, formatMmSs, parseMmSs, validateVideoMarks } from "@funnel/shared";
+import {
+  defaultLessonStartSec,
+  formatMmSs,
+  isInMarkRange,
+  markRange,
+  parseMmSs,
+  type VideoMarks,
+  validateVideoMarks,
+  videoMarkKeys,
+} from "@funnel/shared";
 
 describe("formatMmSs", () => {
   it("pads and floors", () => {
@@ -62,6 +71,7 @@ describe("validateVideoMarks", () => {
 
   it("rejects course start at or after price", () => {
     expect(validateVideoMarks({ courseStartSec: 600, priceSec: 600 }, 900, open)).toBe("course_after_price");
+    expect(validateVideoMarks({ courseStartSec: 900 }, 900, open)).toBe("course_after_price");
   });
 
   it("accepts an unlock point strictly inside the video regardless of other marks", () => {
@@ -93,5 +103,50 @@ describe("defaultLessonStartSec", () => {
   it("always passes the marks check", () => {
     const open = { requirePrice: false };
     expect(validateVideoMarks({ introEndSec: defaultLessonStartSec({ courseStartSec: 1, priceSec: 5 }, 9), courseStartSec: 1, priceSec: 5 }, 9, open)).toBeNull();
+  });
+});
+
+describe("markRange", () => {
+  it("bounds each mark by its chronological neighbours", () => {
+    const marks = { introEndSec: 5, courseStartSec: 20, priceSec: 22, unlockSec: 10 };
+    expect(markRange("introEndSec", marks, 40)).toEqual({ min: 0, max: 19, after: null, before: "courseStartSec" });
+    expect(markRange("courseStartSec", marks, 40)).toEqual({ min: 6, max: 21, after: "introEndSec", before: "priceSec" });
+    expect(markRange("priceSec", marks, 40)).toEqual({ min: 21, max: 39, after: "courseStartSec", before: null });
+    expect(markRange("unlockSec", marks, 40)).toEqual({ min: 1, max: 39, after: null, before: null });
+  });
+
+  it("falls back to the next known mark or the video edges", () => {
+    expect(markRange("introEndSec", { priceSec: 22 }, 40)).toMatchObject({ max: 21, before: "priceSec" });
+    expect(markRange("introEndSec", {}, 40)).toMatchObject({ min: 0, max: 39, before: null });
+    expect(markRange("courseStartSec", {}, 40)).toMatchObject({ min: 1, max: 39, after: null, before: null });
+    expect(markRange("priceSec", { introEndSec: 5 }, 40)).toMatchObject({ min: 6, after: "introEndSec" });
+  });
+
+  it("reports an empty range when the neighbours leave no room", () => {
+    const range = markRange("priceSec", { courseStartSec: 39 }, 40);
+    expect(range.min).toBeGreaterThan(range.max);
+  });
+
+  it("agrees with validateVideoMarks for every value", () => {
+    const duration = 12;
+    const open = { requirePrice: false };
+    const samples: VideoMarks[] = [
+      {},
+      { introEndSec: 2, courseStartSec: 5, priceSec: 8, unlockSec: 3 },
+      { courseStartSec: 4 },
+      { priceSec: 6 },
+      { introEndSec: 3, priceSec: 9 },
+    ];
+    for (const sample of samples) {
+      for (const key of videoMarkKeys) {
+        const others = { ...sample, [key]: null };
+        if (validateVideoMarks(others, duration, open) !== null) continue;
+        const range = markRange(key, others, duration);
+        for (let value = 0; value <= duration + 1; value += 1) {
+          const valid = validateVideoMarks({ ...others, [key]: value }, duration, open) === null;
+          expect([key, value, valid]).toEqual([key, value, isInMarkRange(range, value)]);
+        }
+      }
+    }
   });
 });

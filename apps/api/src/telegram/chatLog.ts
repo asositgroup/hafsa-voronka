@@ -7,6 +7,7 @@ import { isBlockedError } from "@/telegram/blocked";
 const HOUR_MS = 3_600_000;
 export const CHAT_CLEANUP_AGE_MS = 24 * HOUR_MS;
 const DELETE_LIMIT_MS = 48 * HOUR_MS;
+const KEEP_ROWS_MS = 72 * HOUR_MS;
 const CLEANUP_BATCH_SIZE = 500;
 const MESSAGE_NOT_FOUND = "message to delete not found";
 
@@ -65,6 +66,7 @@ export async function replaceBotReply(api: Api, chatId: number, send: () => Prom
 }
 
 export async function cleanupChatMessages(api: Api, now: Date, pace: Pace) {
+  await db().delete(chatMessages).where(lte(chatMessages.sentAt, new Date(now.getTime() - KEEP_ROWS_MS)));
   await db()
     .update(chatMessages)
     .set({ deleteError: "too_old" })

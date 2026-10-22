@@ -157,7 +157,7 @@ describe.skipIf(!testDbUrl)("Bot registration flow", () => {
     expect(logged.filter((row) => row.fromBot && row.deletedAt === null)).toHaveLength(1);
   });
 
-  it("deletes logged chat messages once they are 24 hours old", async () => {
+  it("deletes logged chat messages once they are 24 hours old and drops rows after 3 days", async () => {
     const { cleanupChatMessages } = await import("@/telegram/chatLog");
     const chatId = 7_800_000 + Math.floor(Math.random() * 100_000);
     const now = new Date();
@@ -168,6 +168,7 @@ describe.skipIf(!testDbUrl)("Bot registration flow", () => {
         { chatId, messageId: 1, fromBot: false, sentAt: hoursAgo(25) },
         { chatId, messageId: 2, fromBot: true, sentAt: hoursAgo(23) },
         { chatId, messageId: 3, fromBot: true, sentAt: hoursAgo(49) },
+        { chatId, messageId: 4, fromBot: true, sentAt: hoursAgo(73), deletedAt: hoursAgo(49) },
       ]);
 
     await cleanupChatMessages(testBot.api, now, async () => {});
@@ -179,6 +180,7 @@ describe.skipIf(!testDbUrl)("Bot registration flow", () => {
     expect(byId.get(1)?.deletedAt).toEqual(now);
     expect(byId.get(2)?.deletedAt).toBeNull();
     expect(byId.get(3)?.deleteError).toBe("too_old");
+    expect(byId.has(4)).toBe(false);
   });
 
   it("ignores group chatter and answers /chatid in groups", async () => {

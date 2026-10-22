@@ -7,11 +7,8 @@ Official documentation links for reference:
 - [Vercel Deployment Documentation](https://vercel.com/docs)
 ---
 ## 1. Cloudflare DNS Configuration
-
-The apex domain and DNS management reside on Cloudflare.
-
+The apex domain and DNS management reside on Cloudflare.\
 ### DNS Records
-
 | Type | Name | Content / Target | Proxy Status | Purpose |
 | --- | --- | --- | --- | --- |
 | CNAME | `yourdomain.uz` | `cname.vercel-dns.com` | DNS only (Grey cloud) | Web frontend on Vercel |

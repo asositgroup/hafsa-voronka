@@ -4,7 +4,7 @@ import { attachLeadToUser } from "@/leads/service";
 import { syncSegment } from "./segments";
 import { logEvent, markRegistered } from "./users";
 
-export type RegistrationFields = { name: string; phone: string; phoneVerified: boolean };
+export type RegistrationFields = { name: string; phone: string | null; phoneVerified: boolean };
 
 export type RegistrationSource = { actionSource: CapiActionSource; client?: CapiClient };
 

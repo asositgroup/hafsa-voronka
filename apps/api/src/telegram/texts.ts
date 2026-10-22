@@ -16,17 +16,12 @@ import { type BotTextRow, botTexts } from "@/db/schema";
 import { uploadToMediaChat } from "@/telegram/media";
 
 export const defaultBotTexts: Record<BotTextKey, string> = {
-  askContact:
-    "Assalomu alaykum, {name}! 👋\n\nHafsa ustozaning «Arab tilini o'rganishdagi 5 muhim qadam» video darsi sizni kutmoqda: 12 yillik tajriba, atigi 17 daqiqada.\n\nDarsni bepul olish uchun pastdagi «📱 Raqamni yuborish» tugmasini bosing. Bir soniya ham ketmaydi 👇",
-  askContactShort:
-    "Bepul darsgacha bir qadam qoldi! 👇\nPastdagi «📱 Raqamni yuborish» tugmasini bosing, dars darhol ochiladi.",
   welcome:
     "Qaytganingizdan xursandmiz, {name}! 👋\n\nVideo dars hali ham sizni kutmoqda. Atigi 17 daqiqa, arab tilini qayerdan boshlashni aniq bilib olasiz 👇",
   welcomeBack:
     "Yana xush kelibsiz, {name}! 🌿\n\nDarsni qayta ko'rishingiz mumkin. Arab tilini Hafsa ustoza bilan chuqurroq o'rganmoqchi bo'lsangiz, adminga yozing. Sizga mos yo'lni ko'rsatib beradi.",
-  registered: "Ajoyib, siz ro'yxatdan o'tdingiz! ✅",
   watchPrompt:
-    "🎁 Video dars tayyor!\n\nUnda arab tilini to'g'ri boshlash uchun 5 ta muhim qadamni bilib olasiz. Ko'pchilik aynan shu qadamlarni bilmagani uchun yarim yo'lda to'xtab qoladi.\n\n17 daqiqa ajrating va hoziroq ko'ring 👇",
+    "Assalomu alaykum, {name}! 👋\n\n🎁 Video dars tayyor!\n\nUnda arab tilini to'g'ri boshlash uchun 5 ta muhim qadamni bilib olasiz. Ko'pchilik aynan shu qadamlarni bilmagani uchun yarim yo'lda to'xtab qoladi.\n\n17 daqiqa ajrating va hoziroq ko'ring 👇",
   completion:
     "Barakalla! 🎉 Darsni ko'rib chiqdingiz. Bu arab tilini o'rganishdagi eng muhim qadam: to'g'ri boshlash.\n\nEndi bilganlaringizni amalda qo'llash vaqti. Arab tilini Hafsa ustoza bilan davom ettirmoqchimisiz yoki savollaringiz bormi? Adminga yozing, sizga batafsil ma'lumot beradi 👇",
   fallback: "Video darsni ko'rish uchun pastdagi tugmani bosing 👇",
@@ -41,7 +36,6 @@ export const defaultBotTexts: Record<BotTextKey, string> = {
   reopenNow: "Bonus darsingiz yana ochildi! 🎁\n\nLink 24 soat amal qiladi. Tayyor bo'lsangiz, boshlang 👇",
   remindNow: "Eslatib qo'ydim, dars sizni kutmoqda! ⏰\n\nTayyor bo'lsangiz, davom eting 👇",
   offerClosed: "Bu tugma eskirgan 🙂 Darsga qaytish uchun /start bosing.",
-  shareContactButton: "📱 Raqamni yuborish",
   watchButton: "▶️ Bepul darsni ko'rish",
   channelButton: "✍️ Adminga yozish",
   laterTonight: "🌙 Bugun kechqurun ({soat})",

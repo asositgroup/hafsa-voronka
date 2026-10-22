@@ -7,7 +7,7 @@ export type ChatButton = { key: BotButtonKey; placement: "reply" | "inline" };
 export type ChatTrigger =
   | {
       kind: "user";
-      text: "start" | "wrote" | "contact" | "later" | "other" | "day" | "picked" | "stale";
+      text: "start" | "wrote" | "later" | "other" | "day" | "picked" | "stale";
       context?: "notWatched" | "watched";
     }
   | { kind: "note"; note?: "buttonReady" | "hourBefore" | "chosenTime" };
@@ -16,17 +16,13 @@ export type ScenarioCard = { key: BotMessageKey; trigger?: ChatTrigger; buttons:
 
 const watch: ChatButton = { key: "watchButton", placement: "inline" };
 const channel: ChatButton = { key: "channelButton", placement: "inline" };
-const share: ChatButton = { key: "shareContactButton", placement: "reply" };
 const inline = (key: BotButtonKey): ChatButton => ({ key, placement: "inline" });
 
 export const scenarioOrder: ScenarioId[] = ["newUser", "returning", "afterLesson", "secondChance"];
 
 export const scenarios: Record<ScenarioId, ScenarioCard[]> = {
   newUser: [
-    { key: "askContact", trigger: { kind: "user", text: "start" }, buttons: [share] },
-    { key: "askContactShort", trigger: { kind: "user", text: "wrote" }, buttons: [share] },
-    { key: "registered", trigger: { kind: "user", text: "contact" }, buttons: [] },
-    { key: "watchPrompt", buttons: [watch] },
+    { key: "watchPrompt", trigger: { kind: "user", text: "start" }, buttons: [watch] },
   ],
   returning: [
     { key: "welcome", trigger: { kind: "user", text: "start", context: "notWatched" }, buttons: [watch] },

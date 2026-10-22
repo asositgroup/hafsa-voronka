@@ -1,15 +1,8 @@
-import { Bot, type Context, InlineKeyboard, Keyboard } from "grammy";
-import { normalizeContactPhone } from "@funnel/shared";
+import { Bot, type Context, InlineKeyboard } from "grammy";
 import type { User } from "@/db/schema";
 import { env } from "@/env";
 import { completeRegistration, nameFromTelegram } from "@/funnel/registration";
-import {
-  findByTelegramId,
-  logEvent,
-  saveContactPhone,
-  setBotBlocked,
-  upsertUser,
-} from "@/funnel/users";
+import { findByTelegramId, logEvent, setBotBlocked, upsertUser } from "@/funnel/users";
 import { syncSegment } from "@/funnel/segments";
 import { uz } from "@/i18n/uz";
 import { applyLeadAction } from "@/leads/actions";
@@ -27,20 +20,19 @@ async function watchKeyboard(completed: boolean) {
   return completed ? keyboard.row().url(await botText("channelButton"), env.CHANNEL_URL) : keyboard;
 }
 
-async function contactKeyboard() {
-  return new Keyboard().requestContact(await botText("shareContactButton")).resized().oneTime();
-}
-
-async function registerFromChat(ctx: Context, user: User, phone: string) {
-  const webLead = await findMatchingWebLead(user.visitorId, phone);
+async function registerFromChat(ctx: Context, user: User) {
+  const webLead = await findMatchingWebLead(user.visitorId, user.phone);
   const name =
     webLead?.name ||
     (ctx.from && nameFromTelegram(ctx.from)) ||
     ctx.from?.username ||
     uz.bot.defaultName;
-  await completeRegistration(user, { name, phone, phoneVerified: true }, { actionSource: "chat" });
-  await sendBotText(ctx.api, ctx.chat!.id, "registered", {}, { remove_keyboard: true });
-  await sendBotText(ctx.api, ctx.chat!.id, "watchPrompt", {}, await watchKeyboard(false));
+  await completeRegistration(
+    user,
+    { name, phone: user.phone, phoneVerified: user.phoneVerified },
+    { actionSource: "chat" },
+  );
+  await sendBotText(ctx.api, ctx.chat!.id, "watchPrompt", { name: ctx.from?.first_name || name }, await watchKeyboard(false));
 }
 
 function isLeadsChat(chat: { id: number; username?: string } | undefined) {
@@ -90,7 +82,7 @@ function createBot() {
     const name = ctx.from.first_name;
 
     if (user.registeredAt === null) {
-      await sendBotText(ctx.api, ctx.chat.id, "askContact", { name }, await contactKeyboard());
+      await registerFromChat(ctx, user);
       return;
     }
 
@@ -98,26 +90,10 @@ function createBot() {
     await sendBotText(ctx.api, ctx.chat.id, completed ? "welcomeBack" : "welcome", { name }, await watchKeyboard(completed));
   });
 
-  bot.on("message:contact", async (ctx) => {
-    const contact = ctx.message.contact;
-    if (contact.user_id !== ctx.from.id) {
-      await ctx.reply(uz.bot.contactMismatch, { reply_markup: await contactKeyboard() });
-      return;
-    }
-
-    const phone = normalizeContactPhone(contact.phone_number);
-    const user = await saveContactPhone(ctx.from, phone);
-    if (user.registeredAt === null) {
-      await registerFromChat(ctx, user, phone);
-      return;
-    }
-    await ctx.reply(uz.bot.contactConfirmed, { reply_markup: { remove_keyboard: true } });
-  });
-
   bot.on("message", async (ctx) => {
-    const user = await findByTelegramId(ctx.from.id);
-    if (!user?.registeredAt) {
-      await sendBotText(ctx.api, ctx.chat.id, "askContactShort", {}, await contactKeyboard());
+    const user = (await findByTelegramId(ctx.from.id)) ?? (await upsertUser(ctx.from, undefined)).user;
+    if (user.registeredAt === null) {
+      await registerFromChat(ctx, user);
       return;
     }
     await sendBotText(ctx.api, ctx.chat.id, "fallback", {}, await watchKeyboard(user.completedAt !== null));

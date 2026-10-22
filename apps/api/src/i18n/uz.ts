@@ -11,8 +11,6 @@ const videoMarkErrors = {
 export const uz = {
   bot: {
     defaultName: "Foydalanuvchi",
-    contactConfirmed: "Raqamingiz qabul qilindi! ✅ Mini ilovada davom etishingiz mumkin.",
-    contactMismatch: "Iltimos, faqat o'z telefon raqamingizni yuboring.",
     adminVideo: {
       yes: "Ha",
       no: "Yo'q",

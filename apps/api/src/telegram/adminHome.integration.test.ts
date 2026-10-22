@@ -166,7 +166,7 @@ describe.skipIf(!database.url)("Admin home in the bot", () => {
   it("keeps the lead flow for regular users", async () => {
     await command(LEAD, "start");
 
-    expect(requestsContact(lastSend())).toBe(true);
+    expect(inlineButtons(lastSend())[0].web_app?.url).toBe("https://example.com/app");
     expect(lastSend().payload.text).not.toContain("adminsiz");
   });
 
@@ -197,8 +197,8 @@ describe.skipIf(!database.url)("Admin home in the bot", () => {
     await tap(ADMIN, "ah:stats");
 
     const text = String(lastSend().payload.text);
-    expect(text).toContain("Bugun:\nHavola berildi: 1\nVideoni ochdi: 0\nNarxgacha ko'rdi: 0\nAdminga yozdi: 1");
-    expect(text).toContain("Oxirgi 7 kun:\nHavola berildi: 2\nVideoni ochdi: 0\nNarxgacha ko'rdi: 0\nAdminga yozdi: 1");
+    expect(text).toContain("Bugun:\nHavola berildi: 2\nVideoni ochdi: 0\nNarxgacha ko'rdi: 0\nAdminga yozdi: 1");
+    expect(text).toContain("Oxirgi 7 kun:\nHavola berildi: 3\nVideoni ochdi: 0\nNarxgacha ko'rdi: 0\nAdminga yozdi: 1");
     expect(inlineButtons(lastSend())).toEqual([{ text: "🔄 Yangilash", callback_data: "ah:refresh" }]);
 
     await db().insert(users).values({ telegramId: REPORT_LEAD + 2, registeredAt: now, linkGivenAt: now, videoId: video.id });
@@ -206,7 +206,7 @@ describe.skipIf(!database.url)("Admin home in the bot", () => {
     await tap(ADMIN, "ah:refresh");
 
     const edit = calls.find((call) => call.method === "editMessageText");
-    expect(edit?.payload.text).toContain("Bugun:\nHavola berildi: 2");
+    expect(edit?.payload.text).toContain("Bugun:\nHavola berildi: 3");
     expect(sends()).toHaveLength(0);
   });
 
@@ -217,7 +217,7 @@ describe.skipIf(!database.url)("Admin home in the bot", () => {
     const today = getTashkentToday();
 
     const report = await getReport({ from: today, to: today });
-    expect(report.videos.reduce((total, row) => total + row.given, 0)).toBe(2);
+    expect(report.videos.reduce((total, row) => total + row.given, 0)).toBe(3);
 
     const list = await getLeads({ from: today, to: today });
     const ids = new Set(list.leads.map((lead) => lead.id));
@@ -232,10 +232,6 @@ describe.skipIf(!database.url)("Admin home in the bot", () => {
 
     calls.length = 0;
     await command(TEST_ADMIN, "start");
-    expect(requestsContact(lastSend())).toBe(true);
-
-    calls.length = 0;
-    await shareContact(TEST_ADMIN, "+998901234567");
     const user = await userRow(TEST_ADMIN);
     expect(user.registeredAt).not.toBeNull();
     expect(inlineButtons(lastSend())[0].web_app?.url).toBe("https://example.com/app");
@@ -261,7 +257,6 @@ describe.skipIf(!database.url)("Admin home in the bot", () => {
 
   it("does not notify the leads chat about an admin registration", async () => {
     await command(LEAD, "start");
-    await shareContact(LEAD, "+998907654321");
     const { flushLeadNotifications } = await import("@/leads/notifier");
     const sent: string[] = [];
     await flushLeadNotifications({

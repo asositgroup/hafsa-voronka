@@ -39,7 +39,7 @@
 <div class="hero__text">
 <p class="hero__eyebrow">Eksklyuziv onlayn dars</p>
 <p class="timer" role="timer"><span class="timer__dot" aria-hidden="true"></span>Video o‘chishiga <time class="timer__time" id="timer">01:00:00</time> qoldi</p>
-<p class="hero__fact"><span class="diamond" aria-hidden="true"></span>17 daqiqalik bepul videodars</p>
+<p class="hero__fact"><span class="diamond" aria-hidden="true"></span>23 daqiqalik bepul videodars</p>
 <h1 class="hero__title">Arab tilini to‘g‘ri o‘rganishni nimadan boshlash kerak?</h1>
 <p class="hero__lead">Hafsa ustozaning 12 yillik tajribasi asosida arab tilini o‘rganishdagi 5 ta muhim qadamni bilib oling.</p>
 <p class="hero__para">To‘g‘ri ustoz va kitob tanlashdan arab harflarini o‘rganishgacha — jarayonni tezlashtiring va vaqtingizni tejang.</p>
@@ -52,10 +52,10 @@
 <div class="arch">
 <svg class="arch__word" role="img" aria-label="اِقْرَأْ" lang="ar"><use href="./svg/sprite.svg#iqra"/></svg>
 <p class="badge"><b>12+</b><span>yillik ta’lim tajribasi</span></p>
-<a class="poster" href="https://t.me/%%BOT_USERNAME%%" data-cta aria-label="Videoni Telegramda ko‘rish, 17:29">
+<a class="poster" href="https://t.me/%%BOT_USERNAME%%" data-cta aria-label="Videoni Telegramda ko‘rish, 22:50">
 <img src="./img/poster-480.avif" srcset="./img/poster-480.avif 480w, ./img/poster-800.avif 800w" sizes="(min-width: 1024px) 416px, calc(100vw - 40px)" width="800" height="450" alt="" loading="lazy" decoding="async">
 <span class="poster__play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 3.5v17a1 1 0 0 0 1.52.85l13.6-8.5a1 1 0 0 0 0-1.7L7.52 2.65A1 1 0 0 0 6 3.5Z"/></svg></span>
-<span class="poster__time" aria-hidden="true">17:29</span>
+<span class="poster__time" aria-hidden="true">22:50</span>
 </a>
 </div>
 </div>
@@ -126,15 +126,14 @@
 <div class="wrap">
 <h2 class="h2">Videoni qanday olasiz?</h2>
 <ol class="steps">
-<li><span class="steps__num">1</span><p><b>Ism va raqamingizni qoldiring</b>Shundan so‘ng Telegramda bot ochiladi</p></li>
-<li><span class="steps__num">2</span><p><b>Botda raqamingizni tasdiqlang</b>«Raqamni yuborish» tugmasini bosing</p></li>
+<li><span class="steps__num">1</span><p><b>«Telegramda ko‘rish» tugmasini bosing</b>Telegramda bot ochiladi</p></li>
+<li><span class="steps__num">2</span><p><b>Botni ishga tushiring</b>«Start» tugmasini bosing</p></li>
 <li><span class="steps__num">3</span><p><b>Darsni ko‘ring</b>Telegram ichida, o‘zingizga qulay vaqtda</p></li>
 </ol>
 <div class="final">
-<p class="final__text"><b>Birinchi qadamni bugun qo‘ying.</b>17 daqiqalik videodarsni bepul oling.</p>
+<p class="final__text"><b>Birinchi qadamni bugun qo‘ying.</b>23 daqiqalik videodarsni bepul oling.</p>
 <a class="btn btn--gold" href="https://t.me/%%BOT_USERNAME%%" data-cta><svg class="btn__icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#tg"/></svg>Telegramda ko‘rish</a>
 </div>
-<p class="privacy">Raqamingiz faqat dars haqida xabar berish uchun ishlatiladi.</p>
 </div>
 </section>
 </main>
@@ -151,29 +150,6 @@
 <a class="btn btn--ink" href="https://t.me/%%BOT_USERNAME%%" data-cta>Bepul darsni ko‘rish</a>
 </div>
 
-<dialog class="modal" id="lead" aria-labelledby="lead-title" aria-describedby="lead-sub">
-<button class="modal__close" type="button" data-close aria-label="Yopish"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
-<form class="form" id="lead-form" novalidate>
-<h2 class="modal__title" id="lead-title">Bepul darsni oling</h2>
-<p class="modal__sub" id="lead-sub">Ism va raqamingizni qoldiring, dars Telegramda ochiladi.</p>
-<label class="field__label" for="lead-name">Ismingiz</label>
-<input class="field" id="lead-name" name="name" type="text" autocomplete="name" maxlength="60" placeholder="Masalan, Aziza" aria-describedby="lead-name-err">
-<p class="field__err" id="lead-name-err" hidden>Ismingizni kiriting (2-60 ta belgi)</p>
-<label class="field__label" for="lead-phone">Telefon raqamingiz</label>
-<div class="field field--phone"><span>+998</span><input id="lead-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="90 123 45 67" aria-describedby="lead-phone-err"></div>
-<p class="field__err" id="lead-phone-err" hidden>Telefon raqamingizni to‘g‘ri kiriting: 90 123 45 67</p>
-<input class="hp" name="website" type="text" tabindex="-1" autocomplete="off" aria-hidden="true">
-<p class="field__err form__err" id="lead-err" role="alert" hidden></p>
-<button class="btn btn--gold form__submit" type="submit"><svg class="btn__icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#tg"/></svg><span>Davom etish</span></button>
-<p class="form__privacy">Ma’lumotlaringiz maxfiy saqlanadi va faqat dars haqida xabar berish uchun ishlatiladi.</p>
-</form>
-<div class="done" id="lead-done" role="status" hidden>
-<span class="done__check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span>
-<h2 class="modal__title" id="lead-done-title">Rahmat!</h2>
-<p class="modal__sub">Telegram ochilmoqda. Botda «Raqamni yuborish» tugmasini bosing va dars ochiladi.</p>
-<a class="btn btn--gold" id="lead-open" href="https://t.me/%%BOT_USERNAME%%"><svg class="btn__icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#tg"/></svg>Telegramni ochish</a>
-</div>
-</dialog>
 <script src="./js/pixel.js" defer></script>
 </body>
 </html>

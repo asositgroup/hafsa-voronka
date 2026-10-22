@@ -57,19 +57,9 @@ export async function upsertUser(
   return { user: created, isNew: true };
 }
 
-export async function saveContactPhone(profile: TelegramProfile, phone: string) {
-  const { user } = await upsertUser(profile, undefined);
-  const [updated] = await db()
-    .update(users)
-    .set({ phone, phoneVerified: true })
-    .where(eq(users.id, user.id))
-    .returning();
-  return updated;
-}
-
 export async function markRegistered(
   userId: number,
-  fields: { name: string; phone: string; phoneVerified: boolean },
+  fields: { name: string; phone: string | null; phoneVerified: boolean },
 ) {
   const now = new Date();
   const ttlHours = await linkTtlHours();

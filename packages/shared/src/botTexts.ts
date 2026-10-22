@@ -18,11 +18,8 @@ export const BOT_MEDIA_MIME_TYPES = {
 } as const;
 
 export const botMessageKeys = [
-  "askContact",
-  "askContactShort",
   "welcome",
   "welcomeBack",
-  "registered",
   "watchPrompt",
   "completion",
   "fallback",
@@ -39,7 +36,6 @@ export const botMessageKeys = [
 ] as const;
 
 export const botButtonKeys = [
-  "shareContactButton",
   "watchButton",
   "channelButton",
   "laterTonight",
@@ -64,12 +60,9 @@ export type BotTextKind = "message" | "button";
 export type BotMediaType = keyof typeof BOT_MEDIA_LIMITS;
 
 export const botTextDefinitions: Record<BotTextKey, { kind: BotTextKind; placeholders: readonly string[] }> = {
-  askContact: { kind: "message", placeholders: ["name"] },
-  askContactShort: { kind: "message", placeholders: [] },
   welcome: { kind: "message", placeholders: ["name"] },
   welcomeBack: { kind: "message", placeholders: ["name"] },
-  registered: { kind: "message", placeholders: [] },
-  watchPrompt: { kind: "message", placeholders: [] },
+  watchPrompt: { kind: "message", placeholders: ["name"] },
   completion: { kind: "message", placeholders: [] },
   fallback: { kind: "message", placeholders: [] },
   laterAck: { kind: "message", placeholders: [] },
@@ -82,7 +75,6 @@ export const botTextDefinitions: Record<BotTextKey, { kind: BotTextKind; placeho
   reopenNow: { kind: "message", placeholders: [] },
   remindNow: { kind: "message", placeholders: [] },
   offerClosed: { kind: "message", placeholders: [] },
-  shareContactButton: { kind: "button", placeholders: [] },
   watchButton: { kind: "button", placeholders: [] },
   channelButton: { kind: "button", placeholders: [] },
   laterTonight: { kind: "button", placeholders: ["soat"] },

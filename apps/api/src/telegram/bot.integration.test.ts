@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { eq } from "drizzle-orm";
 import type { Bot } from "grammy";
 import { closeDb, db } from "@/db";
-import { events, leads, users } from "@/db/schema";
+import { chatMessages, events, leads, users } from "@/db/schema";
 import { runMigrations } from "@/db/migrate";
 import { setTestEnv } from "@/test/env";
 
@@ -20,6 +20,7 @@ describe.skipIf(!testDbUrl)("Bot registration flow", () => {
   let testBot: Bot;
   const calls: ApiCall[] = [];
   let updateId = 1;
+  let messageSeq = 1_000_000;
 
   beforeAll(async () => {
     setTestEnv({ DATABASE_URL: testDbUrl!, LEADS_CHAT_ID: String(LEADS_CHAT_ID) });
@@ -39,6 +40,7 @@ describe.skipIf(!testDbUrl)("Bot registration flow", () => {
     } as Bot["botInfo"];
     testBot.api.config.use(async (_prev, method, payload) => {
       calls.push({ method, payload: payload as Record<string, unknown> });
+      if (method.startsWith("send")) return { ok: true, result: { message_id: ++messageSeq } } as never;
       return { ok: true, result: true } as never;
     });
   });
@@ -82,16 +84,23 @@ describe.skipIf(!testDbUrl)("Bot registration flow", () => {
     );
   }
 
-  it("asks a new user for their contact at /start", async () => {
+  it("registers a new user at /start without asking for a phone", async () => {
     const telegramId = 7_000_000 + Math.floor(Math.random() * 100_000);
     await start(telegramId);
 
-    const reply = calls.find((c) => c.method === "sendMessage");
-    const markup = reply?.payload.reply_markup as { keyboard?: { request_contact?: boolean }[][] };
-    expect(markup.keyboard?.[0]?.[0]?.request_contact).toBe(true);
-    expect(reply?.payload.parse_mode).toBe("HTML");
-    expect(reply?.payload.text).toContain("Ali");
-    expect((await userRow(telegramId)).registeredAt).toBeNull();
+    const user = await userRow(telegramId);
+    expect(user.registeredAt).not.toBeNull();
+    expect(user.phone).toBeNull();
+    expect(user.phoneVerified).toBe(false);
+    expect(user.name).toBe("Ali Valiyev");
+    expect(await registeredEvents(user.id)).toHaveLength(1);
+
+    const replies = calls.filter((c) => c.method === "sendMessage");
+    expect(replies).toHaveLength(1);
+    expect(replies[0].payload.parse_mode).toBe("HTML");
+    expect(replies[0].payload.text).toContain("Ali");
+    const watch = replies[0].payload.reply_markup as { inline_keyboard: { web_app?: { url: string } }[][] };
+    expect(watch.inline_keyboard[0][0].web_app?.url).toBe("https://example.com/app");
   });
 
   it("escapes HTML in the user's first name", async () => {
@@ -113,92 +122,65 @@ describe.skipIf(!testDbUrl)("Bot registration flow", () => {
     expect(reply?.payload.text).not.toContain("<b>Ali");
   });
 
-  it("registers with a verified phone when the user shares their own contact", async () => {
-    const telegramId = 7_100_000 + Math.floor(Math.random() * 100_000);
-    await start(telegramId);
-    calls.length = 0;
-
-    await message(telegramId, {
-      contact: { phone_number: "998901234567", first_name: "Ali", user_id: telegramId },
-    });
+  it("registers a user who writes to the bot without pressing /start", async () => {
+    const telegramId = 7_300_000 + Math.floor(Math.random() * 100_000);
+    await message(telegramId, { text: "salom" });
 
     const user = await userRow(telegramId);
     expect(user.registeredAt).not.toBeNull();
-    expect(user.phone).toBe("+998901234567");
-    expect(user.phoneVerified).toBe(true);
-    expect(user.name).toBe("Ali Valiyev");
-    expect(await registeredEvents(user.id)).toHaveLength(1);
-
-    const replies = calls.filter((c) => c.method === "sendMessage");
-    expect(replies[0].payload.reply_markup).toEqual({ remove_keyboard: true });
-    const watch = replies[1].payload.reply_markup as { inline_keyboard: { web_app?: { url: string } }[][] };
+    const watch = calls.find((c) => c.method === "sendMessage")?.payload.reply_markup as {
+      inline_keyboard: { web_app?: { url: string } }[][];
+    };
     expect(watch.inline_keyboard[0][0].web_app?.url).toBe("https://example.com/app");
   });
 
-  it("rejects someone else's contact", async () => {
-    const telegramId = 7_200_000 + Math.floor(Math.random() * 100_000);
-    await start(telegramId);
-
-    await message(telegramId, {
-      contact: { phone_number: "998901234567", first_name: "Other", user_id: telegramId + 1 },
-    });
-
-    const user = await userRow(telegramId);
-    expect(user.registeredAt).toBeNull();
-    expect(user.phone).toBeNull();
-  });
-
-  it("does not register from a typed phone number and re-asks for the contact button", async () => {
-    const telegramId = 7_300_000 + Math.floor(Math.random() * 100_000);
-    await start(telegramId);
-    calls.length = 0;
-
-    await message(telegramId, { text: "+998 (93) 111-22-33" });
-
-    const user = await userRow(telegramId);
-    expect(user.registeredAt).toBeNull();
-    expect(user.phone).toBeNull();
-    const markup = calls.find((c) => c.method === "sendMessage")?.payload.reply_markup as {
-      keyboard?: { request_contact?: boolean }[][];
-    };
-    expect(markup.keyboard?.[0]?.[0]?.request_contact).toBe(true);
-  });
-
-  it("uses the landing form name and links the web lead to the Telegram user", async () => {
-    const telegramId = 7_500_000 + Math.floor(Math.random() * 100_000);
-    const visitorId = `W${String(telegramId).padStart(9, "0")}`;
-    const [lead] = await db()
-      .insert(leads)
-      .values({ source: "web", visitorId, name: "Aziz Karimov", phone: "+998901112233" })
-      .returning();
-
-    await message(telegramId, {
-      text: `/start v_${visitorId}`,
-      entities: [{ type: "bot_command", offset: 0, length: 6 }],
-    });
-    await message(telegramId, {
-      contact: { phone_number: "998935554433", first_name: "Ali", user_id: telegramId },
-    });
-
-    const user = await userRow(telegramId);
-    expect(user.name).toBe("Aziz Karimov");
-    expect(user.phone).toBe("+998935554433");
-    const [linked] = await db().select().from(leads).where(eq(leads.id, lead.id));
-    expect(linked.userId).toBe(user.id);
-    expect(linked.notifyVersion).toBe(2);
-  });
-
-  it("creates a bot lead when there is no matching web lead", async () => {
+  it("does not create a lead when a user registers", async () => {
     const telegramId = 7_600_000 + Math.floor(Math.random() * 100_000);
     await start(telegramId);
-    await message(telegramId, {
-      contact: { phone_number: "998977776655", first_name: "Ali", user_id: telegramId },
-    });
 
     const user = await userRow(telegramId);
-    const rows = await db().select().from(leads).where(eq(leads.userId, user.id));
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ source: "bot", name: "Ali Valiyev", phone: "+998977776655" });
+    expect(await db().select().from(leads).where(eq(leads.userId, user.id))).toHaveLength(0);
+  });
+
+  it("replaces the previous bot reply when /start is pressed again", async () => {
+    const telegramId = 7_700_000 + Math.floor(Math.random() * 100_000);
+    await start(telegramId);
+    const firstReply = messageSeq;
+    calls.length = 0;
+
+    await start(telegramId);
+
+    const deletes = calls.filter((c) => c.method === "deleteMessage").map((c) => c.payload);
+    expect(deletes).toEqual([{ chat_id: telegramId, message_id: firstReply }]);
+    const logged = await db().select().from(chatMessages).where(eq(chatMessages.chatId, telegramId));
+    expect(logged.filter((row) => !row.fromBot)).toHaveLength(2);
+    expect(logged.filter((row) => row.fromBot && row.deletedAt === null)).toHaveLength(1);
+  });
+
+  it("deletes logged chat messages once they are 24 hours old and drops rows after 3 days", async () => {
+    const { cleanupChatMessages } = await import("@/telegram/chatLog");
+    const chatId = 7_800_000 + Math.floor(Math.random() * 100_000);
+    const now = new Date();
+    const hoursAgo = (hours: number) => new Date(now.getTime() - hours * 3_600_000);
+    await db()
+      .insert(chatMessages)
+      .values([
+        { chatId, messageId: 1, fromBot: false, sentAt: hoursAgo(25) },
+        { chatId, messageId: 2, fromBot: true, sentAt: hoursAgo(23) },
+        { chatId, messageId: 3, fromBot: true, sentAt: hoursAgo(49) },
+        { chatId, messageId: 4, fromBot: true, sentAt: hoursAgo(73), deletedAt: hoursAgo(49) },
+      ]);
+
+    await cleanupChatMessages(testBot.api, now, async () => {});
+
+    const deletes = calls.filter((c) => c.method === "deleteMessage").map((c) => c.payload);
+    expect(deletes).toEqual([{ chat_id: chatId, message_id: 1 }]);
+    const rows = await db().select().from(chatMessages).where(eq(chatMessages.chatId, chatId));
+    const byId = new Map(rows.map((row) => [row.messageId, row]));
+    expect(byId.get(1)?.deletedAt).toEqual(now);
+    expect(byId.get(2)?.deletedAt).toBeNull();
+    expect(byId.get(3)?.deleteError).toBe("too_old");
+    expect(byId.has(4)).toBe(false);
   });
 
   it("ignores group chatter and answers /chatid in groups", async () => {
@@ -224,13 +206,10 @@ describe.skipIf(!testDbUrl)("Bot registration flow", () => {
     expect(calls[0].payload).toMatchObject({ chat_id: groupId, text: `LEADS_CHAT_ID=${groupId}` });
   });
 
-  it("does not register twice when the contact is shared again", async () => {
+  it("does not register twice when /start is pressed again", async () => {
     const telegramId = 7_400_000 + Math.floor(Math.random() * 100_000);
     await start(telegramId);
-    const contact = { phone_number: "+998901234567", first_name: "Ali", user_id: telegramId };
-
-    await message(telegramId, { contact });
-    await message(telegramId, { contact });
+    await start(telegramId);
 
     const user = await userRow(telegramId);
     expect(await registeredEvents(user.id)).toHaveLength(1);

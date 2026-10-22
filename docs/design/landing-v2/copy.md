@@ -7,14 +7,14 @@ Use ‘ (U+2018) in o‘/g‘ and ’ (U+2019) in ta’lim, Qur’on, as written
 - Button: Bepul olish
 
 ## Hero
-- Fact line: 17 daqiqalik bepul videodars
+- Fact line: 23 daqiqalik bepul videodars
 - H1: Arab tilini to‘g‘ri o‘rganishni nimadan boshlash kerak?
 - Lead: Hafsa ustozaning 12 yillik tajribasi asosida arab tilini o‘rganishdagi 5 ta muhim qadamni bilib oling.
 - Second paragraph (desktop only): To‘g‘ri ustoz va kitob tanlashdan arab harflarini o‘rganishgacha — jarayonni tezlashtiring va vaqtingizni tejang.
 - Button: Bepul darsni ko‘rish
 - Telegram note: Telegram ichida ochiladi / Bir necha soniyada
 - Poster card aria-label: Videoni Telegramda ko‘rish
-- Duration chip: 17:29
+- Duration chip: 22:50
 - Badge: 12+ / yillik ta’lim tajribasi
 
 ## Lesson
@@ -65,7 +65,7 @@ Hafsa ustozaning tajribasi asosida dastlabki qadamlarni tushunib, o‘qishni ayn
   2. Raqamingizni yuboring / Buning uchun bitta tugma yetarli
   3. Darsni ko‘ring / Telegram ichida, o‘zingizga qulay vaqtda
 - Final card title: Birinchi qadamni bugun qo‘ying.
-- Final card subline: 17 daqiqalik videodarsni bepul oling.
+- Final card subline: 23 daqiqalik videodarsni bepul oling.
 - Final card button: Telegramda ko‘rish
 - Privacy line: Raqamingiz faqat dars va kanal haqida xabar berish uchun ishlatiladi.
 

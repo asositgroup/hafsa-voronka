@@ -9,12 +9,11 @@ export const uz = {
     openInTelegramButton: "Telegramda ochish",
   },
   gate: {
-    title: "Avval botda ro‘yxatdan o‘ting",
-    description:
-      "Botga qayting va pastdagi «Raqamni yuborish» tugmasini bosing. Shundan so‘ng dars shu yerda ochiladi.",
+    title: "Avval botni ishga tushiring",
+    description: "Botga qayting va /start tugmasini bosing. Shundan so‘ng dars shu yerda ochiladi.",
     backToBot: "Botga qaytish",
-    recheck: "Ro‘yxatdan o‘tdim, tekshirish",
-    stillLocked: "Hali ro‘yxatdan o‘tmagansiz. Botda raqamingizni yuboring.",
+    recheck: "Botni ishga tushirdim, tekshirish",
+    stillLocked: "Bot hali ishga tushirilmagan. Botda /start tugmasini bosing.",
   },
   watch: {
     title: "Arab tilini o‘rganishdagi 5 muhim qadam",

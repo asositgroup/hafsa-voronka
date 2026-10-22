@@ -7,7 +7,7 @@ describe("validateBotText", () => {
   });
 
   it("rejects placeholders the message does not support", () => {
-    expect(validateBotText("registered", "Rahmat, {name}!", false)).toBe("unknown_placeholder");
+    expect(validateBotText("fallback", "Rahmat, {name}!", false)).toBe("unknown_placeholder");
     expect(validateBotText("welcome", "Salom, {phone}!", false)).toBe("unknown_placeholder");
   });
 

@@ -12,6 +12,7 @@ import { refreshUserLeadCards } from "@/leads/service";
 import { bot } from "@/telegram/bot";
 import { isBlockedError, markBlocked } from "@/telegram/blocked";
 import { videoForUser } from "@/videos/service";
+import { logChatMessage } from "@/telegram/chatLog";
 import { botText, sendBotText } from "@/telegram/texts";
 import {
   applyBeat,
@@ -34,7 +35,8 @@ export type EventResult =
 async function sendUnlockMessage(userId: number, telegramId: number) {
   try {
     const keyboard = new InlineKeyboard().url(await botText("channelButton"), env.CHANNEL_URL);
-    await sendBotText(bot().api, telegramId, "completion", {}, keyboard);
+    const message = await sendBotText(bot().api, telegramId, "completion", {}, keyboard);
+    await logChatMessage(telegramId, message.message_id, true);
   } catch (error) {
     if (isBlockedError(error)) {
       await markBlocked(userId).catch((e) => console.error("Segment sync failed:", e));

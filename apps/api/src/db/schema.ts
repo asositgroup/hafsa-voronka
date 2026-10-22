@@ -455,6 +455,27 @@ export const sentMessages = pgTable(
 
 export type SentMessage = typeof sentMessages.$inferSelect;
 
+export const chatMessages = pgTable(
+  "chat_messages",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    chatId: bigint("chat_id", { mode: "number" }).notNull(),
+    messageId: bigint("message_id", { mode: "number" }).notNull(),
+    fromBot: boolean("from_bot").notNull(),
+    sentAt: timestamp("sent_at", { withTimezone: true }).notNull(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    deleteError: text("delete_error"),
+  },
+  (t) => [
+    uniqueIndex("chat_messages_chat_message_idx").on(t.chatId, t.messageId),
+    index("chat_messages_undeleted_idx")
+      .on(t.sentAt)
+      .where(sql`${t.deletedAt} is null and ${t.deleteError} is null`),
+  ],
+);
+
+export type ChatMessage = typeof chatMessages.$inferSelect;
+
 export const secondChanceOffers = pgTable(
   "second_chance_offers",
   {

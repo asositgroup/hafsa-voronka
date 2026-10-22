@@ -86,7 +86,7 @@ describe.skipIf(!testDbUrl)("Editable bot texts", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.mediaEnabled).toBe(true);
-    expect(body.items).toHaveLength(30);
+    expect(body.items).toHaveLength(26);
     const welcome = body.items.find((item: { key: string }) => item.key === "welcome");
     expect(welcome).toMatchObject({ kind: "message", placeholders: ["name"], text: null, media: null });
     expect(welcome.defaultText).toContain("{name}");
@@ -133,7 +133,7 @@ describe.skipIf(!testDbUrl)("Editable bot texts", () => {
   });
 
   it("rejects invalid text and keeps the previous value", async () => {
-    expect(await (await putText("registered", "Rahmat, {name}")).json()).toEqual({ error: "unknown_placeholder" });
+    expect(await (await putText("fallback", "Rahmat, {name}")).json()).toEqual({ error: "unknown_placeholder" });
     expect(await (await putText("watchButton", "Ko'rish\nhozir")).json()).toEqual({ error: "multiline_button" });
     expect((await putText("watchButton", "")).status).toBe(422);
     expect(await texts.botText("watchButton")).toBe(texts.defaultBotTexts.watchButton);
@@ -179,7 +179,7 @@ describe.skipIf(!testDbUrl)("Editable bot texts", () => {
 
   it("explains that the media chat is unreachable instead of failing", async () => {
     mediaChatMissing = true;
-    const res = await upload("askContact", new File([new Uint8Array([1, 2, 3])], "a.jpg", { type: "image/jpeg" }));
+    const res = await upload("watchPrompt", new File([new Uint8Array([1, 2, 3])], "a.jpg", { type: "image/jpeg" }));
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({ error: "media_chat_unavailable" });
   });

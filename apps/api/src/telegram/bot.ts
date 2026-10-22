@@ -12,6 +12,7 @@ import { adminVideoComposer } from "@/telegram/admin-video/handlers";
 import { adminHomeComposer } from "@/telegram/adminHome";
 import { reminderComposer } from "@/telegram/reminders";
 import { watchAppUrl } from "@/telegram/watchUrl";
+import { logChatMessage, replaceBotReply } from "@/telegram/chatLog";
 import { botText, sendBotText } from "@/telegram/texts";
 
 async function watchKeyboard(completed: boolean) {
@@ -29,7 +30,11 @@ async function registerFromChat(ctx: Context, user: User) {
     { name, phone: user.phone, phoneVerified: user.phoneVerified },
     { actionSource: "chat" },
   );
-  await sendBotText(ctx.api, ctx.chat!.id, "watchPrompt", { name: ctx.from?.first_name || name }, await watchKeyboard(false));
+  const chatId = ctx.chat!.id;
+  const keyboard = await watchKeyboard(false);
+  await replaceBotReply(ctx.api, chatId, () =>
+    sendBotText(ctx.api, chatId, "watchPrompt", { name: ctx.from?.first_name || name }, keyboard),
+  );
 }
 
 function isLeadsChat(chat: { id: number; username?: string } | undefined) {
@@ -68,6 +73,11 @@ function createBot() {
   bot.use(reminderComposer);
   bot.use(adminHomeComposer);
 
+  bot.on("message", async (ctx, next) => {
+    await logChatMessage(ctx.chat.id, ctx.msg.message_id, false);
+    await next();
+  });
+
   bot.command("start", async (ctx) => {
     if (!ctx.from) return;
     const { user, isNew } = await upsertUser(ctx.from, ctx.match || undefined);
@@ -84,7 +94,10 @@ function createBot() {
     }
 
     const completed = user.completedAt !== null;
-    await sendBotText(ctx.api, ctx.chat.id, completed ? "welcomeBack" : "welcome", { name }, await watchKeyboard(completed));
+    const keyboard = await watchKeyboard(completed);
+    await replaceBotReply(ctx.api, ctx.chat.id, () =>
+      sendBotText(ctx.api, ctx.chat.id, completed ? "welcomeBack" : "welcome", { name }, keyboard),
+    );
   });
 
   bot.on("message", async (ctx) => {
@@ -93,7 +106,8 @@ function createBot() {
       await registerFromChat(ctx, user);
       return;
     }
-    await sendBotText(ctx.api, ctx.chat.id, "fallback", {}, await watchKeyboard(user.completedAt !== null));
+    const keyboard = await watchKeyboard(user.completedAt !== null);
+    await replaceBotReply(ctx.api, ctx.chat.id, () => sendBotText(ctx.api, ctx.chat.id, "fallback", {}, keyboard));
   });
 
   bot.on("my_chat_member", async (ctx) => {

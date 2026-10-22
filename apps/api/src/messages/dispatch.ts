@@ -38,6 +38,7 @@ import { linkTtlHours, messageCaps } from "@/settings/service";
 import { isAdminTelegramId, notAdminTelegramId } from "@/telegram/admins";
 import { bot } from "@/telegram/bot";
 import { isBlockedError, markBlocked } from "@/telegram/blocked";
+import { cleanupChatMessages } from "@/telegram/chatLog";
 import { botText, sendBotText } from "@/telegram/texts";
 import { watchAppUrl } from "@/telegram/watchUrl";
 import { templateContextFor } from "./context";
@@ -774,6 +775,16 @@ async function sweep(api: Api, now: Date, pace: Pace) {
   }
 }
 
+async function cleanupChat(api: Api, now: Date, pace: Pace) {
+  if (now.getTime() < pausedUntil) return;
+  try {
+    await cleanupChatMessages(api, now, pace);
+  } catch (error) {
+    if (error instanceof GrammyError && error.error_code === 429) pauseFor(error, now);
+    else throw error;
+  }
+}
+
 export async function dispatchMessages(options: DispatchOptions = {}): Promise<void> {
   const api = options.api ?? bot().api;
   const clock = options.now ?? (() => new Date());
@@ -790,6 +801,7 @@ export async function dispatchMessages(options: DispatchOptions = {}): Promise<v
       await sendOffers(api, clock(), pace, candidates);
       await sendDue(api, clock(), pace, candidates);
       await sweep(api, clock(), pace);
+      await cleanupChat(api, clock(), pace);
     } finally {
       await conn`SELECT pg_advisory_unlock(${DISPATCH_LOCK_KEY})`;
     }

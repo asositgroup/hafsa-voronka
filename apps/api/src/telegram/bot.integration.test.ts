@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { eq } from "drizzle-orm";
 import type { Bot } from "grammy";
 import { closeDb, db } from "@/db";
-import { events, leads, users } from "@/db/schema";
+import { chatMessages, events, leads, users } from "@/db/schema";
 import { runMigrations } from "@/db/migrate";
 import { setTestEnv } from "@/test/env";
 
@@ -20,6 +20,7 @@ describe.skipIf(!testDbUrl)("Bot registration flow", () => {
   let testBot: Bot;
   const calls: ApiCall[] = [];
   let updateId = 1;
+  let messageSeq = 1_000_000;
 
   beforeAll(async () => {
     setTestEnv({ DATABASE_URL: testDbUrl!, LEADS_CHAT_ID: String(LEADS_CHAT_ID) });
@@ -39,6 +40,7 @@ describe.skipIf(!testDbUrl)("Bot registration flow", () => {
     } as Bot["botInfo"];
     testBot.api.config.use(async (_prev, method, payload) => {
       calls.push({ method, payload: payload as Record<string, unknown> });
+      if (method.startsWith("send")) return { ok: true, result: { message_id: ++messageSeq } } as never;
       return { ok: true, result: true } as never;
     });
   });
@@ -138,6 +140,45 @@ describe.skipIf(!testDbUrl)("Bot registration flow", () => {
 
     const user = await userRow(telegramId);
     expect(await db().select().from(leads).where(eq(leads.userId, user.id))).toHaveLength(0);
+  });
+
+  it("replaces the previous bot reply when /start is pressed again", async () => {
+    const telegramId = 7_700_000 + Math.floor(Math.random() * 100_000);
+    await start(telegramId);
+    const firstReply = messageSeq;
+    calls.length = 0;
+
+    await start(telegramId);
+
+    const deletes = calls.filter((c) => c.method === "deleteMessage").map((c) => c.payload);
+    expect(deletes).toEqual([{ chat_id: telegramId, message_id: firstReply }]);
+    const logged = await db().select().from(chatMessages).where(eq(chatMessages.chatId, telegramId));
+    expect(logged.filter((row) => !row.fromBot)).toHaveLength(2);
+    expect(logged.filter((row) => row.fromBot && row.deletedAt === null)).toHaveLength(1);
+  });
+
+  it("deletes logged chat messages once they are 24 hours old", async () => {
+    const { cleanupChatMessages } = await import("@/telegram/chatLog");
+    const chatId = 7_800_000 + Math.floor(Math.random() * 100_000);
+    const now = new Date();
+    const hoursAgo = (hours: number) => new Date(now.getTime() - hours * 3_600_000);
+    await db()
+      .insert(chatMessages)
+      .values([
+        { chatId, messageId: 1, fromBot: false, sentAt: hoursAgo(25) },
+        { chatId, messageId: 2, fromBot: true, sentAt: hoursAgo(23) },
+        { chatId, messageId: 3, fromBot: true, sentAt: hoursAgo(49) },
+      ]);
+
+    await cleanupChatMessages(testBot.api, now, async () => {});
+
+    const deletes = calls.filter((c) => c.method === "deleteMessage").map((c) => c.payload);
+    expect(deletes).toEqual([{ chat_id: chatId, message_id: 1 }]);
+    const rows = await db().select().from(chatMessages).where(eq(chatMessages.chatId, chatId));
+    const byId = new Map(rows.map((row) => [row.messageId, row]));
+    expect(byId.get(1)?.deletedAt).toEqual(now);
+    expect(byId.get(2)?.deletedAt).toBeNull();
+    expect(byId.get(3)?.deleteError).toBe("too_old");
   });
 
   it("ignores group chatter and answers /chatid in groups", async () => {

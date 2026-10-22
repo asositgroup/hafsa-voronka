@@ -78,6 +78,7 @@ document.addEventListener("click", (event) => {
   if (!event.target.closest("[data-cta]")) return;
   track({ visitor_id: vid, type: "cta_click" });
   fbq("trackCustom", "CTAClick");
+  fbq("track", "CompleteRegistration");
 });
 
 const sticky = document.getElementById("sticky");

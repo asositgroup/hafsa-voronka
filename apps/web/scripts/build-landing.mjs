@@ -16,7 +16,7 @@ function required(name) {
 const apiUrl = required("NEXT_PUBLIC_API_URL");
 const botUsername = required("NEXT_PUBLIC_BOT_USERNAME");
 const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || "http://localhost:3000";
-const pixelId = process.env.NEXT_PUBLIC_FB_PIXEL_ID || "";
+const pixelId = process.env.NEXT_PUBLIC_FB_PIXEL_ID || "2585302615300650";
 
 async function minifyCss(file) {
   const { code } = await transform(await readFile(join(src, "css", file), "utf8"), {

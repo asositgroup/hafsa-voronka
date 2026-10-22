@@ -17,11 +17,11 @@ import { uploadToMediaChat } from "@/telegram/media";
 
 export const defaultBotTexts: Record<BotTextKey, string> = {
   welcome:
-    "Qaytganingizdan xursandmiz, {name}! 👋\n\nVideo dars hali ham sizni kutmoqda. Atigi 17 daqiqa, arab tilini qayerdan boshlashni aniq bilib olasiz 👇",
+    "Qaytganingizdan xursandmiz, {name}! 👋\n\nVideo dars hali ham sizni kutmoqda. Atigi 23 daqiqa, arab tilini qayerdan boshlashni aniq bilib olasiz 👇",
   welcomeBack:
     "Yana xush kelibsiz, {name}! 🌿\n\nDarsni qayta ko'rishingiz mumkin. Arab tilini Hafsa ustoza bilan chuqurroq o'rganmoqchi bo'lsangiz, adminga yozing. Sizga mos yo'lni ko'rsatib beradi.",
   watchPrompt:
-    "Assalomu alaykum, {name}! 👋\n\n🎁 Video dars tayyor!\n\nUnda arab tilini to'g'ri boshlash uchun 5 ta muhim qadamni bilib olasiz. Ko'pchilik aynan shu qadamlarni bilmagani uchun yarim yo'lda to'xtab qoladi.\n\n17 daqiqa ajrating va hoziroq ko'ring 👇",
+    "Assalomu alaykum, {name}! 👋\n\n🎁 Video dars tayyor!\n\nUnda arab tilini to'g'ri boshlash uchun 5 ta muhim qadamni bilib olasiz. Ko'pchilik aynan shu qadamlarni bilmagani uchun yarim yo'lda to'xtab qoladi.\n\n23 daqiqa ajrating va hoziroq ko'ring 👇",
   completion:
     "Barakalla! 🎉 Darsni ko'rib chiqdingiz. Bu arab tilini o'rganishdagi eng muhim qadam: to'g'ri boshlash.\n\nEndi bilganlaringizni amalda qo'llash vaqti. Arab tilini Hafsa ustoza bilan davom ettirmoqchimisiz yoki savollaringiz bormi? Adminga yozing, sizga batafsil ma'lumot beradi 👇",
   fallback: "Video darsni ko'rish uchun pastdagi tugmani bosing 👇",
@@ -31,7 +31,7 @@ export const defaultBotTexts: Record<BotTextKey, string> = {
   laterPickHour: "Soat nechada? Toshkent vaqti bilan 🕐",
   laterConfirmed: "Zo'r! 🙌 {vaqt} — darsingizni ochib, eslatib qo'yaman ✅",
   laterTooLate:
-    "Dars {link_tugash_vaqti} da o'chadi, shuning uchun bundan keyin qulay vaqt qolmadi 😔\n\nHoziroq ko'rib oling, 17 daqiqa yetarli 👇",
+    "Dars {link_tugash_vaqti} da o'chadi, shuning uchun bundan keyin qulay vaqt qolmadi 😔\n\nHoziroq ko'rib oling, 23 daqiqa yetarli 👇",
   reopenPreReminder: "1 soatdan keyin bonus darsingiz ochiladi, choy tayyorlab qo'ying 🙂",
   reopenNow: "Bonus darsingiz yana ochildi! 🎁\n\nLink 24 soat amal qiladi. Tayyor bo'lsangiz, boshlang 👇",
   remindNow: "Eslatib qo'ydim, dars sizni kutmoqda! ⏰\n\nTayyor bo'lsangiz, davom eting 👇",

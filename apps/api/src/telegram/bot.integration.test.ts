@@ -132,34 +132,12 @@ describe.skipIf(!testDbUrl)("Bot registration flow", () => {
     expect(watch.inline_keyboard[0][0].web_app?.url).toBe("https://example.com/app");
   });
 
-  it("uses the landing form name and links the web lead to the Telegram user", async () => {
-    const telegramId = 7_500_000 + Math.floor(Math.random() * 100_000);
-    const visitorId = `W${String(telegramId).padStart(9, "0")}`;
-    const [lead] = await db()
-      .insert(leads)
-      .values({ source: "web", visitorId, name: "Aziz Karimov", phone: "+998901112233" })
-      .returning();
-
-    await message(telegramId, {
-      text: `/start v_${visitorId}`,
-      entities: [{ type: "bot_command", offset: 0, length: 6 }],
-    });
-
-    const user = await userRow(telegramId);
-    expect(user.name).toBe("Aziz Karimov");
-    const [linked] = await db().select().from(leads).where(eq(leads.id, lead.id));
-    expect(linked.userId).toBe(user.id);
-    expect(linked.notifyVersion).toBe(2);
-  });
-
-  it("creates a bot lead when there is no matching web lead", async () => {
+  it("does not create a lead when a user registers", async () => {
     const telegramId = 7_600_000 + Math.floor(Math.random() * 100_000);
     await start(telegramId);
 
     const user = await userRow(telegramId);
-    const rows = await db().select().from(leads).where(eq(leads.userId, user.id));
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ source: "bot", name: "Ali Valiyev", phone: "" });
+    expect(await db().select().from(leads).where(eq(leads.userId, user.id))).toHaveLength(0);
   });
 
   it("ignores group chatter and answers /chatid in groups", async () => {

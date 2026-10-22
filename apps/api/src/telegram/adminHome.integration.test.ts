@@ -255,25 +255,13 @@ describe.skipIf(!database.url)("Admin home in the bot", () => {
     expect(await db().select().from(botAdminTestModes)).toHaveLength(0);
   });
 
-  it("does not notify the leads chat about an admin registration", async () => {
+  it("does not create leads for bot registrations", async () => {
     await command(LEAD, "start");
-    const { flushLeadNotifications } = await import("@/leads/notifier");
-    const sent: string[] = [];
-    await flushLeadNotifications({
-      send: async (text) => {
-        sent.push(text);
-        return sent.length;
-      },
-      edit: async () => {},
-    });
 
-    const leadOf = async (telegramId: number) => {
-      const [row] = await db().select().from(leads).where(eq(leads.userId, (await userRow(telegramId)).id));
-      return row;
-    };
-    expect((await leadOf(LEAD)).notifyMessageId).not.toBeNull();
-    expect((await leadOf(TEST_ADMIN)).notifyMessageId).toBeNull();
-    expect(sent.some((text) => text.includes("+998901234567") || text.includes("998 90 123 45 67"))).toBe(false);
+    for (const telegramId of [LEAD, TEST_ADMIN]) {
+      const user = await userRow(telegramId);
+      expect(await db().select().from(leads).where(eq(leads.userId, user.id))).toHaveLength(0);
+    }
   });
 
   it("never sends scheduled messages or appointment reminders to admins", async () => {

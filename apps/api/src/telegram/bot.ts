@@ -7,7 +7,6 @@ import { syncSegment } from "@/funnel/segments";
 import { uz } from "@/i18n/uz";
 import { applyLeadAction } from "@/leads/actions";
 import type { LeadAction } from "@/leads/card";
-import { findMatchingWebLead } from "@/leads/service";
 import { markBlockedByTelegramId } from "@/telegram/blocked";
 import { adminVideoComposer } from "@/telegram/admin-video/handlers";
 import { adminHomeComposer } from "@/telegram/adminHome";
@@ -21,9 +20,7 @@ async function watchKeyboard(completed: boolean) {
 }
 
 async function registerFromChat(ctx: Context, user: User) {
-  const webLead = await findMatchingWebLead(user.visitorId, user.phone);
   const name =
-    webLead?.name ||
     (ctx.from && nameFromTelegram(ctx.from)) ||
     ctx.from?.username ||
     uz.bot.defaultName;

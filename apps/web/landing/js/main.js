@@ -28,7 +28,7 @@ function utmParams() {
   };
 }
 
-function fbq(...args) {
+function pixel(...args) {
   try {
     window.fbq?.(...args);
   } catch {}
@@ -77,8 +77,8 @@ for (const cta of document.querySelectorAll("[data-cta]")) cta.href = botUrl;
 document.addEventListener("click", (event) => {
   if (!event.target.closest("[data-cta]")) return;
   track({ visitor_id: vid, type: "cta_click" });
-  fbq("trackCustom", "CTAClick");
-  fbq("track", "CompleteRegistration");
+  pixel("trackCustom", "CTAClick");
+  pixel("track", "CompleteRegistration");
 });
 
 const sticky = document.getElementById("sticky");

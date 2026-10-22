@@ -1,15 +1,11 @@
 # Deployment Runbook
-
 Complete step-by-step production deployment guide for the Telegram Video Funnel.
-
 Official documentation links for reference:
 - [Cloudflare DNS Documentation](https://developers.cloudflare.com/dns/)
 - [Cloudflare R2 Documentation](https://developers.cloudflare.com/r2/)
 - [Telegram Bot API & Mini Apps Documentation](https://core.telegram.org/bots/webapps)
 - [Vercel Deployment Documentation](https://vercel.com/docs)
-
 ---
-
 ## 1. Cloudflare DNS Configuration
 
 The apex domain and DNS management reside on Cloudflare.

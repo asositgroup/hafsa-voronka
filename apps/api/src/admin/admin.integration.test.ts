@@ -320,7 +320,6 @@ describe.skipIf(!testDbUrl)("Admin Integration Tests", () => {
     expect(stepCounts).toEqual({
       landing_view: 2,
       cta_click: 1,
-      lead_submitted: 0,
       bot_start: 3,
       registered: 3,
       video_start: 2,
@@ -331,8 +330,7 @@ describe.skipIf(!testDbUrl)("Admin Integration Tests", () => {
     const stepConv = Object.fromEntries(stats.funnel.map((s) => [s.step, s.conversionRate]));
     expect(stepConv.landing_view).toBe(100);
     expect(stepConv.cta_click).toBe(50);
-    expect(stepConv.lead_submitted).toBe(0);
-    expect(stepConv.bot_start).toBe(0);
+    expect(stepConv.bot_start).toBe(300);
     expect(stepConv.registered).toBe(100);
     expect(stepConv.video_start).toBe(66.7);
     expect(stepConv.video_complete).toBe(50);
@@ -343,12 +341,11 @@ describe.skipIf(!testDbUrl)("Admin Integration Tests", () => {
     expect(may06Daily).toEqual({ date: "2026-05-06", registrations: 1, completions: 1 });
     expect(may07Daily).toEqual({ date: "2026-05-07", registrations: 2, completions: 0 });
 
-    const p10 = stats.dropoff.find((d) => d.percent === 10);
-    const p50 = stats.dropoff.find((d) => d.percent === 50);
-    const p100 = stats.dropoff.find((d) => d.percent === 100);
-    expect(p10).toEqual({ percent: 10, count: 3, share: 100 });
-    expect(p50).toEqual({ percent: 50, count: 2, share: 66.7 });
-    expect(p100).toEqual({ percent: 100, count: 1, share: 33.3 });
+    expect(stats.dropoff.map((d) => d.minute)).toEqual(Array.from({ length: 15 }, (_, i) => i + 1));
+    expect(stats.dropoff.find((d) => d.minute === 1)).toEqual({ minute: 1, count: 3, share: 100 });
+    expect(stats.dropoff.find((d) => d.minute === 2)).toEqual({ minute: 2, count: 2, share: 66.7 });
+    expect(stats.dropoff.find((d) => d.minute === 8)).toEqual({ minute: 8, count: 1, share: 33.3 });
+    expect(stats.dropoff.find((d) => d.minute === 15)).toEqual({ minute: 15, count: 1, share: 33.3 });
 
     expect(stats.campaigns.length).toBe(3);
     const fbCampaign = stats.campaigns.find((c) => c.source === "fb_ad" && c.content === "video_ad");

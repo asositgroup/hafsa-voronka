@@ -16,7 +16,6 @@ import { formatTashkentDate, listDaysInRange } from "./dates";
 const FUNNEL_STEP_NAMES: Record<string, string> = {
   landing_view: "Saytga kirdi",
   cta_click: "Tugmani bosdi",
-  lead_submitted: "Formani to‘ldirdi",
   bot_start: "Botga o‘tdi",
   registered: "Ro‘yxatdan o‘tdi",
   video_start: "Videoni boshladi",
@@ -27,7 +26,6 @@ const FUNNEL_STEP_NAMES: Record<string, string> = {
 const ORDERED_FUNNEL_STEPS = [
   "landing_view",
   "cta_click",
-  "lead_submitted",
   "bot_start",
   "registered",
   "video_start",
@@ -52,7 +50,7 @@ export async function getFunnelAndKpis(filters: QueryFilters): Promise<{
     SELECT
       type,
       CASE
-        WHEN type IN ('landing_view', 'cta_click', 'lead_submitted') THEN count(DISTINCT visitor_id)
+        WHEN type IN ('landing_view', 'cta_click') THEN count(DISTINCT visitor_id)
         ELSE count(DISTINCT user_id)
       END AS count
     FROM (
@@ -66,9 +64,9 @@ export async function getFunnelAndKpis(filters: QueryFilters): Promise<{
         ${leadUser()}
         AND (e.created_at AT TIME ZONE 'Asia/Tashkent')::date >= ${filters.from}::date
         AND (e.created_at AT TIME ZONE 'Asia/Tashkent')::date <= ${filters.to}::date
-        AND e.type IN ('landing_view', 'cta_click', 'lead_submitted', 'bot_start', 'registered', 'video_start', 'video_complete', 'channel_click')
+        AND e.type IN ('landing_view', 'cta_click', 'bot_start', 'registered', 'video_start', 'video_complete', 'channel_click')
         AND (
-          (e.type IN ('landing_view', 'cta_click', 'lead_submitted')
+          (e.type IN ('landing_view', 'cta_click')
            AND (
              (${filters.source ?? null}::text IS NULL AND ${filters.campaign ?? null}::text IS NULL)
              OR e.visitor_id IN (
@@ -80,7 +78,7 @@ export async function getFunnelAndKpis(filters: QueryFilters): Promise<{
              )
            ))
           OR
-          (e.type NOT IN ('landing_view', 'cta_click', 'lead_submitted')
+          (e.type NOT IN ('landing_view', 'cta_click')
            AND (${filters.source ?? null}::text IS NULL OR u.utm_source = ${filters.source ?? null})
            AND (${filters.campaign ?? null}::text IS NULL OR u.utm_campaign = ${filters.campaign ?? null}))
         )
@@ -222,70 +220,45 @@ export async function getCampaignStats(filters: QueryFilters): Promise<CampaignS
 }
 
 export async function getWatchDropoff(filters: QueryFilters): Promise<DropoffStat[]> {
-  const [row] = await db().execute<{
+  const rows = await db().execute<{
+    minute: number;
+    count: string | number;
     total_registered: string | number;
-    p10: string | number;
-    p20: string | number;
-    p30: string | number;
-    p40: string | number;
-    p50: string | number;
-    p60: string | number;
-    p70: string | number;
-    p80: string | number;
-    p90: string | number;
-    p100: string | number;
   }>(sql`
+    WITH viewers AS (
+      SELECT
+        coalesce(wp.max_position, 0) AS max_position,
+        v.duration
+      FROM users u
+      LEFT JOIN watch_progress wp ON wp.user_id = u.id
+      LEFT JOIN videos v ON v.id = u.video_id
+      WHERE
+        u.registered_at IS NOT NULL
+        AND ${leadUser()}
+        AND (u.registered_at AT TIME ZONE 'Asia/Tashkent')::date >= ${filters.from}::date
+        AND (u.registered_at AT TIME ZONE 'Asia/Tashkent')::date <= ${filters.to}::date
+        AND (${filters.source ?? null}::text IS NULL OR u.utm_source = ${filters.source ?? null})
+        AND (${filters.campaign ?? null}::text IS NULL OR u.utm_campaign = ${filters.campaign ?? null})
+    )
     SELECT
-      count(u.id) AS total_registered,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.1 * v.duration THEN 1 END) AS p10,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.2 * v.duration THEN 1 END) AS p20,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.3 * v.duration THEN 1 END) AS p30,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.4 * v.duration THEN 1 END) AS p40,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.5 * v.duration THEN 1 END) AS p50,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.6 * v.duration THEN 1 END) AS p60,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.7 * v.duration THEN 1 END) AS p70,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.8 * v.duration THEN 1 END) AS p80,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 0.9 * v.duration THEN 1 END) AS p90,
-      count(CASE WHEN coalesce(wp.max_position, 0) >= 1.0 * v.duration THEN 1 END) AS p100
-    FROM users u
-    LEFT JOIN watch_progress wp ON wp.user_id = u.id
-    LEFT JOIN videos v ON v.id = u.video_id
-    WHERE
-      u.registered_at IS NOT NULL
-      AND ${leadUser()}
-      AND (u.registered_at AT TIME ZONE 'Asia/Tashkent')::date >= ${filters.from}::date
-      AND (u.registered_at AT TIME ZONE 'Asia/Tashkent')::date <= ${filters.to}::date
-      AND (${filters.source ?? null}::text IS NULL OR u.utm_source = ${filters.source ?? null})
-      AND (${filters.campaign ?? null}::text IS NULL OR u.utm_campaign = ${filters.campaign ?? null})
+      m.minute,
+      count(*) FILTER (WHERE viewers.max_position >= m.minute * 60) AS count,
+      count(*) AS total_registered
+    FROM generate_series(1, (SELECT coalesce(max(duration), 0) / 60 FROM viewers)) AS m(minute)
+    CROSS JOIN viewers
+    GROUP BY m.minute
+    ORDER BY m.minute
   `);
 
-  const totalRegistered = Number(row?.total_registered) || 0;
-  const dropoff: DropoffStat[] = [];
-  const pValues = [
-    Number(row?.p10) || 0,
-    Number(row?.p20) || 0,
-    Number(row?.p30) || 0,
-    Number(row?.p40) || 0,
-    Number(row?.p50) || 0,
-    Number(row?.p60) || 0,
-    Number(row?.p70) || 0,
-    Number(row?.p80) || 0,
-    Number(row?.p90) || 0,
-    Number(row?.p100) || 0,
-  ];
-
-  for (let k = 1; k <= 10; k++) {
-    const percent = k * 10;
-    const count = pValues[k - 1];
-    const share = totalRegistered > 0 ? Math.round((count / totalRegistered) * 1000) / 10 : 0;
-    dropoff.push({
-      percent,
+  return rows.map((row) => {
+    const count = Number(row.count) || 0;
+    const totalRegistered = Number(row.total_registered) || 0;
+    return {
+      minute: Number(row.minute),
       count,
-      share,
-    });
-  }
-
-  return dropoff;
+      share: totalRegistered > 0 ? Math.round((count / totalRegistered) * 1000) / 10 : 0,
+    };
+  });
 }
 
 export async function getHealthStats(): Promise<AdminStatsResponse["health"]> {

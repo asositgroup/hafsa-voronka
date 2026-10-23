@@ -8,8 +8,8 @@ export function DropoffBars({ dropoff }: { dropoff: DropoffStat[] }) {
       title={adminUz.dropoff.title}
       subtitle={adminUz.dropoff.subtitle}
       stages={dropoff.map((item) => ({
-        key: String(item.percent),
-        label: `${item.percent}% video`,
+        key: String(item.minute),
+        label: adminUz.dropoff.minuteLabel(item.minute),
         count: item.count,
       }))}
     />

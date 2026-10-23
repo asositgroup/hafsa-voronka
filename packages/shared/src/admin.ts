@@ -57,7 +57,7 @@ export const campaignStatSchema = z.object({
 export type CampaignStat = z.infer<typeof campaignStatSchema>;
 
 export const dropoffStatSchema = z.object({
-  percent: z.number(),
+  minute: z.number(),
   count: z.number(),
   share: z.number(),
 });

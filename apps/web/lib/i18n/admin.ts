@@ -120,7 +120,8 @@ export const adminUz = {
   },
   dropoff: {
     title: "Videoni qancha ko‘rishdi",
-    subtitle: "Ro‘yxatdan o‘tgan foydalanuvchilarning ko‘rish ulushi",
+    subtitle: "Videoning qaysi daqiqasigacha ko‘rishgani",
+    minuteLabel: (minute: number) => `${minute}-daqiqa`,
     percentHeader: "Video qismi",
     shareHeader: "Ulush",
   },

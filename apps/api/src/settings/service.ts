@@ -1,4 +1,10 @@
-import { DEFAULT_MESSAGE_CAPS, type MessageCaps, messageCapsSchema } from "@funnel/shared";
+import {
+  chatCleanupHoursSchema,
+  DEFAULT_CHAT_CLEANUP_HOURS,
+  DEFAULT_MESSAGE_CAPS,
+  type MessageCaps,
+  messageCapsSchema,
+} from "@funnel/shared";
 import { db } from "@/db";
 import { settings } from "@/db/schema";
 
@@ -31,4 +37,10 @@ export async function messageCaps(): Promise<MessageCaps> {
   } catch {
     return DEFAULT_MESSAGE_CAPS;
   }
+}
+
+export async function chatCleanupHours(): Promise<number> {
+  const raw = (await allSettings()).get("CHAT_CLEANUP_HOURS");
+  const parsed = chatCleanupHoursSchema.safeParse(Number(raw));
+  return raw !== undefined && parsed.success ? parsed.data : DEFAULT_CHAT_CLEANUP_HOURS;
 }

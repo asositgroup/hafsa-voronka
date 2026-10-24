@@ -58,7 +58,7 @@ describe.skipIf(!database.url)("Admin settings", () => {
   it("returns the default link TTL", async () => {
     const res = await app.request("/admin/settings", { headers: { cookie } });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ linkTtlHours: 24, messageCaps: DEFAULT_MESSAGE_CAPS });
+    expect(await res.json()).toEqual({ linkTtlHours: 24, messageCaps: DEFAULT_MESSAGE_CAPS, chatCleanupHours: 24 });
   });
 
   it("rejects out-of-range and non-numeric values", async () => {
@@ -72,10 +72,10 @@ describe.skipIf(!database.url)("Admin settings", () => {
   it("saves the TTL and applies it to users registered afterwards", async () => {
     const saved = await put({ linkTtlHours: 48 });
     expect(saved.status).toBe(200);
-    expect(await saved.json()).toEqual({ linkTtlHours: 48, messageCaps: DEFAULT_MESSAGE_CAPS });
+    expect(await saved.json()).toEqual({ linkTtlHours: 48, messageCaps: DEFAULT_MESSAGE_CAPS, chatCleanupHours: 24 });
 
     const res = await app.request("/admin/settings", { headers: { cookie } });
-    expect(await res.json()).toEqual({ linkTtlHours: 48, messageCaps: DEFAULT_MESSAGE_CAPS });
+    expect(await res.json()).toEqual({ linkTtlHours: 48, messageCaps: DEFAULT_MESSAGE_CAPS, chatCleanupHours: 24 });
 
     const { linkTtlHours } = await import("./service");
     expect(await linkTtlHours()).toBe(48);
@@ -91,9 +91,21 @@ describe.skipIf(!database.url)("Admin settings", () => {
     const caps = { A: { daily: 8, total: null }, B: { daily: 3, total: 6 }, C: { daily: 10, total: 20 } };
     const saved = await put({ messageCaps: caps });
     expect(saved.status).toBe(200);
-    expect(await saved.json()).toEqual({ linkTtlHours: 48, messageCaps: caps });
+    expect(await saved.json()).toEqual({ linkTtlHours: 48, messageCaps: caps, chatCleanupHours: 24 });
     const { messageCaps } = await import("./service");
     expect(await messageCaps()).toEqual(caps);
+  });
+
+  it("saves the chat cleanup delay and rejects values outside the offered choices", async () => {
+    const saved = await put({ chatCleanupHours: 1 });
+    expect(saved.status).toBe(200);
+    expect((await saved.json()).chatCleanupHours).toBe(1);
+    const { chatCleanupHours } = await import("./service");
+    expect(await chatCleanupHours()).toBe(1);
+
+    for (const value of [0, 2, 48, 1.5, "1"]) {
+      expect((await put({ chatCleanupHours: value })).status).toBe(400);
+    }
   });
 
   it("rejects caps above the daily ceiling or below one", async () => {

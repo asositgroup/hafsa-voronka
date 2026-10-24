@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { eq } from "drizzle-orm";
 import type { Bot } from "grammy";
 import { closeDb, db } from "@/db";
-import { chatMessages, events, leads, users } from "@/db/schema";
+import { chatMessages, events, leads, settings, users } from "@/db/schema";
 import { runMigrations } from "@/db/migrate";
 import { setTestEnv } from "@/test/env";
 
@@ -181,6 +181,35 @@ describe.skipIf(!testDbUrl)("Bot registration flow", () => {
     expect(byId.get(2)?.deletedAt).toBeNull();
     expect(byId.get(3)?.deleteError).toBe("too_old");
     expect(byId.has(4)).toBe(false);
+  });
+
+  it("deletes logged chat messages after the cleanup delay chosen in settings", async () => {
+    const { cleanupChatMessages } = await import("@/telegram/chatLog");
+    const { invalidateSettings } = await import("@/settings/service");
+    await db()
+      .insert(settings)
+      .values({ key: "CHAT_CLEANUP_HOURS", value: "1" })
+      .onConflictDoUpdate({ target: settings.key, set: { value: "1" } });
+    invalidateSettings();
+    const chatId = 7_900_000 + Math.floor(Math.random() * 100_000);
+    const now = new Date();
+    const minutesAgo = (minutes: number) => new Date(now.getTime() - minutes * 60_000);
+    await db()
+      .insert(chatMessages)
+      .values([
+        { chatId, messageId: 1, fromBot: true, sentAt: minutesAgo(61) },
+        { chatId, messageId: 2, fromBot: true, sentAt: minutesAgo(59) },
+      ]);
+
+    try {
+      await cleanupChatMessages(testBot.api, now, async () => {});
+    } finally {
+      await db().delete(settings).where(eq(settings.key, "CHAT_CLEANUP_HOURS"));
+      invalidateSettings();
+    }
+
+    const deletes = calls.filter((c) => c.method === "deleteMessage").map((c) => c.payload);
+    expect(deletes).toEqual([{ chat_id: chatId, message_id: 1 }]);
   });
 
   it("ignores group chatter and answers /chatid in groups", async () => {

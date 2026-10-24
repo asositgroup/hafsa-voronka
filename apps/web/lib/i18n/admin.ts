@@ -18,7 +18,7 @@ export const adminUz = {
     messages: { title: "Eslatmalar", description: "Bot 7 kun davomida avtomatik yuboradigan xabarlar." },
     videos: { title: "Videolar", description: "Yangi foydalanuvchilarga beriladigan dars videosi." },
     botTexts: { title: "Bot matnlari", description: "Botning doimiy javoblari va tugma nomlari. Saqlangan o‘zgarish botda darhol ishlaydi." },
-    settings: { title: "Sozlamalar", description: "Havola muddati va boshqa umumiy sozlamalar." },
+    settings: { title: "Sozlamalar", description: "Havola muddati, chatni tozalash va boshqa umumiy sozlamalar." },
   },
   segments: {
     A: {
@@ -549,6 +549,12 @@ export const adminUz = {
     saved: "Saqlandi",
     invalid: "1 dan 720 gacha butun son kiriting",
     error: "Saqlashda xatolik yuz berdi",
+    chatCleanup: {
+      title: "Chatni tozalash",
+      label: "Xabarlar o‘chiriladigan vaqt",
+      hint: "Bot javoblari va odam yozgan xabarlar yuborilganidan shuncha vaqt o‘tib chatdan o‘chiriladi. Eslatmalarga ta’sir qilmaydi.",
+      option: (hours: number) => `${hours} soatdan keyin`,
+    },
     caps: {
       title: "Xabar limitlari",
       description: "Bitta odamga shu bo‘limda yuboriladigan eslatmalar soni. Barcha bo‘limlar bo‘yicha kuniga 10 tadan oshmaydi.",

@@ -195,6 +195,14 @@ export const adminUz = {
   messages: {
     dayLabel: "{n}-kun",
     addMessage: "Eslatma qo‘shish",
+    board: {
+      add: "Qo‘shish",
+      addToDay: "{n}-kunga xabar qo‘shish",
+      linkOpenTitle: "Havola ochiq turganda",
+      linkOpenHint: "Havola ochiq turgan vaqtda boradigan eslatmalar.",
+      afterCloseTitle: "Havola yopilgandan keyin, har kuni",
+      afterCloseHint: "Videoni ko‘rmay qolganlarga har kuni alohida xabar boradi. Har bir kunga boshqa matn yozing.",
+    },
     expiryGroup: "Havola yopilishidan oldin",
     emptyTitle: "Hali xabar yo‘q",
     emptyHint: "Bu bosqich uchun birinchi xabarni yozing.",
@@ -211,7 +219,7 @@ export const adminUz = {
       },
       empty: "Hali xabar yo‘q",
       linkOpen: "havola {n} soat ochiq turadi",
-      occasionsFilled: "{done} / {total} imkon to‘ldirilgan",
+      occasionsFilled: "{done} / {total} kun to‘ldirilgan",
     },
     count: "{n} ta eslatma",
     moveUp: "Yuqoriga ko‘chirish",
@@ -234,17 +242,17 @@ export const adminUz = {
       occasion: "Havola yopilganda",
     },
     secondChance: {
-      hint: "Har bir imkon uchun alohida matn: bir odamga bir matn ikki marta bormaydi. Asosiy matn bo‘sh qolsa, bu imkonda hech kimga xabar bormaydi. Narxgacha yetmaganlarga boshqa matn ixtiyoriy: yozilmasa, ularga ham asosiy matn boradi.",
-      occasion: "{n}-imkon",
-      firstWhen: "Havola yopilganda",
-      nextWhen: "Javob bo‘lmasa, oldingisidan 1 kun keyin. «Ha» bosgan bo‘lsa, yangi havola yopilganda",
+      hint: "Har bir kunga alohida matn: bir odamga bir matn ikki marta bormaydi. Asosiy matn bo‘sh qolsa, o‘sha kuni hech kimga xabar bormaydi. Narxgacha yetmaganlarga boshqa matn ixtiyoriy: yozilmasa, ularga ham asosiy matn boradi.",
+      occasion: "{n}-kun",
+      firstWhen: "Havola yopilgan kuni",
+      nextWhen: "Javob bo‘lmasa, keyingi kuni. «Ha» bosgan bo‘lsa, yangi havola yopilganda",
       slots: {
         not_opened: "Asosiy matn",
         no_price: "Narxgacha yetmaganlarga boshqa matn (ixtiyoriy)",
       },
       add: "Matn yozish",
       addVariant: "Boshqa matn yozish",
-      editorTitle: "{n}-imkon · {slot}",
+      editorTitle: "{n}-kun · {slot}",
       presets: {
         not_opened: "Afsus, bonus dars o'chib ketdi. Sizga yana bir imkon bersak, darsni ko'rgan bo'lar edingizmi?",
         no_price:

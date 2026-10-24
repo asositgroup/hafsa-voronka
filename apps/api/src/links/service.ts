@@ -1,7 +1,7 @@
 import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { type FunnelStatus, type LinkGrantKind, offerVariantFor } from "@funnel/shared";
 import { db } from "@/db";
-import { type LinkGrant, linkGrants, secondChanceOffers, type User, users, watchProgress } from "@/db/schema";
+import { type LinkGrant, linkGrants, secondChanceOffers, type User, users, videos, watchProgress } from "@/db/schema";
 import { linkStateFor } from "@/funnel/secondChance";
 import { NO_VIDEO_MARKS, statusFor } from "@/funnel/status";
 import { syncSegment } from "@/funnel/segments";
@@ -9,7 +9,6 @@ import { logEvent } from "@/funnel/users";
 import { refreshUserLeadCards } from "@/leads/service";
 import { linkExpiryFor } from "@/messages/plan";
 import { linkTtlHours } from "@/settings/service";
-import { videoForUser } from "@/videos/service";
 import { cancelPendingAppointments } from "./appointmentStore";
 import { offerHistory } from "./offers";
 
@@ -76,7 +75,9 @@ export function linkExpiredBeforePrice(
 
 async function expiredStatus(tx: Tx, user: User, now: Date) {
   const [progress] = await tx.select().from(watchProgress).where(eq(watchProgress.userId, user.id)).limit(1);
-  const status = statusFor(progress, (await videoForUser(user)) ?? NO_VIDEO_MARKS, user);
+  const [video] =
+    user.videoId === null ? [] : await tx.select().from(videos).where(eq(videos.id, user.videoId)).limit(1);
+  const status = statusFor(progress, video ?? NO_VIDEO_MARKS, user);
   return linkExpiredBeforePrice(user, status, now) ? status : undefined;
 }
 

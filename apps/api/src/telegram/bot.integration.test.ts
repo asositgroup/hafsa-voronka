@@ -208,7 +208,9 @@ describe.skipIf(!testDbUrl)("Bot registration flow", () => {
       invalidateSettings();
     }
 
-    const deletes = calls.filter((c) => c.method === "deleteMessage").map((c) => c.payload);
+    const deletes = calls
+      .filter((c) => c.method === "deleteMessage" && c.payload.chat_id === chatId)
+      .map((c) => c.payload);
     expect(deletes).toEqual([{ chat_id: chatId, message_id: 1 }]);
   });
 

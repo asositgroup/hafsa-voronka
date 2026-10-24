@@ -26,6 +26,9 @@ import {
   linkGrantKinds,
   offerAnswers,
   offerVariants,
+  type RolloutAudience,
+  rolloutAudiences,
+  rolloutStatuses,
   segmentEndReasons,
   type TemplateButton,
   templateMediaTypes,
@@ -110,6 +113,7 @@ export const users = pgTable(
   wroteAdminAt: timestamp("wrote_admin_at", { withTimezone: true }),
   wroteAdminBy: bigint("wrote_admin_by", { mode: "number" }),
   botBlocked: boolean("bot_blocked").default(false).notNull(),
+  funnelEpoch: integer("funnel_epoch").default(0).notNull(),
   linkId: bigint("link_id", { mode: "number" }).references((): AnyPgColumn => linkGrants.id),
   videoId: bigint("video_id", { mode: "number" }).references(() => videos.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -127,15 +131,17 @@ export const linkGrants = pgTable(
     userId: bigint("user_id", { mode: "number" })
       .notNull()
       .references((): AnyPgColumn => users.id),
+    epoch: integer("epoch").default(0).notNull(),
     attempt: smallint("attempt").notNull(),
     kind: text("kind", { enum: linkGrantKinds }).notNull(),
     offerFirst: boolean("offer_first").default(false).notNull(),
+    silent: boolean("silent").default(false).notNull(),
     givenAt: timestamp("given_at", { withTimezone: true }).notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
-    uniqueIndex("link_grants_user_attempt_idx").on(t.userId, t.attempt),
+    uniqueIndex("link_grants_user_epoch_attempt_idx").on(t.userId, t.epoch, t.attempt),
     index("link_grants_expires_at_idx").on(t.expiresAt),
     check("link_grants_attempt_range", sql`${t.attempt} >= 1`),
   ],
@@ -483,6 +489,7 @@ export const secondChanceOffers = pgTable(
     userId: bigint("user_id", { mode: "number" })
       .notNull()
       .references(() => users.id),
+    epoch: integer("epoch").default(0).notNull(),
     occasion: smallint("occasion").notNull(),
     variant: text("variant", { enum: offerVariants }).notNull(),
     expiredLinkId: bigint("expired_link_id", { mode: "number" })
@@ -497,7 +504,7 @@ export const secondChanceOffers = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
-    uniqueIndex("second_chance_offers_user_occasion_idx").on(t.userId, t.occasion),
+    uniqueIndex("second_chance_offers_user_epoch_occasion_idx").on(t.userId, t.epoch, t.occasion),
     index("second_chance_offers_sent_message_idx").on(t.sentMessageId),
     check("second_chance_offers_occasion_range", sql`${t.occasion} between 1 and 7`),
     check("second_chance_offers_answer_pair", sql`(${t.answer} is null) = (${t.answeredAt} is null)`),
@@ -536,3 +543,68 @@ export const watchAppointments = pgTable(
 );
 
 export type WatchAppointment = typeof watchAppointments.$inferSelect;
+
+export const rolloutRecipientStates = ["pending", "restarted", "sent", "blocked", "skipped", "failed"] as const;
+export type RolloutRecipientState = (typeof rolloutRecipientStates)[number];
+
+export const videoRollouts = pgTable(
+  "video_rollouts",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    videoId: bigint("video_id", { mode: "number" })
+      .notNull()
+      .references(() => videos.id, { onDelete: "cascade" }),
+    audiences: text("audiences").array().$type<RolloutAudience[]>().notNull(),
+    sinceDays: integer("since_days"),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
+    status: text("status", { enum: rolloutStatuses }).notNull().default("scheduled"),
+    previewCount: integer("preview_count").notNull(),
+    targetCount: integer("target_count"),
+    sentCount: integer("sent_count").default(0).notNull(),
+    blockedCount: integer("blocked_count").default(0).notNull(),
+    skippedCount: integer("skipped_count").default(0).notNull(),
+    failedCount: integer("failed_count").default(0).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("video_rollouts_one_open_idx")
+      .on(sql`(true)`)
+      .where(sql`${t.status} in ('scheduled', 'running')`),
+    index("video_rollouts_video_idx").on(t.videoId, t.createdAt),
+    check(
+      "video_rollouts_audiences_values",
+      sql`cardinality(${t.audiences}) > 0 and ${t.audiences} <@ array['not_opened', 'halfway', 'saw_price', 'wrote_admin', 'bought']::text[]`,
+    ),
+    check("video_rollouts_status_values", sql`${t.status} in ('scheduled', 'running', 'done', 'cancelled')`),
+    check("video_rollouts_finished_pair", sql`(${t.finishedAt} is null) = (${t.status} in ('scheduled', 'running'))`),
+  ],
+);
+
+export type VideoRolloutRow = typeof videoRollouts.$inferSelect;
+
+export const videoRolloutRecipients = pgTable(
+  "video_rollout_recipients",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    rolloutId: bigint("rollout_id", { mode: "number" })
+      .notNull()
+      .references(() => videoRollouts.id, { onDelete: "cascade" }),
+    userId: bigint("user_id", { mode: "number" })
+      .notNull()
+      .references(() => users.id),
+    audience: text("audience", { enum: rolloutAudiences }).notNull(),
+    state: text("state", { enum: rolloutRecipientStates }).notNull().default("pending"),
+    linkId: bigint("link_id", { mode: "number" }).references(() => linkGrants.id),
+    sentMessageId: bigint("sent_message_id", { mode: "number" }).references(() => sentMessages.id),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("video_rollout_recipients_rollout_user_idx").on(t.rolloutId, t.userId),
+    index("video_rollout_recipients_open_idx")
+      .on(t.rolloutId, t.state, t.id)
+      .where(sql`${t.state} in ('pending', 'restarted')`),
+  ],
+);
+
+export type VideoRolloutRecipient = typeof videoRolloutRecipients.$inferSelect;

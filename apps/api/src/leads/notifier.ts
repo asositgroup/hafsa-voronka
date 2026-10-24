@@ -116,7 +116,7 @@ async function flushPending(sender: LeadSender) {
       maxPosition: watchProgress.maxPosition,
       duration: videos.duration,
       offered: sql<number>`(select count(*) from second_chance_offers o where o.user_id = ${leads.userId} and o.sent_message_id is not null)::int`,
-      lastAnswer: sql<OfferAnswer | null>`(select o.answer from second_chance_offers o where o.user_id = ${leads.userId} and o.sent_message_id is not null order by o.occasion desc limit 1)`,
+      lastAnswer: sql<OfferAnswer | null>`(select o.answer from second_chance_offers o where o.user_id = ${leads.userId} and o.sent_message_id is not null order by o.epoch desc, o.occasion desc limit 1)`,
       exhausted: sql<boolean>`exists (select 1 from segment_runs r where r.user_id = ${leads.userId} and r.end_reason = 'offers_exhausted')`,
       appointmentAt: sql<Date | null>`(select a.chosen_at from watch_appointments a where a.user_id = ${leads.userId} and a.fired_at is null and a.cancelled_at is null limit 1)`,
     })

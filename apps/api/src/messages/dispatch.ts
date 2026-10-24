@@ -6,6 +6,7 @@ import {
   type BotMessageKey,
   type FunnelSegment,
   type FunnelStatus,
+  isInRolloutWindow,
   linkBoundSegments,
   offerVariantFor,
   SECOND_CHANCE_SEGMENT,
@@ -21,6 +22,8 @@ import {
   sentMessages,
   users,
   segmentRuns,
+  type VideoRolloutRecipient,
+  videoRolloutRecipients,
   videos,
   watchAppointments,
   watchProgress,
@@ -32,7 +35,7 @@ import { NO_VIDEO_MARKS, statusFor } from "@/funnel/status";
 import { logEvent } from "@/funnel/users";
 import { refreshUserLeadCards } from "@/leads/service";
 import { pendingAppointmentUserIds } from "@/links/appointmentStore";
-import { offerHistories } from "@/links/offers";
+import { currentEpochOf, offerHistories } from "@/links/offers";
 import { insertGrant } from "@/links/service";
 import { linkTtlHours, messageCaps } from "@/settings/service";
 import { isAdminTelegramId, notAdminTelegramId } from "@/telegram/admins";
@@ -41,6 +44,20 @@ import { isBlockedError, markBlocked } from "@/telegram/blocked";
 import { cleanupChatMessages } from "@/telegram/chatLog";
 import { botText, sendBotText } from "@/telegram/texts";
 import { watchAppUrl } from "@/telegram/watchUrl";
+import { uz } from "@/i18n/uz";
+import {
+  cancelIfVideoInactive,
+  cancelledStragglers,
+  dueRollout,
+  priorPrompt,
+  promptRunId,
+  refreshRolloutProgress,
+  restartRecipient,
+  ROLLOUT_PROMPT_KEY,
+  rolloutBatch,
+  settleRecipient,
+  startRollout,
+} from "@/videos/rollout/run";
 import { templateContextFor } from "./context";
 import { renderTemplate, type ButtonWrap } from "./render";
 import { activeTemplateRows, toTemplate } from "./repo";
@@ -72,6 +89,7 @@ const INTERRUPTED_MS = 10 * 60_000;
 const SWEEP_BATCH_SIZE = 500;
 const EXPIRE_BATCH_SIZE = 500;
 const APPOINTMENT_BATCH_SIZE = 500;
+const ROLLOUT_BATCH_SIZE = 300;
 const DEFAULT_RETRY_AFTER_SEC = 30;
 const MESSAGE_NOT_FOUND = "message to delete not found";
 
@@ -79,6 +97,7 @@ export type DispatchOptions = { api?: Api; now?: () => Date; gapMs?: number };
 
 type Pace = () => Promise<void>;
 type SendResult = "ok" | "skip" | "abort";
+type Delivery = "ok" | "blocked" | "retry" | "failed" | "abort";
 
 type Candidate = {
   runId: number;
@@ -127,6 +146,8 @@ export function trackedWrap(
   };
 }
 
+const chainAllowed = sql`not exists (select 1 from ${linkGrants} where ${linkGrants.id} = ${users.linkId} and ${linkGrants.silent})`;
+
 async function loadCandidates(now: Date, userId?: number): Promise<Candidate[]> {
   const dayStart = tashkentDayStart(now).toISOString();
   const since = new Date(now.getTime() - CHAIN_MS - DAY_MS);
@@ -167,6 +188,7 @@ async function loadCandidates(now: Date, userId?: number): Promise<Candidate[]> 
         eq(users.botBlocked, false),
         isNull(users.wroteAdminAt),
         notAdminTelegramId(users.telegramId),
+        chainAllowed,
         gt(segmentRuns.enteredAt, since),
         userId === undefined ? undefined : eq(segmentRuns.userId, userId),
       ),
@@ -295,6 +317,7 @@ async function sendOne(api: Api, pick: Pick, now: Date, pace: Pace): Promise<Sen
     where exists (
         select 1 from segment_runs r join users u on u.id = r.user_id
         where r.id = ${runId} and r.ended_at is null and u.bot_blocked = false and u.wrote_admin_at is null
+          and not exists (select 1 from link_grants g where g.id = u.link_id and g.silent)
       )
       and exists (
         select 1 from message_templates t
@@ -328,7 +351,8 @@ async function sendOne(api: Api, pick: Pick, now: Date, pace: Pace): Promise<Sen
   });
   await db().update(sentMessages).set({ linkTargets: targets }).where(eq(sentMessages.id, id));
 
-  return deliver(id, userId, now, pace, () => sendRendered(api, telegramId, rendered));
+  const delivery = await deliver(id, userId, now, pace, () => sendRendered(api, telegramId, rendered));
+  return delivery === "ok" || delivery === "abort" ? delivery : "skip";
 }
 
 async function deliver(
@@ -337,7 +361,7 @@ async function deliver(
   now: Date,
   pace: Pace,
   send: () => Promise<Message>,
-): Promise<SendResult> {
+): Promise<Delivery> {
   try {
     await pace();
     const message = await send();
@@ -353,7 +377,7 @@ async function deliver(
         .set({ sendError: (error as GrammyError).description })
         .where(eq(sentMessages.id, id));
       await markBlocked(userId);
-      return "skip";
+      return "blocked";
     }
     if (error instanceof GrammyError && error.error_code === 429) {
       await db().delete(sentMessages).where(eq(sentMessages.id, id));
@@ -362,32 +386,44 @@ async function deliver(
     }
     if (error instanceof HttpError || (error instanceof GrammyError && error.error_code >= 500)) {
       await db().delete(sentMessages).where(eq(sentMessages.id, id));
-      return "skip";
+      return "retry";
     }
     console.error(`Message ${id} failed:`, error);
     await db()
       .update(sentMessages)
       .set({ sendError: error instanceof Error ? error.message : String(error) })
       .where(eq(sentMessages.id, id));
-    return "skip";
+    return "failed";
   }
 }
 
-type SystemMessage = { userId: number; telegramId: number; key: BotMessageKey; button?: BotButtonKey };
+type SystemMessage = {
+  userId: number;
+  telegramId: number;
+  key: BotMessageKey;
+  button?: BotButtonKey;
+  vars?: Record<string, string>;
+  runId?: number;
+};
+
+async function openRunId(userId: number): Promise<number | null> {
+  const [run] = await db()
+    .select({ id: segmentRuns.id })
+    .from(segmentRuns)
+    .where(and(eq(segmentRuns.userId, userId), isNull(segmentRuns.endedAt)))
+    .limit(1);
+  return run?.id ?? null;
+}
 
 async function sendSystem(
   api: Api,
   message: SystemMessage,
   now: Date,
   pace: Pace,
-): Promise<{ result: SendResult; sentMessageId: number | null }> {
-  const { userId, telegramId, key, button } = message;
-  const [run] = await db()
-    .select({ id: segmentRuns.id })
-    .from(segmentRuns)
-    .where(and(eq(segmentRuns.userId, userId), isNull(segmentRuns.endedAt)))
-    .limit(1);
-  if (!run) return { result: "skip", sentMessageId: null };
+): Promise<{ result: Delivery | "skip"; sentMessageId: number | null }> {
+  const { userId, telegramId, key, button, vars } = message;
+  const runId = message.runId ?? (await openRunId(userId));
+  if (runId === null) return { result: "skip", sentMessageId: null };
 
   const [reserved] = await db()
     .insert(sentMessages)
@@ -395,7 +431,7 @@ async function sendSystem(
       userId,
       botTextKey: key,
       linkId: sql`(select link_id from users where id = ${userId})`,
-      segmentRunId: run.id,
+      segmentRunId: runId,
       dueAt: now,
       createdAt: now,
     })
@@ -410,7 +446,7 @@ async function sendSystem(
     ? new InlineKeyboard().webApp(await botText(button), `${watchAppUrl()}?m=${reserved.id}`)
     : undefined;
   const result = await deliver(reserved.id, userId, now, pace, () =>
-    sendBotText(api, telegramId, key, {}, keyboard),
+    sendBotText(api, telegramId, key, vars, keyboard),
   );
   return { result, sentMessageId: result === "ok" ? reserved.id : null };
 }
@@ -649,6 +685,96 @@ async function processAppointments(api: Api, now: Date, pace: Pace) {
   }
 }
 
+async function sendRolloutPrompt(
+  api: Api,
+  recipient: VideoRolloutRecipient,
+  now: Date,
+  pace: Pace,
+): Promise<"abort" | "retry" | "done"> {
+  const prior = await priorPrompt(recipient);
+  if (prior) {
+    await settleRecipient(recipient.id, prior.state, prior.sentMessageId, now);
+    return "done";
+  }
+  const [user] = await db().select().from(users).where(eq(users.id, recipient.userId));
+  if (!user || user.botBlocked) {
+    await settleRecipient(recipient.id, user ? "blocked" : "skipped", null, now);
+    return "done";
+  }
+  const runId = await promptRunId(user.id);
+  if (runId === null) {
+    await settleRecipient(recipient.id, "skipped", null, now);
+    return "done";
+  }
+  const sent = await sendSystem(
+    api,
+    {
+      userId: user.id,
+      telegramId: user.telegramId,
+      key: ROLLOUT_PROMPT_KEY,
+      button: "watchButton",
+      vars: { name: user.firstName || user.name || uz.bot.defaultName },
+      runId,
+    },
+    now,
+    pace,
+  );
+  if (sent.result === "abort" || sent.result === "retry") return sent.result;
+  if (sent.result === "ok") await settleRecipient(recipient.id, "sent", sent.sentMessageId, now);
+  else await settleRecipient(recipient.id, sent.result === "blocked" ? "blocked" : "failed", null, now);
+  return "done";
+}
+
+async function promptRestarted(api: Api, recipientId: number, now: Date, pace: Pace): Promise<"abort" | "ok"> {
+  const [restarted] = await db().select().from(videoRolloutRecipients).where(eq(videoRolloutRecipients.id, recipientId));
+  if (restarted?.state !== "restarted") return "ok";
+  await syncSegment(restarted.userId, now).catch((error) => console.error("Segment sync failed:", error));
+  const result = await sendRolloutPrompt(api, restarted, now, pace);
+  if (result === "abort") return "abort";
+  if (result === "done") {
+    await refreshUserLeadCards(restarted.userId).catch((error) => console.error("Lead card refresh failed:", error));
+  }
+  return "ok";
+}
+
+async function finishCancelledPrompts(api: Api, now: Date, pace: Pace): Promise<"abort" | "ok"> {
+  const stragglers = await cancelledStragglers(ROLLOUT_BATCH_SIZE);
+  const touched = new Set<number>();
+  try {
+    for (const recipient of stragglers) {
+      touched.add(recipient.rolloutId);
+      if ((await promptRestarted(api, recipient.id, now, pace)) === "abort") return "abort";
+    }
+    return "ok";
+  } finally {
+    for (const rolloutId of touched) await refreshRolloutProgress(rolloutId, now);
+  }
+}
+
+async function processRollouts(api: Api, now: Date, pace: Pace) {
+  if (now.getTime() < pausedUntil) return;
+  const due = await dueRollout(now);
+  if (due && (await cancelIfVideoInactive(due, now))) return;
+  if (!isInRolloutWindow(now)) return;
+  if ((await finishCancelledPrompts(api, now, pace)) === "abort" || !due) return;
+  const rollout = await startRollout(due, now);
+  if (!rollout) return;
+
+  const ttlHours = await linkTtlHours();
+  try {
+    for (const recipient of await rolloutBatch(rollout.id, ROLLOUT_BATCH_SIZE)) {
+      if (recipient.state === "pending") {
+        const outcome = await restartRecipient(rollout, recipient, now, ttlHours);
+        if (outcome === "stopped") return;
+        if (outcome === "skipped") continue;
+      }
+      if ((await promptRestarted(api, recipient.id, now, pace)) === "abort") return;
+    }
+  } finally {
+    await refreshRolloutProgress(rollout.id, now);
+  }
+}
+
 async function settleOffer(offerId: number, candidate: Candidate, templateId: number) {
   const [sent] = await db()
     .select({ id: sentMessages.id, sentAt: sentMessages.sentAt, sendError: sentMessages.sendError })
@@ -698,6 +824,7 @@ async function sendOffers(api: Api, now: Date, pace: Pace, all: Candidate[]) {
       .insert(secondChanceOffers)
       .values({
         userId: candidate.userId,
+        epoch: currentEpochOf(candidate.userId),
         occasion: step.occasion,
         variant,
         expiredLinkId: candidate.linkId,
@@ -797,6 +924,7 @@ export async function dispatchMessages(options: DispatchOptions = {}): Promise<v
       await markInterrupted(clock());
       await expireLinks(api, clock(), pace);
       await processAppointments(api, clock(), pace);
+      await processRollouts(api, clock(), pace);
       const candidates = await loadCandidates(clock());
       await sendOffers(api, clock(), pace, candidates);
       await sendDue(api, clock(), pace, candidates);

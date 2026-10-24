@@ -36,6 +36,8 @@ export const defaultBotTexts: Record<BotTextKey, string> = {
   reopenNow: "Bonus darsingiz yana ochildi! 🎁\n\nLink 24 soat amal qiladi. Tayyor bo'lsangiz, boshlang 👇",
   remindNow: "Eslatib qo'ydim, dars sizni kutmoqda! ⏰\n\nTayyor bo'lsangiz, davom eting 👇",
   offerClosed: "Bu tugma eskirgan 🙂 Darsga qaytish uchun /start bosing.",
+  rolloutPrompt:
+    "Assalomu alaykum, {name}! 👋\n\n🎁 Yangi dars tayyor!\n\nSiz uchun video darsni yangiladik. Unda arab tilini to'g'ri boshlash bo'yicha yangi va foydali ma'lumotlarni bilib olasiz.\n\nBiroz vaqt ajrating va hoziroq ko'ring 👇",
   watchButton: "▶️ Bepul darsni ko'rish",
   channelButton: "✍️ Adminga yozish",
   laterTonight: "🌙 Bugun kechqurun ({soat})",

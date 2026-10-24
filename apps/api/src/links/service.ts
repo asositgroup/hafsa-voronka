@@ -10,22 +10,31 @@ import { refreshUserLeadCards } from "@/leads/service";
 import { linkExpiryFor } from "@/messages/plan";
 import { linkTtlHours } from "@/settings/service";
 import { cancelPendingAppointments } from "./appointmentStore";
-import { offerHistory } from "./offers";
+import { currentEpochOf, inCurrentEpoch, offerHistory } from "./offers";
 
 type Tx = Parameters<Parameters<ReturnType<typeof db>["transaction"]>[0]>[0];
 type Executor = Pick<ReturnType<typeof db>, "select">;
 
-export type GrantRequest = { kind: LinkGrantKind; offerFirst: boolean; now: Date; ttlHours: number };
+export type GrantRequest = {
+  kind: LinkGrantKind;
+  offerFirst: boolean;
+  now: Date;
+  ttlHours: number;
+  silent?: boolean;
+};
 
 export async function insertGrant(tx: Tx, userId: number, request: GrantRequest): Promise<LinkGrant> {
   const expiresAt = linkExpiryFor(request.now, request.ttlHours);
+  const epoch = currentEpochOf(userId);
   const [grant] = await tx
     .insert(linkGrants)
     .values({
       userId,
-      attempt: sql`(select coalesce(max(${linkGrants.attempt}), 0) + 1 from ${linkGrants} where ${linkGrants.userId} = ${userId})`,
+      epoch,
+      attempt: sql`(select coalesce(max(${linkGrants.attempt}), 0) + 1 from ${linkGrants} where ${linkGrants.userId} = ${userId} and ${linkGrants.epoch} = ${epoch})`,
       kind: request.kind,
       offerFirst: request.offerFirst,
+      silent: request.silent ?? false,
       givenAt: request.now,
       expiresAt,
     })
@@ -104,7 +113,7 @@ export async function acceptSecondChance(userId: number, now = new Date()): Prom
       const [latest] = await tx
         .select({ answer: secondChanceOffers.answer, grantedLinkId: secondChanceOffers.grantedLinkId })
         .from(secondChanceOffers)
-        .where(eq(secondChanceOffers.userId, userId))
+        .where(and(eq(secondChanceOffers.userId, userId), inCurrentEpoch))
         .orderBy(desc(secondChanceOffers.occasion))
         .limit(1);
       return latest?.answer === "again" && latest.grantedLinkId === user.linkId ? "already" : "closed";

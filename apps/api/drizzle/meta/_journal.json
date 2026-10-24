@@ -169,6 +169,13 @@
       "when": 1792691019461,
       "tag": "0023_chat_messages",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1792865029197,
+      "tag": "0024_video_rollouts",
+      "breakpoints": true
     }
   ]
 }

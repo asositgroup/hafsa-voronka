@@ -6,6 +6,8 @@ import { ArchiveIcon, TrashIcon } from "@/components/icons";
 import { AdminVideoPlayer, type VideoMarker } from "@/components/admin/AdminVideoPlayer";
 import { ShortOfferVideo } from "@/components/admin/ShortOfferVideo";
 import { VideoMarksEditor } from "@/components/admin/VideoMarksEditor";
+import { VideoRolloutDialog } from "@/components/admin/VideoRolloutDialog";
+import { VideoRolloutStatus } from "@/components/admin/VideoRolloutStatus";
 import { Badge } from "@/components/admin/ui/Badge";
 import { Button } from "@/components/admin/ui/Button";
 import { ConfirmDialog } from "@/components/admin/ui/Dialog";
@@ -19,6 +21,7 @@ import {
   moveAllUsersToVideo,
   unarchiveVideo,
 } from "@/lib/admin/videos";
+import { useVideoRollouts } from "@/lib/admin/useVideoRollouts";
 import { videoFailureMessage } from "@/lib/admin/videoErrors";
 import { adminUz } from "@/lib/i18n/admin";
 
@@ -64,6 +67,8 @@ export function VideoCard({ item, uploadsEnabled, otherVideoUsers, onItems }: Vi
   const [marksOpen, setMarksOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
+  const [rolloutOpen, setRolloutOpen] = useState(false);
+  const rollouts = useVideoRollouts(item.id, item.isActive);
 
   const archived = item.archivedAt !== null;
   const needsPrice = item.priceSec === null;
@@ -112,6 +117,10 @@ export function VideoCard({ item, uploadsEnabled, otherVideoUsers, onItems }: Vi
 
       {needsPrice && !item.isActive && !archived && <p className="m-0 text-[13px] text-qalam">{copy.needsPrice}</p>}
 
+      {rollouts.latest && (
+        <VideoRolloutStatus rollout={rollouts.latest} onCancel={rollouts.cancel} onError={setError} />
+      )}
+
       {error && <Notice tone="danger" onDismiss={() => setError(null)}>{error}</Notice>}
 
       <footer className="flex flex-wrap items-center gap-2 border-t border-chiziq pt-3">
@@ -131,6 +140,11 @@ export function VideoCard({ item, uploadsEnabled, otherVideoUsers, onItems }: Vi
         {item.isActive && otherVideoUsers > 0 && (
           <Button disabled={busy !== null} onClick={() => setMoveOpen(true)}>
             {copy.moveUsers}
+          </Button>
+        )}
+        {item.isActive && (
+          <Button variant="secondary" disabled={busy !== null || rollouts.live} onClick={() => setRolloutOpen(true)}>
+            {adminUz.videos.rollout.open}
           </Button>
         )}
         {!item.isActive && (
@@ -158,6 +172,10 @@ export function VideoCard({ item, uploadsEnabled, otherVideoUsers, onItems }: Vi
       </footer>
 
       {marksOpen && <VideoMarksEditor item={item} onItems={onItems} onClose={() => setMarksOpen(false)} />}
+
+      {rolloutOpen && (
+        <VideoRolloutDialog videoId={item.id} onCreated={rollouts.added} onClose={() => setRolloutOpen(false)} />
+      )}
 
       <ConfirmDialog
         open={confirmOpen}

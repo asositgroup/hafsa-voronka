@@ -32,6 +32,7 @@ function makeUser(overrides: Partial<User> = {}): User {
     wroteAdminAt: null,
     wroteAdminBy: null,
     botBlocked: false,
+    funnelEpoch: 0,
     videoId: null,
     createdAt: new Date("2026-03-01T09:00:00Z"),
     ...overrides,

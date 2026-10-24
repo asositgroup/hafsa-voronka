@@ -5,9 +5,15 @@ export type StatusProgress = { maxPosition: number; startedAt: Date | null };
 
 export const NO_VIDEO_MARKS = { duration: 1, introEndSec: null, courseStartSec: null, priceSec: null };
 
+type VideoMarks = Pick<Video, "duration" | "introEndSec" | "courseStartSec" | "priceSec">;
+
+export function lessonStartSec(video: VideoMarks): number {
+  return video.introEndSec ?? (video.courseStartSec ?? video.priceSec ?? video.duration) / 2;
+}
+
 export function statusFor(
   progress: StatusProgress | undefined,
-  video: Pick<Video, "duration" | "introEndSec" | "courseStartSec" | "priceSec">,
+  video: VideoMarks,
   user: Pick<User, "registeredAt" | "wroteAdminAt" | "offerWatchedAt">,
 ): FunnelStatus | null {
   if (user.registeredAt === null) return null;
@@ -19,8 +25,7 @@ export function statusFor(
   if (video.priceSec !== null && position >= video.priceSec) return "narxni_kurdi";
   if (video.courseStartSec !== null && position >= video.courseStartSec) return "sotuvda_toxtadi";
 
-  const lessonStart = video.introEndSec ?? (video.courseStartSec ?? video.priceSec ?? video.duration) / 2;
-  return position >= lessonStart ? "dars_yarmida" : "korishni_boshladi";
+  return position >= lessonStartSec(video) ? "dars_yarmida" : "korishni_boshladi";
 }
 
 export type LinkState = "live" | "expired" | "exhausted";

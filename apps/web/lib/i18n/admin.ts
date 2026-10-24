@@ -639,6 +639,11 @@ export const adminUz = {
       deleting: "O‘chirilmoqda...",
       confirmDeleteTitle: "Videoni o‘chirasizmi?",
       confirmDelete: "«{title}» butunlay o‘chiriladi. Buni qaytarib bo‘lmaydi.",
+      moveUsers: "Eski obunachilarga ham berish",
+      confirmMoveUsersTitle: "Eski obunachilarga ham shu videoni berasizmi?",
+      confirmMoveUsers:
+        "Boshqa videolardagi {count} ta obunachi «{title}» videosiga o‘tkaziladi va uni boshidan ko‘radi. Har kim o‘z bosqichida qoladi: masalan, narxgacha ko‘rganlar yangi videoda ham narxgacha ko‘rgan hisoblanadi.",
+      moveUsersConfirm: "O‘tkazish",
       marks: "Vaqt belgilari",
     },
     offer: {
@@ -688,6 +693,7 @@ export const adminUz = {
       price_required: "Faol videoda narx joyi bo‘lishi shart",
       archived: "Arxivdagi videoni faollashtirib bo‘lmaydi",
       video_active: "Faol videoni arxivlash yoki o‘chirish mumkin emas",
+      video_not_active: "Obunachilarni faqat faol videoga o‘tkazish mumkin",
       activation_conflict: "Boshqa video hozirgina faollashtirildi. Qayta urinib ko‘ring.",
       video_in_use: "{count} ta foydalanuvchi shu videoda",
       uploads_not_configured: "Video yuklash sozlanmagan",

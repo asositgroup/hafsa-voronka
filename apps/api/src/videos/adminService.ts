@@ -1,4 +1,4 @@
-import { asc, count, desc, eq, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
 import {
   type AdminVideoItem,
   type VideoMarkError,
@@ -7,7 +7,8 @@ import {
 } from "@funnel/shared";
 import type { z } from "zod";
 import { db } from "@/db";
-import { users, type Video, videos } from "@/db/schema";
+import { lessonStartSec } from "@/funnel/status";
+import { users, type Video, videos, watchProgress } from "@/db/schema";
 import { keyFromPublicUrl, r2 } from "@/storage/r2";
 
 export type VideoInput = {
@@ -22,6 +23,7 @@ export type VideoFailure =
   | { ok: false; code: "not_found" }
   | { ok: false; code: "archived" }
   | { ok: false; code: "video_active" }
+  | { ok: false; code: "video_not_active" }
   | { ok: false; code: "invalid_file_url" }
   | { ok: false; code: "activation_conflict" }
   | { ok: false; code: "price_required" }
@@ -168,6 +170,41 @@ export async function unarchiveVideo(id: number): Promise<VideoResult> {
 
   const [video] = await db().update(videos).set({ archivedAt: null }).where(eq(videos.id, id)).returning();
   return { ok: true, video };
+}
+
+function stageStartIn(source: Video, target: Video) {
+  const max = watchProgress.maxPosition;
+  const targetLessonStart = lessonStartSec(target);
+  const reached = (mark: number | null) => (mark === null ? sql`false` : sql`${max} >= ${mark}`);
+  return sql`case
+    when ${reached(source.priceSec)} then ${target.priceSec ?? target.duration}::real
+    when ${reached(source.courseStartSec)} then ${target.courseStartSec ?? targetLessonStart}::real
+    when ${max} >= ${lessonStartSec(source)} then ${targetLessonStart}::real
+    else 0
+  end`;
+}
+
+export async function moveAllUsersToVideo(id: number): Promise<VideoResult> {
+  return db().transaction(async (tx): Promise<VideoResult> => {
+    const [row] = await tx.select().from(videos).where(eq(videos.id, id)).for("update");
+    if (!row) return { ok: false, code: "not_found" };
+    if (!row.isActive) return { ok: false, code: "video_not_active" };
+
+    const onOtherVideo = and(isNotNull(users.videoId), ne(users.videoId, id));
+    const sources = await tx
+      .selectDistinct({ video: videos })
+      .from(users)
+      .innerJoin(videos, eq(videos.id, users.videoId))
+      .where(onOtherVideo);
+    for (const { video: source } of sources) {
+      await tx
+        .update(watchProgress)
+        .set({ maxPosition: stageStartIn(source, row), lastPosition: 0, watchedSecs: 0, playing: false })
+        .where(inArray(watchProgress.userId, tx.select({ id: users.id }).from(users).where(eq(users.videoId, source.id))));
+    }
+    await tx.update(users).set({ videoId: id }).where(onOtherVideo);
+    return { ok: true, video: row };
+  });
 }
 
 export async function deleteVideo(id: number): Promise<{ ok: true } | VideoFailure> {

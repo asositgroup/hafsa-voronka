@@ -21,6 +21,7 @@ import {
   createVideo,
   deleteVideo,
   listAdminVideos,
+  moveAllUsersToVideo,
   unarchiveVideo,
   updateVideo,
   type VideoFailure,
@@ -33,7 +34,7 @@ adminVideoRoutes.use("*", requireAdminAuth);
 const MAX_PRESIGNED_PARTS = 256;
 const PART_URL_TTL_SEC = 86400;
 
-const conflictCodes = new Set(["archived", "video_active", "video_in_use", "activation_conflict"]);
+const conflictCodes = new Set(["archived", "video_active", "video_not_active", "video_in_use", "activation_conflict"]);
 
 async function snapshot() {
   return { items: await listAdminVideos(), uploadsEnabled: r2() !== null };
@@ -168,6 +169,7 @@ for (const [action, run] of [
   ["activate", activateVideo],
   ["archive", archiveVideo],
   ["unarchive", unarchiveVideo],
+  ["move-users", moveAllUsersToVideo],
 ] as const) {
   adminVideoRoutes.post(`/:id{[0-9]+}/${action}`, async (c) => {
     const id = parseId(c.req.param("id"));

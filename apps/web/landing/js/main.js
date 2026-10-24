@@ -65,7 +65,25 @@ function startTimer() {
   tick();
 }
 
+function showVideoDuration() {
+  fetch(`${API_URL}/landing/video`)
+    .then((res) => (res.ok ? res.json() : null))
+    .then((video) => {
+      const seconds = Math.round(Number(video?.duration));
+      if (!(seconds > 0)) return;
+      const clock = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+      const minutes = String(Math.max(1, Math.round(seconds / 60)));
+      for (const el of document.querySelectorAll("[data-duration]")) el.textContent = clock;
+      for (const el of document.querySelectorAll("[data-duration-minutes]")) el.textContent = minutes;
+      for (const el of document.querySelectorAll("[data-duration-label]")) {
+        el.setAttribute("aria-label", el.getAttribute("aria-label").replace(/\d+:\d{2}$/, clock));
+      }
+    })
+    .catch(() => {});
+}
+
 startTimer();
+showVideoDuration();
 
 const vid = visitorId();
 

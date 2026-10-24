@@ -7,6 +7,7 @@ import { initDataAuth } from "@/auth";
 import { db } from "@/db";
 import { env } from "@/env";
 import { adminRoutes } from "@/routes/admin";
+import { landingRoutes } from "@/routes/landing";
 import { leadRoutes } from "@/routes/leads";
 import { miniappRoutes } from "@/routes/miniapp";
 import { redirectRoutes } from "@/routes/redirect";
@@ -68,6 +69,9 @@ export function createApp() {
 
   app.use("/track", publicCors);
   app.route("/track", trackRoutes);
+
+  app.use("/landing/*", publicCors);
+  app.route("/landing", landingRoutes);
 
   app.use("/leads", publicCors);
   app.route("/leads", leadRoutes);

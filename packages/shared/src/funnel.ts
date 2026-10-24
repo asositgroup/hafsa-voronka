@@ -22,6 +22,7 @@ export const segmentEndReasons = [
   "expired",
   "relinked",
   "offers_exhausted",
+  "rollout",
 ] as const;
 
 export type SegmentEndReason = (typeof segmentEndReasons)[number];
@@ -38,7 +39,7 @@ export const SECOND_CHANCE_INTERVAL_HOURS = 24;
 
 export const MAX_LINK_ATTEMPTS = SECOND_CHANCE_OCCASIONS + 1;
 
-export const linkGrantKinds = ["initial", "again", "scheduled"] as const;
+export const linkGrantKinds = ["initial", "again", "scheduled", "rollout"] as const;
 
 export type LinkGrantKind = (typeof linkGrantKinds)[number];
 

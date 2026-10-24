@@ -2,11 +2,9 @@
 
 import { useState } from "react";
 import { useMiniApp } from "@/components/miniapp/MiniAppProvider";
-import { fetchSession, miniAppBeacon, miniAppPost } from "@/lib/api";
+import { fetchSession, miniAppPost } from "@/lib/api";
 import { watchUz } from "@/lib/i18n/watch";
-import { getTelegramWebApp, hapticSuccess } from "@/lib/telegram";
-
-const CLOSE_AFTER_OPEN_MS = 150;
+import { hapticSuccess } from "@/lib/telegram";
 
 type RenewState = "idle" | "opening" | "failed";
 
@@ -14,18 +12,6 @@ export function LinkExpiredScreen() {
   const { initData, session, setSession } = useMiniApp();
   const [renew, setRenew] = useState<RenewState>("idle");
   const offered = session.secondChance;
-  const channelUrl = session.config.channelUrl;
-
-  const handleAdmin = () => {
-    miniAppBeacon("/app/event", initData, { type: "channel_click" });
-    const tg = getTelegramWebApp();
-    if (tg?.openTelegramLink) {
-      tg.openTelegramLink(channelUrl);
-      setTimeout(() => tg.close(), CLOSE_AFTER_OPEN_MS);
-    } else {
-      window.open(channelUrl, "_blank");
-    }
-  };
 
   const handleRenew = async () => {
     setRenew("opening");
@@ -51,7 +37,7 @@ export function LinkExpiredScreen() {
             {watchUz.secondChanceFailed}
           </p>
         )}
-        <div className="pt-2 flex flex-col gap-3">
+        <div className="pt-2">
           <button
             type="button"
             onClick={() => void handleRenew()}
@@ -64,13 +50,6 @@ export function LinkExpiredScreen() {
               : offered
                 ? watchUz.secondChanceButton
                 : watchUz.expiredButton}
-          </button>
-          <button
-            type="button"
-            onClick={handleAdmin}
-            className="flex w-full items-center justify-center min-h-[54px] rounded-[14px] border border-chegara-tun bg-transparent text-varaq font-semibold text-[17px] transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oltin"
-          >
-            {watchUz.proceedButton}
           </button>
         </div>
       </div>

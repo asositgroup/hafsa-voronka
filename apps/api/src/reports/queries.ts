@@ -48,7 +48,7 @@ export async function getVideoReport({ from, to }: DateRange): Promise<VideoRepo
     FROM users u
     JOIN videos v ON v.id = u.video_id
     LEFT JOIN watch_progress wp ON wp.user_id = u.id
-    LEFT JOIN link_grants first_link ON first_link.user_id = u.id AND first_link.attempt = 1
+    LEFT JOIN link_grants first_link ON first_link.user_id = u.id AND first_link.epoch = 0 AND first_link.attempt = 1
     LEFT JOIN LATERAL (
       SELECT max(e.created_at) AS last_open_at FROM events e
       WHERE e.user_id = u.id AND e.type = 'app_open'

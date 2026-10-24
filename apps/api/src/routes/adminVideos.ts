@@ -3,6 +3,8 @@ import {
   type DriveConfig,
   type DriveImport,
   driveImportRequestSchema,
+  rolloutCreateSchema,
+  rolloutFilterSchema,
   type UploadStartResponse,
   uploadAbortRequestSchema,
   uploadCompleteRequestSchema,
@@ -21,11 +23,17 @@ import {
   createVideo,
   deleteVideo,
   listAdminVideos,
-  moveAllUsersToVideo,
   unarchiveVideo,
   updateVideo,
   type VideoFailure,
 } from "@/videos/adminService";
+import {
+  cancelRollout,
+  createRollout,
+  listRollouts,
+  previewRollout,
+  type RolloutFailure,
+} from "@/videos/rollout/service";
 
 export const adminVideoRoutes = new Hono();
 
@@ -46,6 +54,19 @@ function failureResponse(c: Context, failure: VideoFailure) {
   if (failure.code === "video_in_use") return c.json({ error: failure.code, userCount: failure.userCount }, 409);
   if (conflictCodes.has(failure.code)) return c.json({ error: failure.code }, 409);
   return c.json({ error: failure.code }, 422);
+}
+
+const rolloutStatusByCode: Record<RolloutFailure["code"], 404 | 409 | 422> = {
+  not_found: 404,
+  video_not_active: 409,
+  rollout_in_progress: 409,
+  rollout_finished: 409,
+  past: 422,
+  outside_window: 422,
+};
+
+function rolloutFailure(c: Context, failure: RolloutFailure) {
+  return c.json({ error: failure.code }, rolloutStatusByCode[failure.code]);
 }
 
 function parseId(raw: string) {
@@ -169,7 +190,6 @@ for (const [action, run] of [
   ["activate", activateVideo],
   ["archive", archiveVideo],
   ["unarchive", unarchiveVideo],
-  ["move-users", moveAllUsersToVideo],
 ] as const) {
   adminVideoRoutes.post(`/:id{[0-9]+}/${action}`, async (c) => {
     const id = parseId(c.req.param("id"));
@@ -188,4 +208,47 @@ adminVideoRoutes.delete("/:id{[0-9]+}", async (c) => {
   const result = await deleteVideo(id);
   if (!result.ok) return failureResponse(c, result);
   return c.json(await snapshot());
+});
+
+adminVideoRoutes.post("/:id{[0-9]+}/rollouts/preview", async (c) => {
+  const id = parseId(c.req.param("id"));
+  if (id === null) return c.json({ error: "not_found" }, 404);
+
+  const body = rolloutFilterSchema.safeParse(await c.req.json().catch(() => null));
+  if (!body.success) return c.json({ error: "invalid_request" }, 400);
+
+  const result = await previewRollout(id, body.data);
+  if (!result.ok) return rolloutFailure(c, result);
+  return c.json({ count: result.count });
+});
+
+adminVideoRoutes.get("/:id{[0-9]+}/rollouts", async (c) => {
+  const id = parseId(c.req.param("id"));
+  if (id === null) return c.json({ error: "not_found" }, 404);
+
+  const items = await listRollouts(id);
+  if (!items) return c.json({ error: "not_found" }, 404);
+  return c.json({ items });
+});
+
+adminVideoRoutes.post("/:id{[0-9]+}/rollouts", async (c) => {
+  const id = parseId(c.req.param("id"));
+  if (id === null) return c.json({ error: "not_found" }, 404);
+
+  const body = rolloutCreateSchema.safeParse(await c.req.json().catch(() => null));
+  if (!body.success) return c.json({ error: "invalid_request" }, 400);
+
+  const result = await createRollout(id, body.data);
+  if (!result.ok) return rolloutFailure(c, result);
+  return c.json({ rollout: result.rollout }, 201);
+});
+
+adminVideoRoutes.post("/:id{[0-9]+}/rollouts/:rolloutId{[0-9]+}/cancel", async (c) => {
+  const id = parseId(c.req.param("id"));
+  const rolloutId = parseId(c.req.param("rolloutId"));
+  if (id === null || rolloutId === null) return c.json({ error: "not_found" }, 404);
+
+  const result = await cancelRollout(id, rolloutId);
+  if (!result.ok) return rolloutFailure(c, result);
+  return c.json({ rollout: result.rollout });
 });

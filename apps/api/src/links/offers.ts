@@ -1,9 +1,14 @@
-import { asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { secondChanceOffers } from "@/db/schema";
+import { secondChanceOffers, users } from "@/db/schema";
 import type { OfferRecord } from "@/funnel/secondChance";
 
 type Executor = Pick<ReturnType<typeof db>, "select">;
+
+export const inCurrentEpoch = sql`${secondChanceOffers.epoch} = (select ${users.funnelEpoch} from ${users} where ${users.id} = ${secondChanceOffers.userId})`;
+
+export const currentEpochOf = (userId: number) =>
+  sql<number>`(select ${users.funnelEpoch} from ${users} where ${users.id} = ${userId})`;
 
 const offerColumns = {
   userId: secondChanceOffers.userId,
@@ -17,7 +22,7 @@ export async function offerHistory(executor: Executor, userId: number): Promise<
   return executor
     .select(offerColumns)
     .from(secondChanceOffers)
-    .where(eq(secondChanceOffers.userId, userId))
+    .where(and(eq(secondChanceOffers.userId, userId), inCurrentEpoch))
     .orderBy(asc(secondChanceOffers.occasion));
 }
 
@@ -27,7 +32,7 @@ export async function offerHistories(executor: Executor, userIds: number[]): Pro
   const rows = await executor
     .select(offerColumns)
     .from(secondChanceOffers)
-    .where(inArray(secondChanceOffers.userId, userIds))
+    .where(and(inArray(secondChanceOffers.userId, userIds), inCurrentEpoch))
     .orderBy(asc(secondChanceOffers.occasion));
   for (const row of rows) histories.get(row.userId)?.push(row);
   return histories;

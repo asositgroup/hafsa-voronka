@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import {
   type AdminVideoItem,
   type VideoMarkError,
@@ -7,8 +7,8 @@ import {
 } from "@funnel/shared";
 import type { z } from "zod";
 import { db } from "@/db";
-import { lessonStartSec } from "@/funnel/status";
-import { users, type Video, videos, watchProgress } from "@/db/schema";
+import { lessonStartSec, NO_VIDEO_MARKS } from "@/funnel/status";
+import { users, type Video, videoRollouts, videos, watchProgress } from "@/db/schema";
 import { keyFromPublicUrl, r2 } from "@/storage/r2";
 
 export type VideoInput = {
@@ -30,6 +30,9 @@ export type VideoFailure =
   | { ok: false; code: VideoMarkError }
   | { ok: false; code: "video_in_use"; userCount: number };
 export type VideoResult = { ok: true; video: Video } | VideoFailure;
+
+type Tx = Parameters<Parameters<ReturnType<typeof db>["transaction"]>[0]>[0];
+type VideoMarks = Pick<Video, "duration" | "introEndSec" | "courseStartSec" | "priceSec">;
 
 function postgresCode(error: unknown): string | undefined {
   const candidate = error as { code?: string; cause?: { code?: string } } | null;
@@ -145,6 +148,10 @@ export async function activateVideo(id: number): Promise<VideoResult> {
       if (markError) return { ok: false, code: markError };
 
       await tx.update(videos).set({ isActive: false }).where(eq(videos.isActive, true));
+      await tx
+        .update(videoRollouts)
+        .set({ status: "cancelled", finishedAt: new Date() })
+        .where(and(inArray(videoRollouts.status, ["scheduled", "running"]), ne(videoRollouts.videoId, id)));
       const [video] = await tx.update(videos).set({ isActive: true }).where(eq(videos.id, id)).returning();
       return { ok: true, video };
     });
@@ -172,7 +179,7 @@ export async function unarchiveVideo(id: number): Promise<VideoResult> {
   return { ok: true, video };
 }
 
-function stageStartIn(source: Video, target: Video) {
+function stageStartIn(source: VideoMarks, target: Video) {
   const max = watchProgress.maxPosition;
   const targetLessonStart = lessonStartSec(target);
   const reached = (mark: number | null) => (mark === null ? sql`false` : sql`${max} >= ${mark}`);
@@ -184,27 +191,18 @@ function stageStartIn(source: Video, target: Video) {
   end`;
 }
 
-export async function moveAllUsersToVideo(id: number): Promise<VideoResult> {
-  return db().transaction(async (tx): Promise<VideoResult> => {
-    const [row] = await tx.select().from(videos).where(eq(videos.id, id)).for("update");
-    if (!row) return { ok: false, code: "not_found" };
-    if (!row.isActive) return { ok: false, code: "video_not_active" };
-
-    const onOtherVideo = and(isNotNull(users.videoId), ne(users.videoId, id));
-    const sources = await tx
-      .selectDistinct({ video: videos })
-      .from(users)
-      .innerJoin(videos, eq(videos.id, users.videoId))
-      .where(onOtherVideo);
-    for (const { video: source } of sources) {
-      await tx
-        .update(watchProgress)
-        .set({ maxPosition: stageStartIn(source, row), lastPosition: 0, watchedSecs: 0, playing: false })
-        .where(inArray(watchProgress.userId, tx.select({ id: users.id }).from(users).where(eq(users.videoId, source.id))));
-    }
-    await tx.update(users).set({ videoId: id }).where(onOtherVideo);
-    return { ok: true, video: row };
-  });
+export async function moveUserToVideo(tx: Tx, userId: number, target: Video): Promise<void> {
+  const [row] = await tx
+    .select({ videoId: users.videoId, source: videos })
+    .from(users)
+    .leftJoin(videos, eq(videos.id, users.videoId))
+    .where(eq(users.id, userId));
+  if (!row || row.videoId === target.id) return;
+  await tx
+    .update(watchProgress)
+    .set({ maxPosition: stageStartIn(row.source ?? NO_VIDEO_MARKS, target), lastPosition: 0, watchedSecs: 0, playing: false })
+    .where(eq(watchProgress.userId, userId));
+  await tx.update(users).set({ videoId: target.id }).where(eq(users.id, userId));
 }
 
 export async function deleteVideo(id: number): Promise<{ ok: true } | VideoFailure> {

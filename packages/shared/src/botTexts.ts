@@ -33,6 +33,7 @@ export const botMessageKeys = [
   "reopenNow",
   "remindNow",
   "offerClosed",
+  "rolloutPrompt",
 ] as const;
 
 export const botButtonKeys = [
@@ -75,6 +76,7 @@ export const botTextDefinitions: Record<BotTextKey, { kind: BotTextKind; placeho
   reopenNow: { kind: "message", placeholders: [] },
   remindNow: { kind: "message", placeholders: [] },
   offerClosed: { kind: "message", placeholders: [] },
+  rolloutPrompt: { kind: "message", placeholders: ["name"] },
   watchButton: { kind: "button", placeholders: [] },
   channelButton: { kind: "button", placeholders: [] },
   laterTonight: { kind: "button", placeholders: ["soat"] },

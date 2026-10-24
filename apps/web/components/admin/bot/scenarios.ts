@@ -28,6 +28,7 @@ export const scenarios: Record<ScenarioId, ScenarioCard[]> = {
     { key: "welcome", trigger: { kind: "user", text: "start", context: "notWatched" }, buttons: [watch] },
     { key: "welcomeBack", trigger: { kind: "user", text: "start", context: "watched" }, buttons: [watch, channel] },
     { key: "fallback", trigger: { kind: "user", text: "wrote" }, buttons: [watch] },
+    { key: "rolloutPrompt", trigger: { kind: "note" }, buttons: [watch] },
   ],
   afterLesson: [{ key: "completion", trigger: { kind: "note" }, buttons: [channel] }],
   secondChance: [

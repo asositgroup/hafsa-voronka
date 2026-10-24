@@ -6,6 +6,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import {
   type FunnelSegment,
   funnelSegments,
+  linkBoundSegments,
   type MessageTemplate,
   SECOND_CHANCE_SEGMENT,
 } from "@funnel/shared";
@@ -178,7 +179,7 @@ function AdminMessagesContent() {
   const editingSource = editing ? cache[editing.segment] : undefined;
 
   return (
-    <Page width="narrow">
+    <Page width={stage === "C" ? "wide" : "narrow"}>
       {stage ? (
         <div className="flex flex-col gap-3">
           <Link href="/admin/messages" className={`${buttonClass({ variant: "ghost", size: "sm" })} -ml-3 self-start`}>
@@ -211,7 +212,7 @@ function AdminMessagesContent() {
         />
       )}
 
-      {stage && loaded && stage !== SECOND_CHANCE_SEGMENT && (
+      {stage && loaded && stage !== SECOND_CHANCE_SEGMENT && !linkBoundSegments.includes(stage) && (
         <ReminderChain
           segment={stage}
           items={loaded.items}
@@ -221,6 +222,44 @@ function AdminMessagesContent() {
           onToggle={(item, isActive) => void toggle(item, isActive)}
           onMove={(group, index, direction) => void move(group, index, direction)}
         />
+      )}
+
+      {stage && loaded && linkBoundSegments.includes(stage) && (
+        <>
+          <section aria-labelledby="link-open-title" className="flex flex-col gap-3">
+            <div>
+              <h2 id="link-open-title" className="m-0 text-lg font-semibold text-siyoh">
+                {copy.board.linkOpenTitle}
+              </h2>
+              <p className="m-0 text-sm text-qalam">{copy.board.linkOpenHint}</p>
+            </div>
+            <ReminderChain
+              segment={stage}
+              items={loaded.items}
+              videoMarks={loaded.videoMarks}
+              onAdd={(preset) => setEditing({ segment: stage, item: null, preset })}
+              onEdit={(item) => setEditing({ segment: stage, item })}
+              onToggle={(item, isActive) => void toggle(item, isActive)}
+              onMove={(group, index, direction) => void move(group, index, direction)}
+            />
+          </section>
+          {cache[SECOND_CHANCE_SEGMENT] && (
+            <section aria-labelledby="after-close-title" className="flex flex-col gap-3 pt-4">
+              <div>
+                <h2 id="after-close-title" className="m-0 text-lg font-semibold text-siyoh">
+                  {copy.board.afterCloseTitle}
+                </h2>
+                <p className="m-0 text-sm text-qalam">{copy.board.afterCloseHint}</p>
+              </div>
+              <SecondChancePages
+                items={cache[SECOND_CHANCE_SEGMENT].items}
+                onEdit={(item) => setEditing({ segment: SECOND_CHANCE_SEGMENT, item })}
+                onAdd={(preset) => setEditing({ segment: SECOND_CHANCE_SEGMENT, item: null, preset })}
+                onToggle={(item, isActive) => void toggle(item, isActive)}
+              />
+            </section>
+          )}
+        </>
       )}
 
       {editing && editingSource && (

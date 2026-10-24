@@ -710,11 +710,6 @@ export const adminUz = {
       deleting: "O‘chirilmoqda...",
       confirmDeleteTitle: "Videoni o‘chirasizmi?",
       confirmDelete: "«{title}» butunlay o‘chiriladi. Buni qaytarib bo‘lmaydi.",
-      moveUsers: "Eski obunachilarga ham berish",
-      confirmMoveUsersTitle: "Eski obunachilarga ham shu videoni berasizmi?",
-      confirmMoveUsers:
-        "Boshqa videolardagi {count} ta obunachi «{title}» videosiga o‘tkaziladi va uni boshidan ko‘radi. Har kim o‘z bosqichida qoladi: masalan, narxgacha ko‘rganlar yangi videoda ham narxgacha ko‘rgan hisoblanadi.",
-      moveUsersConfirm: "O‘tkazish",
       marks: "Vaqt belgilari",
     },
     offer: {

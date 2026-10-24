@@ -18,7 +18,6 @@ import {
   activateVideo,
   archiveVideo,
   deleteVideo,
-  moveAllUsersToVideo,
   unarchiveVideo,
 } from "@/lib/admin/videos";
 import { useVideoRollouts } from "@/lib/admin/useVideoRollouts";
@@ -27,12 +26,11 @@ import { adminUz } from "@/lib/i18n/admin";
 
 const copy = adminUz.videos.card;
 
-type Busy = "activate" | "archive" | "delete" | "move" | null;
+type Busy = "activate" | "archive" | "delete" | null;
 
 type VideoCardProps = {
   item: AdminVideoItem;
   uploadsEnabled: boolean;
-  otherVideoUsers: number;
   onItems: (items: AdminVideoItem[], uploadsEnabled: boolean) => void;
 };
 
@@ -61,12 +59,11 @@ function MarksTimeline({ item }: { item: AdminVideoItem }) {
   );
 }
 
-export function VideoCard({ item, uploadsEnabled, otherVideoUsers, onItems }: VideoCardProps) {
+export function VideoCard({ item, uploadsEnabled, onItems }: VideoCardProps) {
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState<string | null>(null);
   const [marksOpen, setMarksOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [moveOpen, setMoveOpen] = useState(false);
   const [rolloutOpen, setRolloutOpen] = useState(false);
   const rollouts = useVideoRollouts(item.id, item.isActive);
 
@@ -85,7 +82,6 @@ export function VideoCard({ item, uploadsEnabled, otherVideoUsers, onItems }: Vi
     const result = await request();
     setBusy(null);
     setConfirmOpen(false);
-    setMoveOpen(false);
     if (!result.ok) {
       setError(videoFailureMessage(result));
       return;
@@ -137,11 +133,6 @@ export function VideoCard({ item, uploadsEnabled, otherVideoUsers, onItems }: Vi
             {copy.activate}
           </Button>
         )}
-        {item.isActive && otherVideoUsers > 0 && (
-          <Button disabled={busy !== null} onClick={() => setMoveOpen(true)}>
-            {copy.moveUsers}
-          </Button>
-        )}
         {item.isActive && (
           <Button variant="secondary" disabled={busy !== null || rollouts.live} onClick={() => setRolloutOpen(true)}>
             {adminUz.videos.rollout.open}
@@ -187,15 +178,6 @@ export function VideoCard({ item, uploadsEnabled, otherVideoUsers, onItems }: Vi
         onCancel={() => setConfirmOpen(false)}
       />
 
-      <ConfirmDialog
-        open={moveOpen}
-        title={copy.confirmMoveUsersTitle}
-        description={copy.confirmMoveUsers.replace("{count}", String(otherVideoUsers)).replace("{title}", item.title)}
-        confirmLabel={copy.moveUsersConfirm}
-        busy={busy === "move"}
-        onConfirm={() => void run("move", () => moveAllUsersToVideo(item.id))}
-        onCancel={() => setMoveOpen(false)}
-      />
     </Card>
   );
 }

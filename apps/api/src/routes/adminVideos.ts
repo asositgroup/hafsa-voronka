@@ -23,7 +23,6 @@ import {
   createVideo,
   deleteVideo,
   listAdminVideos,
-  moveAllUsersToVideo,
   unarchiveVideo,
   updateVideo,
   type VideoFailure,
@@ -191,7 +190,6 @@ for (const [action, run] of [
   ["activate", activateVideo],
   ["archive", archiveVideo],
   ["unarchive", unarchiveVideo],
-  ["move-users", moveAllUsersToVideo],
 ] as const) {
   adminVideoRoutes.post(`/:id{[0-9]+}/${action}`, async (c) => {
     const id = parseId(c.req.param("id"));

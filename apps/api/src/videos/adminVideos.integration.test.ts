@@ -226,17 +226,6 @@ describe.skipIf(!testDbUrl)("Admin videos integration", () => {
     expect(deleted).toEqual(["videos/test-offer/offer.mp4"]);
   });
 
-  it("moves users only onto the active video", async () => {
-    const idle = await make();
-    const user = { telegramId: Date.now() * 10 + 4, firstName: "D", videoId: idle.id };
-    await db().insert(users).values(user);
-    const res = await post(`/${idle.id}/move-users`);
-    expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: "video_not_active" });
-    const [stored] = await db().select().from(users).where(eq(users.telegramId, user.telegramId));
-    expect(stored.videoId).toBe(idle.id);
-  });
-
   it("lists user counts", async () => {
     const video = await make();
     await db().insert(users).values({ telegramId: Date.now() * 10 + 3, firstName: "C", videoId: video.id });

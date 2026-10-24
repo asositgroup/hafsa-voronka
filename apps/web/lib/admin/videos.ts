@@ -57,7 +57,6 @@ export const updateVideo = (id: number, patch: VideoUpdate) =>
 export const activateVideo = (id: number) => post(`/${id}/activate`);
 export const archiveVideo = (id: number) => post(`/${id}/archive`);
 export const unarchiveVideo = (id: number) => post(`/${id}/unarchive`);
-export const moveAllUsersToVideo = (id: number) => post(`/${id}/move-users`);
 export const deleteVideo = (id: number) => call(`/${id}`, { method: "DELETE" });
 
 export type RolloutResult<T> = { ok: true; data: T } | { ok: false; status: number; error?: string };

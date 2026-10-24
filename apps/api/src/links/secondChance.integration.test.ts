@@ -318,8 +318,36 @@ describe.skipIf(!isolatedDb.url)("Second chance after the link expires", () => {
     expect((await db().select().from(events).where(eq(events.type, "second_chance_again"))).length).toBe(1);
   });
 
-  it("answers 409 on the expired screen when there is no offer to accept", async () => {
-    const user = await linkedUser({ givenAt: new Date(Date.now() - 2 * DAY), expiresAt: new Date(Date.now() - DAY) });
+  it("renews from the expired screen without waiting for an offer, as often as asked", async () => {
+    const user = await linkedUser({ givenAt: new Date(Date.now() - 20 * DAY), expiresAt: new Date(Date.now() - 19 * DAY) });
+    const accept = () =>
+      app.request("/app/second-chance/accept", {
+        method: "POST",
+        headers: { authorization: initData(user.telegramId) },
+      });
+
+    const res = await accept();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, result: "granted" });
+    const grants = await grantsOf(user.id);
+    expect(grants.map((grant) => grant.kind)).toEqual(["initial", "again"]);
+    expect(grants[1].expiresAt!.getTime()).toBeGreaterThan(Date.now());
+    expect(await offersOf(user.id)).toHaveLength(0);
+    expect((await session(user.telegramId)).expired).toBe(false);
+
+    await db().update(users).set({ linkExpiresAt: new Date(Date.now() - DAY) }).where(eq(users.id, user.id));
+    expect((await accept()).status).toBe(200);
+    expect(await grantsOf(user.id)).toHaveLength(3);
+  });
+
+  it("answers 409 to people who reached the price, since their link never closes", async () => {
+    const video = await createTestVideo({ introEndSec: 100, courseStartSec: 300, priceSec: 600 });
+    const user = await linkedUser({
+      givenAt: new Date(Date.now() - 2 * DAY),
+      expiresAt: new Date(Date.now() - DAY),
+      videoId: video.id,
+      maxPosition: 700,
+    });
     const res = await app.request("/app/second-chance/accept", {
       method: "POST",
       headers: { authorization: initData(user.telegramId) },

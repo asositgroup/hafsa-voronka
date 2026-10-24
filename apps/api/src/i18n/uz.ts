@@ -149,6 +149,7 @@ export const uz = {
         not_found: "Video topilmadi",
         archived: "Arxivdagi videoni faol qilib bo'lmaydi. Avval arxivdan chiqaring.",
         video_active: "Faol videoni arxivlab yoki o'chirib bo'lmaydi. Avval boshqa videoni faol qiling.",
+        video_not_active: "Obunachilarni faqat faol videoga o'tkazish mumkin.",
         invalid_file_url: "Video fayli manzili noto'g'ri",
         activation_conflict: "Boshqa video shu payt faol qilindi. Qayta urinib ko'ring.",
         price_required: "Faol qilish uchun avval «Narx» belgisini kiriting («Belgilarni o'zgartirish»).",

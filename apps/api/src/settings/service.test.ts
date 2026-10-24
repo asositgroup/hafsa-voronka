@@ -4,7 +4,7 @@ import { runMigrations } from "@/db/migrate";
 import { settings } from "@/db/schema";
 import { setTestEnv } from "@/test/env";
 import { DEFAULT_MESSAGE_CAPS } from "@funnel/shared";
-import { invalidateSettings, linkTtlHours, messageCaps } from "./service";
+import { chatCleanupHours, invalidateSettings, linkTtlHours, messageCaps } from "./service";
 
 const testDbUrl = process.env.TEST_DATABASE_URL;
 
@@ -51,6 +51,16 @@ describe.skipIf(!testDbUrl)("Settings", () => {
       await db().insert(settings).values({ key: "MESSAGE_CAPS", value });
       invalidateSettings();
       expect(await messageCaps()).toEqual(DEFAULT_MESSAGE_CAPS);
+    }
+  });
+
+  it("defaults the chat cleanup delay to 24 hours and ignores values outside the choices", async () => {
+    expect(await chatCleanupHours()).toBe(24);
+    for (const [value, expected] of [["1", 1], ["12", 12], ["2", 24], ["48", 24], ["abc", 24], ["", 24]] as const) {
+      await db().delete(settings);
+      await db().insert(settings).values({ key: "CHAT_CLEANUP_HOURS", value });
+      invalidateSettings();
+      expect(await chatCleanupHours()).toBe(expected);
     }
   });
 });

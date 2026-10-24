@@ -16,6 +16,7 @@ import {
   activateVideo,
   archiveVideo,
   deleteVideo,
+  moveAllUsersToVideo,
   unarchiveVideo,
 } from "@/lib/admin/videos";
 import { videoFailureMessage } from "@/lib/admin/videoErrors";
@@ -23,11 +24,12 @@ import { adminUz } from "@/lib/i18n/admin";
 
 const copy = adminUz.videos.card;
 
-type Busy = "activate" | "archive" | "delete" | null;
+type Busy = "activate" | "archive" | "delete" | "move" | null;
 
 type VideoCardProps = {
   item: AdminVideoItem;
   uploadsEnabled: boolean;
+  otherVideoUsers: number;
   onItems: (items: AdminVideoItem[], uploadsEnabled: boolean) => void;
 };
 
@@ -56,11 +58,12 @@ function MarksTimeline({ item }: { item: AdminVideoItem }) {
   );
 }
 
-export function VideoCard({ item, uploadsEnabled, onItems }: VideoCardProps) {
+export function VideoCard({ item, uploadsEnabled, otherVideoUsers, onItems }: VideoCardProps) {
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState<string | null>(null);
   const [marksOpen, setMarksOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
 
   const archived = item.archivedAt !== null;
   const needsPrice = item.priceSec === null;
@@ -77,6 +80,7 @@ export function VideoCard({ item, uploadsEnabled, onItems }: VideoCardProps) {
     const result = await request();
     setBusy(null);
     setConfirmOpen(false);
+    setMoveOpen(false);
     if (!result.ok) {
       setError(videoFailureMessage(result));
       return;
@@ -124,6 +128,11 @@ export function VideoCard({ item, uploadsEnabled, onItems }: VideoCardProps) {
             {copy.activate}
           </Button>
         )}
+        {item.isActive && otherVideoUsers > 0 && (
+          <Button disabled={busy !== null} onClick={() => setMoveOpen(true)}>
+            {copy.moveUsers}
+          </Button>
+        )}
         {!item.isActive && (
           <>
             <span className="ml-auto" />
@@ -158,6 +167,16 @@ export function VideoCard({ item, uploadsEnabled, onItems }: VideoCardProps) {
         busy={busy === "delete"}
         onConfirm={() => void run("delete", () => deleteVideo(item.id))}
         onCancel={() => setConfirmOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={moveOpen}
+        title={copy.confirmMoveUsersTitle}
+        description={copy.confirmMoveUsers.replace("{count}", String(otherVideoUsers)).replace("{title}", item.title)}
+        confirmLabel={copy.moveUsersConfirm}
+        busy={busy === "move"}
+        onConfirm={() => void run("move", () => moveAllUsersToVideo(item.id))}
+        onCancel={() => setMoveOpen(false)}
       />
     </Card>
   );

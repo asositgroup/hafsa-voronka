@@ -55,7 +55,7 @@ const segmentA: SeedTemplate[] = [
   {
     day: 1,
     timing: hoursBeforeExpiry(21),
-    text: "{ism}, bu darsda arab tilini <b>qayerdan va qanday boshlashni</b> aniq bilib olasiz. Atigi 23 daqiqa, keyin yo‘lingiz ancha tushunarli bo‘ladi. Qolgan vaqt: {qolgan_vaqt}.",
+    text: "{ism}, bu darsda arab tilini <b>qayerdan va qanday boshlashni</b> aniq bilib olasiz. Qisqa dars, lekin keyin yo‘lingiz ancha tushunarli bo‘ladi. Qolgan vaqt: {qolgan_vaqt}.",
     buttons: [watchButton],
   },
   {
@@ -79,7 +79,7 @@ const segmentA: SeedTemplate[] = [
   {
     day: 1,
     timing: hoursBeforeExpiry(10),
-    text: "Bu darsdan olgan bilimingiz keyingi o‘rganishingizni <b>tezlashtiradi</b>, vaqt va kuchingizni tejaydi. Atigi 23 daqiqa, {qolgan_vaqt} ichida ko‘rib oling 👇",
+    text: "Bu darsdan olgan bilimingiz keyingi o‘rganishingizni <b>tezlashtiradi</b>, vaqt va kuchingizni tejaydi. Ko‘p vaqt olmaydi, {qolgan_vaqt} ichida ko‘rib oling 👇",
     buttons: [watchButton],
   },
   {
@@ -103,7 +103,7 @@ const segmentA: SeedTemplate[] = [
   {
     day: 1,
     timing: hoursBeforeExpiry(2),
-    text: "🔥 {ism}, <b>{qolgan_vaqt}</b> qoldi! 23 daqiqa topsangiz, ulguradi.",
+    text: "🔥 {ism}, <b>{qolgan_vaqt}</b> qoldi! Biroz vaqt topsangiz, ulgurasiz.",
     buttons: [watchButton],
   },
   {

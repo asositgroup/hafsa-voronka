@@ -2,10 +2,10 @@ import { and, asc, eq, gt, isNull, lte } from "drizzle-orm";
 import { type Api, GrammyError } from "grammy";
 import { db } from "@/db";
 import { type ChatMessage, chatMessages } from "@/db/schema";
+import { chatCleanupHours } from "@/settings/service";
 import { isBlockedError } from "@/telegram/blocked";
 
 const HOUR_MS = 3_600_000;
-export const CHAT_CLEANUP_AGE_MS = 24 * HOUR_MS;
 const DELETE_LIMIT_MS = 48 * HOUR_MS;
 const KEEP_ROWS_MS = 72 * HOUR_MS;
 const CLEANUP_BATCH_SIZE = 500;
@@ -72,10 +72,11 @@ export async function cleanupChatMessages(api: Api, now: Date, pace: Pace) {
     .set({ deleteError: "too_old" })
     .where(and(lte(chatMessages.sentAt, new Date(now.getTime() - DELETE_LIMIT_MS)), undeleted));
 
+  const cleanupAgeMs = (await chatCleanupHours()) * HOUR_MS;
   const rows = await db()
     .select()
     .from(chatMessages)
-    .where(and(lte(chatMessages.sentAt, new Date(now.getTime() - CHAT_CLEANUP_AGE_MS)), undeleted))
+    .where(and(lte(chatMessages.sentAt, new Date(now.getTime() - cleanupAgeMs)), undeleted))
     .orderBy(asc(chatMessages.sentAt))
     .limit(CLEANUP_BATCH_SIZE);
   for (const row of rows) {

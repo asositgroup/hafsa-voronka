@@ -8,15 +8,15 @@ import { getTelegramWebApp, hapticSuccess } from "@/lib/telegram";
 
 const CLOSE_AFTER_OPEN_MS = 150;
 
-type AcceptState = "idle" | "opening" | "closed" | "failed";
+type RenewState = "idle" | "opening" | "failed";
 
 export function LinkExpiredScreen() {
   const { initData, session, setSession } = useMiniApp();
+  const [renew, setRenew] = useState<RenewState>("idle");
+  const offered = session.secondChance;
   const channelUrl = session.config.channelUrl;
-  const [accept, setAccept] = useState<AcceptState>("idle");
-  const offered = session.secondChance && accept !== "closed";
 
-  const handleClick = () => {
+  const handleAdmin = () => {
     miniAppBeacon("/app/event", initData, { type: "channel_click" });
     const tg = getTelegramWebApp();
     if (tg?.openTelegramLink) {
@@ -27,57 +27,50 @@ export function LinkExpiredScreen() {
     }
   };
 
-  const handleAgain = async () => {
-    setAccept("opening");
+  const handleRenew = async () => {
+    setRenew("opening");
     try {
       const res = await miniAppPost("/app/second-chance/accept", initData);
-      if (res.status === 409) {
-        setAccept("closed");
-        return;
-      }
-      if (!res.ok) throw new Error(`Accept failed: ${res.status}`);
+      if (!res.ok && res.status !== 409) throw new Error(`Renew failed: ${res.status}`);
       const next = await fetchSession(initData, { reason: "poll" });
-      hapticSuccess();
+      if (res.ok) hapticSuccess();
       setSession(next);
+      setRenew("idle");
     } catch {
-      setAccept("failed");
+      setRenew("failed");
     }
   };
-
-  const note = accept === "closed" ? watchUz.secondChanceClosed : accept === "failed" ? watchUz.secondChanceFailed : null;
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center p-6 text-center bg-siyoh text-varaq">
       <div className="w-full max-w-sm flex flex-col gap-4">
         <h1 className="text-xl font-bold text-varaq m-0">{offered ? watchUz.secondChanceTitle : watchUz.expiredTitle}</h1>
         <p className="text-sm text-kumush m-0">{offered ? watchUz.secondChanceBody : watchUz.expiredBody}</p>
-        {note && (
+        {renew === "failed" && (
           <p role="status" className="text-sm text-oltin m-0">
-            {note}
+            {watchUz.secondChanceFailed}
           </p>
         )}
         <div className="pt-2 flex flex-col gap-3">
-          {offered && (
-            <button
-              type="button"
-              onClick={() => void handleAgain()}
-              disabled={accept === "opening"}
-              aria-busy={accept === "opening"}
-              className="flex w-full items-center justify-center min-h-[54px] rounded-[14px] bg-oltin text-siyoh font-semibold text-[17px] transition active:scale-[0.98] disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oltin"
-            >
-              {accept === "opening" ? watchUz.secondChanceOpening : watchUz.secondChanceButton}
-            </button>
-          )}
           <button
             type="button"
-            onClick={handleClick}
-            className={
-              offered
-                ? "flex w-full items-center justify-center min-h-[54px] rounded-[14px] border border-chegara-tun bg-transparent text-varaq font-semibold text-[17px] transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oltin"
-                : "flex w-full items-center justify-center min-h-[54px] rounded-[14px] bg-oltin text-siyoh font-semibold text-[17px] transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oltin"
-            }
+            onClick={() => void handleRenew()}
+            disabled={renew === "opening"}
+            aria-busy={renew === "opening"}
+            className="flex w-full items-center justify-center min-h-[54px] rounded-[14px] bg-oltin text-siyoh font-semibold text-[17px] transition active:scale-[0.98] disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oltin"
           >
-            {watchUz.expiredButton}
+            {renew === "opening"
+              ? watchUz.secondChanceOpening
+              : offered
+                ? watchUz.secondChanceButton
+                : watchUz.expiredButton}
+          </button>
+          <button
+            type="button"
+            onClick={handleAdmin}
+            className="flex w-full items-center justify-center min-h-[54px] rounded-[14px] border border-chegara-tun bg-transparent text-varaq font-semibold text-[17px] transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oltin"
+          >
+            {watchUz.proceedButton}
           </button>
         </div>
       </div>

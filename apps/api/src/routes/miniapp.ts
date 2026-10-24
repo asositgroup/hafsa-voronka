@@ -7,7 +7,7 @@ import { linkGrants, watchProgress } from "@/db/schema";
 import { env } from "@/env";
 import { NO_VIDEO_MARKS, statusFor } from "@/funnel/status";
 import { logEvent, upsertUser } from "@/funnel/users";
-import { acceptSecondChance, openOffer } from "@/links/service";
+import { acceptSecondChance, linkExpiredBeforePrice, openOffer } from "@/links/service";
 import { recordMessageClick } from "@/messages/clicks";
 import { videoForUser } from "@/videos/service";
 import { remainingWatchSecs } from "@/watch/credit";
@@ -64,13 +64,7 @@ miniappRoutes.post("/session", async (c) => {
     start,
   });
   const status = statusFor(progress, video ?? NO_VIDEO_MARKS, user);
-  const expired =
-    user.registeredAt !== null &&
-    user.linkExpiresAt !== null &&
-    now >= user.linkExpiresAt &&
-    user.completedAt === null &&
-    status !== "narxni_kurdi" &&
-    status !== "adminga_yozdi";
+  const expired = linkExpiredBeforePrice(user, status, now);
   const secondChance = expired && (await openOffer(db(), user, now)) !== null;
 
   return c.json({

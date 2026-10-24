@@ -1,13 +1,15 @@
 import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
-import type { LinkGrantKind } from "@funnel/shared";
+import { type FunnelStatus, type LinkGrantKind, offerVariantFor } from "@funnel/shared";
 import { db } from "@/db";
-import { type LinkGrant, linkGrants, secondChanceOffers, type User, users } from "@/db/schema";
+import { type LinkGrant, linkGrants, secondChanceOffers, type User, users, watchProgress } from "@/db/schema";
 import { linkStateFor } from "@/funnel/secondChance";
+import { NO_VIDEO_MARKS, statusFor } from "@/funnel/status";
 import { syncSegment } from "@/funnel/segments";
 import { logEvent } from "@/funnel/users";
 import { refreshUserLeadCards } from "@/leads/service";
 import { linkExpiryFor } from "@/messages/plan";
 import { linkTtlHours } from "@/settings/service";
+import { videoForUser } from "@/videos/service";
 import { cancelPendingAppointments } from "./appointmentStore";
 import { offerHistory } from "./offers";
 
@@ -57,6 +59,27 @@ export async function openOffer(executor: Executor, user: Pick<User, "id" | "lin
   return state === "expired" ? offer : null;
 }
 
+export function linkExpiredBeforePrice(
+  user: Pick<User, "registeredAt" | "linkExpiresAt" | "completedAt">,
+  status: FunnelStatus | null,
+  now: Date,
+) {
+  return (
+    user.registeredAt !== null &&
+    user.linkExpiresAt !== null &&
+    now >= user.linkExpiresAt &&
+    user.completedAt === null &&
+    status !== "narxni_kurdi" &&
+    status !== "adminga_yozdi"
+  );
+}
+
+async function expiredStatus(tx: Tx, user: User, now: Date) {
+  const [progress] = await tx.select().from(watchProgress).where(eq(watchProgress.userId, user.id)).limit(1);
+  const status = statusFor(progress, (await videoForUser(user)) ?? NO_VIDEO_MARKS, user);
+  return linkExpiredBeforePrice(user, status, now) ? status : undefined;
+}
+
 export type AcceptResult = "granted" | "already" | "closed";
 
 export async function acceptSecondChance(userId: number, now = new Date()): Promise<AcceptResult> {
@@ -66,6 +89,17 @@ export async function acceptSecondChance(userId: number, now = new Date()): Prom
     if (!user || user.registeredAt === null) return "closed";
     const offer = await openOffer(tx, user, now);
     if (!offer) {
+      const status = await expiredStatus(tx, user, now);
+      if (status !== undefined) {
+        await insertGrant(tx, userId, {
+          kind: "again",
+          offerFirst: offerVariantFor(status) === "no_price",
+          now,
+          ttlHours,
+        });
+        await cancelPendingAppointments(tx, userId, now, ["reopen"]);
+        return "granted";
+      }
       const [latest] = await tx
         .select({ answer: secondChanceOffers.answer, grantedLinkId: secondChanceOffers.grantedLinkId })
         .from(secondChanceOffers)

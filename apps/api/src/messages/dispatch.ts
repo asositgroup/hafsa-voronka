@@ -54,7 +54,7 @@ import {
 } from "@/videos/rollout/run";
 import { templateContextFor } from "./context";
 import { renderTemplate, type ButtonWrap } from "./render";
-import { chainTemplateRows, toTemplate } from "./repo";
+import { activeTemplateRows, toTemplate } from "./repo";
 import {
   CHAIN_MS,
   DAY_MS,
@@ -101,6 +101,7 @@ type Candidate = {
   linkId: number | null;
   linkExpiresAt: Date | null;
   sentTemplateIds: number[];
+  deferredSent: boolean;
   usage: SendUsage;
   status: FunnelStatus | null;
   watch: WatchSnapshot;
@@ -165,6 +166,7 @@ async function loadCandidates(now: Date, userId?: number): Promise<Candidate[]> 
       courseStartSec: videos.courseStartSec,
       priceSec: videos.priceSec,
       sentTemplateIds: sql<string[]>`coalesce(array_agg(${sentMessages.templateId}) filter (where ${sentMessages.templateId} is not null), '{}')::bigint[]`,
+      deferredSent: sql<boolean>`coalesce(bool_or(${sentMessages.templateId} is not null and ${sentMessages.dueAt} = ${users.linkExpiresAt}), false)`,
       sentToday: sql<number>`(select count(*) from sent_messages c where c.user_id = ${segmentRuns.userId} and c.template_id is not null and c.sent_at >= ${dayStart}::timestamptz)::int`,
       runToday: sql<number>`(count(*) filter (where ${sentMessages.templateId} is not null and ${sentMessages.sentAt} >= ${dayStart}::timestamptz))::int`,
       runTotal: sql<number>`(count(${sentMessages.sentAt}) filter (where ${sentMessages.templateId} is not null))::int`,
@@ -196,6 +198,7 @@ async function loadCandidates(now: Date, userId?: number): Promise<Candidate[]> 
     linkId: row.linkId,
     linkExpiresAt: row.linkExpiresAt,
     sentTemplateIds: row.sentTemplateIds.map(Number),
+    deferredSent: row.deferredSent,
     usage: { today: row.sentToday, runToday: row.runToday, runTotal: row.runTotal },
     status: statusFor(
       row.maxPosition === null ? undefined : { maxPosition: row.maxPosition, startedAt: row.startedAt },
@@ -444,18 +447,15 @@ async function sendSystem(
 }
 
 function chainFor(candidate: Candidate, templates: MessageTemplateRow[]) {
-  const sent = new Set(candidate.sentTemplateIds);
-  const chainTemplates = templates.filter(
-    (template) => (template.isActive && template.deletedAt === null) || sent.has(template.id),
-  );
   return planChain(
-    segmentChainInput(chainTemplates, {
+    segmentChainInput(templates, {
       segment: candidate.segment,
       enteredAt: candidate.enteredAt,
       status: candidate.status,
       watch: candidate.watch,
       attempt: candidate.attempt,
       linkExpiresAt: candidate.linkExpiresAt,
+      deferredSent: candidate.deferredSent,
     }),
   );
 }
@@ -463,7 +463,10 @@ function chainFor(candidate: Candidate, templates: MessageTemplateRow[]) {
 async function sendDue(api: Api, now: Date, pace: Pace, candidates: Candidate[]) {
   if (now.getTime() < pausedUntil) return;
 
-  const templates = await chainTemplateRows();
+  const templates = await db()
+    .select()
+    .from(messageTemplates)
+    .where(and(eq(messageTemplates.isActive, true), isNull(messageTemplates.deletedAt)));
   const bySegment = new Map<FunnelSegment, MessageTemplateRow[]>();
   for (const template of templates) {
     bySegment.set(template.segment, [...(bySegment.get(template.segment) ?? []), template]);
@@ -743,7 +746,7 @@ async function processRollouts(api: Api, now: Date, pace: Pace) {
 async function nextDueForUser(userId: number, now: Date) {
   const [candidate] = await loadCandidates(now, userId);
   if (!candidate) return null;
-  const templates = await chainTemplateRows({ id: candidate.runId, segment: candidate.segment });
+  const templates = await activeTemplateRows(candidate.segment);
   return nextPendingDue(chainFor(candidate, templates), new Set(candidate.sentTemplateIds), now);
 }
 

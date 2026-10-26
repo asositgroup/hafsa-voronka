@@ -334,6 +334,18 @@ describe.skipIf(!testDbUrl)("Message dispatcher", () => {
     expect(sends().map((call) => call.payload.text)).toEqual(["Afsus", "Kechki"]);
   });
 
+  it("never sends a reminder added before the deferred one after it went out", async () => {
+    await linkedRunUser("A", at(29 * 60));
+    await makeTemplate({ day: 2, text: "Afsus", timingValue: 600 });
+    await makeTemplate({ day: 2, text: "Ikkinchi", timingValue: 720 });
+    await tick(at(29 * 60));
+    await makeTemplate({ day: 2, text: "Yangi", timingValue: 540 });
+    for (let minute = 29 * 60 + 1; minute <= 29 * 60 + 5; minute += 1) await tick(at(minute));
+    await tick(at(29 * 60 + 59));
+    expect(sends().map((call) => call.payload.text)).toEqual(["Afsus"]);
+    expect(deletes()).toHaveLength(0);
+  });
+
   it("sends a day-1 reminder at night as scheduled", async () => {
     await setup({ text: "Tunda", timingValue: 13 * 60 + 30 });
     await tick(at(13 * 60 + 29));

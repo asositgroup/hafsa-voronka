@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { FunnelStatus } from "@funnel/shared";
 import {
   capReached,
   chainAnchor,
@@ -460,5 +461,65 @@ describe("day 2+ reminders while the link is still open", () => {
     expect(planOpen("C", [progrev], "2026-10-20 15:00").map((item) => localTime(item.sendAt))).toEqual([
       "2026-10-21T10:00",
     ]);
+  });
+});
+
+describe("after the deferred reminder was sent", () => {
+  const given = "2026-10-20 15:00";
+  const expiry = T("2026-10-21 15:00");
+  const replan = (
+    templates: ScheduleTemplate[],
+    run: { segment?: "A" | "B"; status?: FunnelStatus | null; attempt?: number } = {},
+  ) =>
+    planChain(
+      segmentChainInput(templates, {
+        segment: run.segment ?? "A",
+        enteredAt: T(given),
+        status: run.status,
+        attempt: run.attempt,
+        linkExpiresAt: expiry,
+        deferredSent: true,
+      }),
+    );
+
+  function expectNothingElse(plan: ReturnType<typeof replan>, sentId: number) {
+    const sent = new Set([sentId]);
+    for (const minute of ["15:01", "15:05", "15:30", "15:59"]) {
+      expect(pickNext(plan, sent, T(`2026-10-21 ${minute}`), unused)).toBeNull();
+    }
+    expect(nextPendingDue(plan, sent, T("2026-10-21 15:01"))).toBeNull();
+  }
+
+  it("ignores a reminder added before the sent one", () => {
+    const first = template({ day: 2, timingValue: 600 });
+    const added = template({ day: 2, timingValue: 540 });
+    expectNothingElse(replan([first, added]), first.id);
+  });
+
+  it("ignores moving the sent one after another deferred reminder", () => {
+    const first = template({ day: 2, timingValue: 600 });
+    const second = template({ day: 2, timingValue: 660 });
+    expectNothingElse(replan([{ ...first, timingValue: 720 }, second]), first.id);
+    expectNothingElse(replan([{ ...first, day: 3, timingValue: 900 }, second]), first.id);
+  });
+
+  it("ignores reordering same-time reminders", () => {
+    const first = template({ day: 2, timingValue: 600, position: 0 });
+    const second = template({ day: 2, timingValue: 600, position: 1 });
+    expectNothingElse(replan([{ ...first, position: 1 }, { ...second, position: 0 }]), first.id);
+  });
+
+  it("ignores the sent one no longer matching the status or attempt", () => {
+    const first = template({ day: 2, timingValue: 600, statuses: ["korishni_boshladi"], attempts: [1] });
+    const second = template({ day: 2, timingValue: 660 });
+    expectNothingElse(replan([first, second], { segment: "B", status: "dars_yarmida" }), first.id);
+    expectNothingElse(replan([first, second], { segment: "B", status: "korishni_boshladi", attempt: 2 }), first.id);
+  });
+
+  it("keeps reminders after the expiry", () => {
+    const first = template({ day: 2, timingValue: 600 });
+    const late = template({ day: 2, timingValue: 960 });
+    const plan = replan([first, late]);
+    expect(pickNext(plan, new Set([first.id]), T("2026-10-21 16:00"), unused)?.template).toBe(late);
   });
 });

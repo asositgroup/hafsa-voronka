@@ -46,6 +46,7 @@ export type PlanInput<T extends ScheduleTemplate = ScheduleTemplate> = {
   enteredAt: Date;
   anchorAt: Date;
   linkExpiresAt?: Date | null;
+  deferredSent?: boolean;
 };
 
 export function tashkentDayStart(date: Date): Date {
@@ -117,7 +118,8 @@ export function planChain<T extends ScheduleTemplate>(input: PlanInput<T>): Plan
     .filter((item) => !closedBeforeSend(item, input.linkExpiresAt))
     .sort(compareItems);
   const firstDeferred = items.find(isDeferred);
-  const keptDeferred = firstDeferred && withinTimeline(firstDeferred.sendAt, input) ? firstDeferred : null;
+  const keptDeferred =
+    !input.deferredSent && firstDeferred && withinTimeline(firstDeferred.sendAt, input) ? firstDeferred : null;
   return items.filter((item) => !isDeferred(item) || item === keptDeferred);
 }
 
@@ -150,6 +152,7 @@ export function segmentChainInput<T extends ScheduleTemplate>(
     watch?: WatchSnapshot | null;
     attempt?: number;
     linkExpiresAt?: Date | null;
+    deferredSent?: boolean;
   },
 ): PlanInput<T> {
   const forLink = run.attempt === undefined ? templates : templatesForAttempt(templates, run.attempt);
@@ -158,6 +161,7 @@ export function segmentChainInput<T extends ScheduleTemplate>(
     enteredAt: run.enteredAt,
     anchorAt: chainAnchor(run, run.watch ?? null),
     linkExpiresAt: linkBoundSegments.includes(run.segment) ? run.linkExpiresAt : null,
+    deferredSent: run.deferredSent,
   };
 }
 

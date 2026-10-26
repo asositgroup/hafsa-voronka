@@ -3,16 +3,12 @@ import {
   type FunnelSegment,
   type FunnelStatus,
   isNightMinute,
-  linkBoundSegments,
   MESSAGE_DAILY_CEILING,
-  MORNING_SEND_MINUTE,
   NIGHT,
-  NIGHT_NOTICE_MINUTE,
   type SegmentCap,
   TASHKENT_OFFSET_MS,
   TEMPLATE_DAYS,
   templatesForAttempt,
-  type TimingType,
 } from "@funnel/shared";
 
 export const MINUTE_MS = 60_000;
@@ -22,7 +18,6 @@ export const CHAIN_MS = TEMPLATE_DAYS * DAY_MS;
 export const GRACE_MS = 60 * MINUTE_MS;
 export const DAILY_CAP = MESSAGE_DAILY_CEILING;
 export const WATCHING_FRESH_MS = 2 * MINUTE_MS;
-const COLLAPSE_SPACING_MS = 60 * MINUTE_MS;
 const UNCAPPED: SegmentCap = { daily: DAILY_CAP, total: null };
 const stopAnchoredSegments: readonly FunnelSegment[] = ["B"];
 
@@ -30,7 +25,6 @@ export type ScheduleTemplate = {
   id: number;
   day: number;
   position: number;
-  timingType: TimingType;
   timingValue: number;
   statuses?: readonly FunnelStatus[] | null;
   attempts?: readonly number[] | null;
@@ -40,31 +34,16 @@ export type WatchSnapshot = { lastBeatAt: Date | null; playing: boolean };
 
 export type SendUsage = { today: number; runToday: number; runTotal: number };
 
-export type PlanKind = "regular" | "collapsed" | "night_notice";
-
 export type PlanItem<T extends ScheduleTemplate = ScheduleTemplate> = {
   template: T;
   sendAt: Date;
-  slot: string;
-  kind: PlanKind;
-};
-
-export type SkippedItem<T extends ScheduleTemplate = ScheduleTemplate> = {
-  template: T;
-  rawAt: Date;
-  reason: "swallowed" | "dropped";
 };
 
 export type PlanInput<T extends ScheduleTemplate = ScheduleTemplate> = {
   templates: T[];
+  enteredAt: Date;
   anchorAt: Date;
-  enteredAt?: Date;
-  linkExpiresAt: Date | null;
-  linkBound: boolean;
-  nightNotice: T | null;
 };
-
-type Raw<T extends ScheduleTemplate> = { template: T; rawAt: Date };
 
 export function tashkentDayStart(date: Date): Date {
   const local = date.getTime() + TASHKENT_OFFSET_MS;
@@ -87,109 +66,29 @@ function nightMorningOf(date: Date): number | null {
   return null;
 }
 
-function tashkentDate(dayStart: number): string {
-  return new Date(dayStart + TASHKENT_OFFSET_MS).toISOString().slice(0, 10);
-}
-
 export function linkExpiryFor(givenAt: Date, ttlHours: number): Date {
   const raw = new Date(givenAt.getTime() + ttlHours * HOUR_MS);
   const morning = nightMorningOf(raw);
   return morning === null ? raw : new Date(morning + EXTENDED_EXPIRY_MINUTE * MINUTE_MS);
 }
 
-function rawTime(template: ScheduleTemplate, input: PlanInput): Date | null {
-  const anchor = input.anchorAt.getTime();
-  const entered = (input.enteredAt ?? input.anchorAt).getTime();
-  const value = template.timingValue * MINUTE_MS;
-  let raw: number;
-  if (template.timingType === "after_entry") {
-    raw = anchor + value;
-  } else if (template.timingType === "day_time") {
-    raw = tashkentDayStart(input.anchorAt).getTime() + (template.day - 1) * DAY_MS + value;
-  } else if (template.timingType === "before_expiry" && input.linkExpiresAt !== null) {
-    raw = input.linkExpiresAt.getTime() - value;
-  } else {
-    return null;
-  }
-  const earliest = template.timingType === "before_expiry" ? entered : anchor;
-  if (raw < earliest || raw >= entered + CHAIN_MS) return null;
-  if (input.linkBound && input.linkExpiresAt !== null && raw >= input.linkExpiresAt.getTime()) return null;
-  return new Date(raw);
+function sendTime(template: ScheduleTemplate, input: PlanInput): Date {
+  const offset = template.timingValue * MINUTE_MS;
+  if (template.day <= 1) return new Date(input.anchorAt.getTime() + offset);
+  return new Date(tashkentDayStart(input.enteredAt).getTime() + (template.day - 1) * DAY_MS + offset);
 }
 
-function compareRaw<T extends ScheduleTemplate>(a: Raw<T>, b: Raw<T>): number {
+function compareItems<T extends ScheduleTemplate>(a: PlanItem<T>, b: PlanItem<T>): number {
   return (
-    a.rawAt.getTime() - b.rawAt.getTime() ||
+    a.sendAt.getTime() - b.sendAt.getTime() ||
     a.template.day - b.template.day ||
     a.template.position - b.template.position ||
     a.template.id - b.template.id
   );
 }
 
-function compareItems<T extends ScheduleTemplate>(a: PlanItem<T>, b: PlanItem<T>): number {
-  return compareRaw({ template: a.template, rawAt: a.sendAt }, { template: b.template, rawAt: b.sendAt });
-}
-
-export function previewChain<T extends ScheduleTemplate>(
-  input: PlanInput<T>,
-): { items: PlanItem<T>[]; skipped: SkippedItem<T>[] } {
-  const anchorMorning = nightMorningOf(input.anchorAt);
-  const swallowedBy = (at: Date): number | null => {
-    const morning = nightMorningOf(at);
-    if (morning !== null) return morning;
-    const sameMorning = anchorMorning !== null && tashkentDayStart(at).getTime() === anchorMorning;
-    return sameMorning && tashkentMinuteOfDay(at) < MORNING_SEND_MINUTE ? anchorMorning : null;
-  };
-
-  const raws: Raw<T>[] = [];
-  for (const template of input.templates) {
-    const rawAt = rawTime(template, input);
-    if (rawAt) raws.push({ template, rawAt });
-  }
-  raws.sort(compareRaw);
-
-  const items: PlanItem<T>[] = [];
-  const nights = new Map<number, Raw<T>[]>();
-  for (const raw of raws) {
-    const morning = swallowedBy(raw.rawAt);
-    if (morning === null) items.push({ template: raw.template, sendAt: raw.rawAt, slot: "", kind: "regular" });
-    else nights.set(morning, [...(nights.get(morning) ?? []), raw]);
-  }
-
-  const dayTimes = items.map((item) => item.sendAt.getTime());
-  const expiry = input.linkBound ? input.linkExpiresAt : null;
-  const skipped: SkippedItem<T>[] = [];
-  const extra: PlanItem<T>[] = [];
-
-  for (const [morning, swallowed] of nights) {
-    const candidate = swallowed[swallowed.length - 1];
-    const sendAt = morning + MORNING_SEND_MINUTE * MINUTE_MS;
-    const afterExpiry = expiry !== null && sendAt >= expiry.getTime();
-    const crowded = dayTimes.some((time) => Math.abs(time - sendAt) < COLLAPSE_SPACING_MS);
-    const kept = !afterExpiry && !crowded;
-    for (const raw of swallowed) {
-      if (raw === candidate && kept) continue;
-      skipped.push({ template: raw.template, rawAt: raw.rawAt, reason: raw === candidate ? "dropped" : "swallowed" });
-    }
-    if (kept) extra.push({ template: candidate.template, sendAt: new Date(sendAt), slot: "", kind: "collapsed" });
-
-    const noticeAt = morning - DAY_MS + NIGHT_NOTICE_MINUTE * MINUTE_MS;
-    if (
-      swallowed.length >= 2 &&
-      expiry !== null &&
-      input.nightNotice !== null &&
-      tashkentDayStart(expiry).getTime() === morning &&
-      noticeAt >= (input.enteredAt ?? input.anchorAt).getTime()
-    ) {
-      extra.push({ template: input.nightNotice, sendAt: new Date(noticeAt), slot: tashkentDate(morning), kind: "night_notice" });
-    }
-  }
-
-  return { items: [...items, ...extra].sort(compareItems), skipped: skipped.sort(compareRaw) };
-}
-
 export function planChain<T extends ScheduleTemplate>(input: PlanInput<T>): PlanItem<T>[] {
-  return previewChain(input).items;
+  return input.templates.map((template) => ({ template, sendAt: sendTime(template, input) })).sort(compareItems);
 }
 
 export function chainAnchor(run: { segment: FunnelSegment; enteredAt: Date }, watch: WatchSnapshot | null): Date {
@@ -217,21 +116,16 @@ export function segmentChainInput<T extends ScheduleTemplate>(
   run: {
     segment: FunnelSegment;
     enteredAt: Date;
-    linkExpiresAt: Date | null;
     status?: FunnelStatus | null;
     watch?: WatchSnapshot | null;
     attempt?: number;
   },
 ): PlanInput<T> {
   const forLink = run.attempt === undefined ? templates : templatesForAttempt(templates, run.attempt);
-  const audience = run.status === undefined ? forLink : templatesForStatus(forLink, run.status);
   return {
-    templates: audience.filter((template) => template.timingType !== "night_notice" && template.timingType !== "occasion"),
-    anchorAt: chainAnchor(run, run.watch ?? null),
+    templates: run.status === undefined ? forLink : templatesForStatus(forLink, run.status),
     enteredAt: run.enteredAt,
-    linkExpiresAt: run.linkExpiresAt,
-    linkBound: linkBoundSegments.includes(run.segment),
-    nightNotice: audience.find((template) => template.timingType === "night_notice") ?? null,
+    anchorAt: chainAnchor(run, run.watch ?? null),
   };
 }
 
@@ -243,31 +137,27 @@ export function capReached(usage: SendUsage, cap: SegmentCap): boolean {
   );
 }
 
-export function planKey(item: { template: { id: number }; slot: string }): string {
-  return `${item.template.id}:${item.slot}`;
-}
-
 export function pickNext<T extends ScheduleTemplate>(
   plan: PlanItem<T>[],
-  sent: ReadonlySet<string>,
+  sent: ReadonlySet<number>,
   now: Date,
   usage: SendUsage,
   cap: SegmentCap = UNCAPPED,
 ): PlanItem<T> | null {
-  if (capReached(usage, cap) || isNightAt(now)) return null;
+  if (capReached(usage, cap)) return null;
   const nowMs = now.getTime();
   const found = plan.find(
-    (item) => !sent.has(planKey(item)) && item.sendAt.getTime() <= nowMs && nowMs - item.sendAt.getTime() <= GRACE_MS,
+    (item) => !sent.has(item.template.id) && item.sendAt.getTime() <= nowMs && nowMs - item.sendAt.getTime() <= GRACE_MS,
   );
   return found ?? null;
 }
 
 export function nextPendingDue<T extends ScheduleTemplate>(
   plan: PlanItem<T>[],
-  sent: ReadonlySet<string>,
+  sent: ReadonlySet<number>,
   now: Date,
 ): Date | null {
   const nowMs = now.getTime();
-  const found = plan.find((item) => !sent.has(planKey(item)) && nowMs - item.sendAt.getTime() <= GRACE_MS);
+  const found = plan.find((item) => !sent.has(item.template.id) && nowMs - item.sendAt.getTime() <= GRACE_MS);
   return found?.sendAt ?? null;
 }

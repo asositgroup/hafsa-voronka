@@ -1,6 +1,5 @@
 import { z } from "zod";
 import {
-  chainSegments,
   type FunnelSegment,
   funnelSegments,
   type FunnelStatus,
@@ -41,7 +40,6 @@ export const MINUTES_PER_DAY = 1440;
 export const NIGHT = { start: 1380, end: 420 } as const;
 export const TASHKENT_OFFSET_MS = 5 * 60 * 60 * 1000;
 export const NIGHT_NOTICE_MINUTE = 22 * 60;
-export const MORNING_SEND_MINUTE = 7 * 60 + 30;
 export const EXTENDED_EXPIRY_MINUTE = 9 * 60;
 export const linkBoundSegments: readonly FunnelSegment[] = ["A", "B"];
 
@@ -685,30 +683,3 @@ export const templateMediaUploadSchema = z.object({
   type: z.enum(templateMediaTypes),
   fileId: z.string().min(1),
 });
-
-export const schedulePreviewRequestSchema = z.object({
-  segment: z.enum(chainSegments),
-  linkGivenAt: z.iso.datetime({ offset: true }),
-});
-
-export type SchedulePreviewRequest = z.infer<typeof schedulePreviewRequestSchema>;
-
-export const schedulePreviewKinds = ["regular", "collapsed", "night_notice", "swallowed", "dropped"] as const;
-
-export type SchedulePreviewKind = (typeof schedulePreviewKinds)[number];
-
-export const schedulePreviewSchema = z.object({
-  linkGivenAt: z.string(),
-  linkExpiresAt: z.string(),
-  extended: z.boolean(),
-  items: z.array(
-    z.object({
-      templateId: z.number().int(),
-      at: z.string(),
-      kind: z.enum(schedulePreviewKinds),
-      remaining: z.string(),
-    }),
-  ),
-});
-
-export type SchedulePreview = z.infer<typeof schedulePreviewSchema>;

@@ -81,8 +81,7 @@ type Candidate = {
   attempt: number;
   telegramId: number;
   linkId: number | null;
-  linkExpiresAt: Date | null;
-  sentKeys: string[];
+  sentTemplateIds: number[];
   usage: SendUsage;
   status: FunnelStatus | null;
   watch: WatchSnapshot;
@@ -132,7 +131,6 @@ async function loadCandidates(now: Date, userId?: number): Promise<Candidate[]> 
       attempt: segmentRuns.attempt,
       telegramId: users.telegramId,
       linkId: users.linkId,
-      linkExpiresAt: users.linkExpiresAt,
       registeredAt: users.registeredAt,
       wroteAdminAt: users.wroteAdminAt,
       offerWatchedAt: users.offerWatchedAt,
@@ -144,7 +142,7 @@ async function loadCandidates(now: Date, userId?: number): Promise<Candidate[]> 
       introEndSec: videos.introEndSec,
       courseStartSec: videos.courseStartSec,
       priceSec: videos.priceSec,
-      sentKeys: sql<string[]>`coalesce(array_agg(${sentMessages.templateId}::text || ':' || ${sentMessages.slot}) filter (where ${sentMessages.templateId} is not null), '{}')::text[]`,
+      sentTemplateIds: sql<string[]>`coalesce(array_agg(${sentMessages.templateId}) filter (where ${sentMessages.templateId} is not null), '{}')::bigint[]`,
       sentToday: sql<number>`(select count(*) from sent_messages c where c.user_id = ${segmentRuns.userId} and c.template_id is not null and c.sent_at >= ${dayStart}::timestamptz)::int`,
       runToday: sql<number>`(count(*) filter (where ${sentMessages.templateId} is not null and ${sentMessages.sentAt} >= ${dayStart}::timestamptz))::int`,
       runTotal: sql<number>`(count(${sentMessages.sentAt}) filter (where ${sentMessages.templateId} is not null))::int`,
@@ -173,8 +171,7 @@ async function loadCandidates(now: Date, userId?: number): Promise<Candidate[]> 
     attempt: row.attempt,
     telegramId: row.telegramId,
     linkId: row.linkId,
-    linkExpiresAt: row.linkExpiresAt,
-    sentKeys: row.sentKeys,
+    sentTemplateIds: row.sentTemplateIds.map(Number),
     usage: { today: row.sentToday, runToday: row.runToday, runTotal: row.runTotal },
     status: statusFor(
       row.maxPosition === null ? undefined : { maxPosition: row.maxPosition, startedAt: row.startedAt },
@@ -283,8 +280,8 @@ async function sendOne(api: Api, pick: Pick, now: Date, pace: Pace): Promise<Sen
   const nowIso = now.toISOString();
 
   const reserved = await db().execute<{ id: string; click_token: string }>(sql`
-    insert into sent_messages (user_id, template_id, link_id, segment_run_id, slot, due_at, created_at)
-    select ${userId}, ${item.template.id}, (select link_id from users where id = ${userId}), ${runId}, ${item.slot}, ${item.sendAt.toISOString()}::timestamptz, ${nowIso}::timestamptz
+    insert into sent_messages (user_id, template_id, link_id, segment_run_id, due_at, created_at)
+    select ${userId}, ${item.template.id}, (select link_id from users where id = ${userId}), ${runId}, ${item.sendAt.toISOString()}::timestamptz, ${nowIso}::timestamptz
     where exists (
         select 1 from segment_runs r join users u on u.id = r.user_id
         where r.id = ${runId} and r.ended_at is null and u.bot_blocked = false and u.wrote_admin_at is null
@@ -413,7 +410,6 @@ function chainFor(candidate: Candidate, templates: MessageTemplateRow[]) {
     segmentChainInput(templates, {
       segment: candidate.segment,
       enteredAt: candidate.enteredAt,
-      linkExpiresAt: candidate.linkExpiresAt,
       status: candidate.status,
       watch: candidate.watch,
       attempt: candidate.attempt,
@@ -438,7 +434,7 @@ async function sendDue(api: Api, now: Date, pace: Pace, candidates: Candidate[])
   for (const candidate of candidates) {
     if (candidate.segment === SECOND_CHANCE_SEGMENT || isWatchingNow(candidate.watch, now)) continue;
     const plan = chainFor(candidate, bySegment.get(candidate.segment) ?? []);
-    const item = pickNext(plan, new Set(candidate.sentKeys), now, candidate.usage, caps[candidate.segment]);
+    const item = pickNext(plan, new Set(candidate.sentTemplateIds), now, candidate.usage, caps[candidate.segment]);
     if (item) picks.push({ candidate, item });
   }
   picks.sort((a, b) => a.item.sendAt.getTime() - b.item.sendAt.getTime());
@@ -618,7 +614,7 @@ async function nextDueForUser(userId: number, now: Date) {
   const [candidate] = await loadCandidates(now, userId);
   if (!candidate) return null;
   const templates = await activeTemplateRows(candidate.segment);
-  return nextPendingDue(chainFor(candidate, templates), new Set(candidate.sentKeys), now);
+  return nextPendingDue(chainFor(candidate, templates), new Set(candidate.sentTemplateIds), now);
 }
 
 async function sweep(api: Api, now: Date, pace: Pace) {

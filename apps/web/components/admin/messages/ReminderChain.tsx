@@ -13,7 +13,6 @@ import {
 import { MessageCard } from "@/components/admin/messages/MessageCard";
 import type { MessagePreset } from "@/components/admin/messages/MessageEditor";
 import { NightRules } from "@/components/admin/messages/NightRules";
-import { ScheduleSimulator } from "@/components/admin/messages/ScheduleSimulator";
 import { chainItems } from "@/components/admin/messages/StageOverview";
 import type { VideoMarks } from "@/components/admin/messages/StopPointPicker";
 import { Button } from "@/components/admin/ui/Button";
@@ -112,8 +111,6 @@ export function ReminderChain({ segment, items, videoMarks, onAdd, onEdit, onTog
           </ul>
         </section>
       ))}
-
-      {segment === "A" && <ScheduleSimulator segment={segment} items={items} />}
     </section>
   );
 }

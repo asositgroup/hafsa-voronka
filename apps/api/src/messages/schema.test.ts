@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { messageTemplateInputSchema, normalizeAttempts, normalizeStatuses } from "@funnel/shared";
+import {
+  messageTemplateBaseSchema,
+  messageTemplateInputSchema,
+  normalizeAttempts,
+  normalizeStatuses,
+  templatesForAttempt,
+  validateTemplateInput,
+} from "@funnel/shared";
 
 const base = {
   segment: "A",
@@ -54,43 +61,19 @@ describe("messageTemplateInputSchema", () => {
     expect(normalizeStatuses("B", null)).toBeNull();
   });
 
-  describe("second chance pages (segment D)", () => {
-    const page = {
-      ...base,
-      segment: "D",
-      day: 3,
-      timing: { type: "occasion", value: 0 },
-      statuses: ["link_berildi"],
-      buttons: [
+  it("allows «Ha» and «Keyinroq» in every stage", () => {
+    for (const segment of ["A", "B", "C"]) {
+      const buttons = [
         { kind: "again", text: "Ha, ko'raman" },
         { kind: "later", text: "Keyinroq, ko'raman" },
-      ],
-    };
-    const issue = (input: unknown) => {
-      const result = messageTemplateInputSchema.safeParse(input);
-      return result.success ? null : result.error.issues[0];
-    };
+      ];
+      const parsed = messageTemplateBaseSchema.parse({ ...base, segment, buttons });
+      expect(validateTemplateInput(parsed)).toBeNull();
+    }
+  });
 
-    it("accepts the not-opened and the §3.8 variant pages", () => {
-      expect(issue(page)).toBeNull();
-      expect(issue({ ...page, statuses: ["sotuvda_toxtadi", "korishni_boshladi", "dars_yarmida"] })).toBeNull();
-    });
-
-    it("requires a variant and the occasion timing", () => {
-      expect(issue({ ...page, statuses: null })).toMatchObject({ message: "statuses_invalid" });
-      expect(issue({ ...page, statuses: ["link_berildi", "dars_yarmida"] })).toMatchObject({ message: "statuses_invalid" });
-      expect(issue({ ...page, timing: { type: "after_entry", value: 2880 } })).toMatchObject({ message: "occasion_only" });
-      expect(issue({ ...base, timing: { type: "occasion", value: 0 } })).toMatchObject({ message: "occasion_only" });
-    });
-
-    it("allows only the second-chance buttons there, and «Ha» nowhere else", () => {
-      expect(issue({ ...page, buttons: [{ kind: "resume", text: "Davom" }] })).toMatchObject({
-        message: "button_not_allowed",
-        path: ["buttons"],
-      });
-      expect(issue({ ...base, buttons: [{ kind: "again", text: "Ha" }] })).toMatchObject({ message: "button_not_allowed" });
-      expect(issue({ ...base, buttons: [{ kind: "when_menu", text: "Qachon?" }] })).not.toBeNull();
-    });
+  it("rejects segment D", () => {
+    expect(messageTemplateBaseSchema.safeParse({ ...base, segment: "D" }).success).toBe(false);
   });
 
   describe("link attempts", () => {
@@ -101,6 +84,12 @@ describe("messageTemplateInputSchema", () => {
       expect(inC.success ? null : inC.error.issues[0]).toMatchObject({ message: "attempts_invalid", path: ["attempts"] });
       expect(messageTemplateInputSchema.safeParse({ ...base, attempts: [9] }).success).toBe(false);
       expect(messageTemplateInputSchema.safeParse({ ...base, attempts: [] }).success).toBe(false);
+    });
+
+    it("accepts link 8 as 8 and later", () => {
+      expect(messageTemplateInputSchema.safeParse({ ...base, attempts: [8] }).success).toBe(true);
+      expect(templatesForAttempt([{ attempts: [8] }], 9)).toHaveLength(1);
+      expect(templatesForAttempt([{ attempts: [7] }], 9)).toHaveLength(0);
     });
 
     it("stores every link as everyone", () => {

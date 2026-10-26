@@ -2,7 +2,6 @@ import { and, count, eq, isNull } from "drizzle-orm";
 import {
   type FunnelSegment,
   type FunnelStatus,
-  SECOND_CHANCE_SEGMENT,
   type MessageTemplateInput,
   type TemplateButton,
   type TemplateTiming,
@@ -18,7 +17,7 @@ type SeedTemplate = {
   statuses?: FunnelStatus[];
 };
 
-export type SeedSegment = Exclude<FunnelSegment, typeof SECOND_CHANCE_SEGMENT>;
+export type SeedSegment = FunnelSegment;
 
 const MINUTES_PER_HOUR = 60;
 

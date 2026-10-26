@@ -1,12 +1,16 @@
 "use client";
 
-import { linkAttempts } from "@funnel/shared";
+import { LINK_ATTEMPT_OPTIONS, linkAttempts } from "@funnel/shared";
 import { adminUz } from "@/lib/i18n/admin";
 
 const copy = adminUz.messages.attempts;
 
+export function attemptLabel(attempt: number): string {
+  return attempt === LINK_ATTEMPT_OPTIONS ? `${attempt}+` : String(attempt);
+}
+
 export function attemptsLabel(attempts: readonly number[]): string {
-  return copy.badge.replace("{list}", attempts.join(", "));
+  return copy.badge.replace("{list}", attempts.map(attemptLabel).join(", "));
 }
 
 type AttemptPickerProps = {
@@ -41,11 +45,11 @@ export function AttemptPicker({ value, onChange }: AttemptPickerProps) {
               key={attempt}
               type="button"
               aria-pressed={pressed}
-              aria-label={copy.item.replace("{n}", String(attempt))}
+              aria-label={copy.item.replace("{n}", attemptLabel(attempt))}
               onClick={() => toggle(attempt)}
               className={chip(pressed)}
             >
-              {attempt}
+              {attemptLabel(attempt)}
             </button>
           );
         })}

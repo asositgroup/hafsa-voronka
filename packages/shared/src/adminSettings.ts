@@ -22,7 +22,7 @@ export type MessageCaps = z.infer<typeof messageCapsSchema>;
 
 export const DEFAULT_MESSAGE_CAPS: MessageCaps = {
   A: { daily: MESSAGE_DAILY_CEILING, total: null },
-  B: { daily: 4, total: 7 },
+  B: { daily: 4, total: null },
   C: { daily: MESSAGE_DAILY_CEILING, total: null },
 };
 

@@ -7,7 +7,6 @@ import {
   type FunnelSegment,
   type FunnelStatus,
   linkBoundSegments,
-  SECOND_CHANCE_SEGMENT,
   type TemplateButton,
 } from "@funnel/shared";
 import { db, rawClient } from "@/db";
@@ -432,7 +431,7 @@ async function sendDue(api: Api, now: Date, pace: Pace, candidates: Candidate[])
   const caps = await messageCaps();
   const picks: Pick[] = [];
   for (const candidate of candidates) {
-    if (candidate.segment === SECOND_CHANCE_SEGMENT || isWatchingNow(candidate.watch, now)) continue;
+    if (isWatchingNow(candidate.watch, now)) continue;
     const plan = chainFor(candidate, bySegment.get(candidate.segment) ?? []);
     const item = pickNext(plan, new Set(candidate.sentTemplateIds), now, candidate.usage, caps[candidate.segment]);
     if (item) picks.push({ candidate, item });

@@ -3,15 +3,9 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
-import {
-  type FunnelSegment,
-  funnelSegments,
-  type MessageTemplate,
-  SECOND_CHANCE_SEGMENT,
-} from "@funnel/shared";
+import { type FunnelSegment, funnelSegments, type MessageTemplate } from "@funnel/shared";
 import { MessageEditor, type MessagePreset } from "@/components/admin/messages/MessageEditor";
 import { ReminderChain } from "@/components/admin/messages/ReminderChain";
-import { SecondChancePages } from "@/components/admin/messages/SecondChancePages";
 import { StageOverview } from "@/components/admin/messages/StageOverview";
 import type { VideoMarks } from "@/components/admin/messages/StopPointPicker";
 import { buttonClass } from "@/components/admin/ui/Button";
@@ -202,16 +196,7 @@ function AdminMessagesContent() {
 
       {stage && !loaded && !failed && <LoadingState variant="list" rows={3} />}
 
-      {stage && loaded && stage === SECOND_CHANCE_SEGMENT && (
-        <SecondChancePages
-          items={loaded.items}
-          onEdit={(item) => setEditing({ segment: stage, item })}
-          onAdd={(preset) => setEditing({ segment: stage, item: null, preset })}
-          onToggle={(item, isActive) => void toggle(item, isActive)}
-        />
-      )}
-
-      {stage && loaded && stage !== SECOND_CHANCE_SEGMENT && (
+      {stage && loaded && (
         <ReminderChain
           segment={stage}
           items={loaded.items}

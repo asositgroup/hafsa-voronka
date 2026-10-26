@@ -123,6 +123,7 @@ export async function getMessageReport({ from, to }: DateRange): Promise<Message
       count(*) FILTER (WHERE sc.admin_after) AS admin_after,
       count(*) FILTER (WHERE sc.clicked AND sc.admin_after) AS clicked_admin_after
     FROM scored sc JOIN message_templates t ON t.id = sc.template_id
+    WHERE t.segment IN ('A', 'B', 'C')
     GROUP BY t.id
     ORDER BY t.segment, t.day, t.position, t.id
   `);

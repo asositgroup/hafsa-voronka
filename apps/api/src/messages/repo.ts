@@ -20,12 +20,11 @@ function constraintOf(error: unknown): string | undefined {
   return candidate?.constraint_name ?? candidate?.cause?.constraint_name;
 }
 
-export type TemplateConflict = "night_notice_exists" | "occasion_exists";
+export type TemplateConflict = "night_notice_exists";
 
 export function templateConflict(error: unknown): TemplateConflict | null {
   const constraint = constraintOf(error);
   if (constraint === "message_templates_night_notice_idx") return "night_notice_exists";
-  if (constraint === "message_templates_occasion_slot_idx") return "occasion_exists";
   return null;
 }
 

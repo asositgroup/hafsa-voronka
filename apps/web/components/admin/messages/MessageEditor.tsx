@@ -7,8 +7,6 @@ import {
   type FunnelSegment,
   type MessageTemplate,
   type MessageTemplateInput,
-  offerVariantOf,
-  SECOND_CHANCE_SEGMENT,
   TEMPLATE_MEDIA_MIME_TYPES,
   templateTextLimit,
   validateTemplateText,
@@ -64,7 +62,7 @@ function usesExtras(segment: FunnelSegment, draft: MessageTemplateInput) {
     !draft.isActive ||
     draft.attempts !== null ||
     (statusTargetSegments.includes(segment) && draft.statuses !== null) ||
-    (segment !== SECOND_CHANCE_SEGMENT && draft.buttons.length > 0)
+    draft.buttons.length > 0
   );
 }
 
@@ -91,14 +89,6 @@ type Admin = { telegramId: number; label: string };
 
 export type MessagePreset = Pick<MessageTemplateInput, "text" | "timing"> &
   Partial<Pick<MessageTemplateInput, "day" | "statuses" | "buttons">>;
-
-function sheetTitle(segment: FunnelSegment, draft: MessageTemplateInput, editing: boolean) {
-  const variant = segment === SECOND_CHANCE_SEGMENT ? offerVariantOf(draft.statuses) : null;
-  if (!variant) return editing ? copy.editTitle : copy.newTitle;
-  return adminUz.messages.secondChance.editorTitle
-    .replace("{n}", String(draft.day))
-    .replace("{slot}", adminUz.messages.secondChance.slots[variant]);
-}
 
 type MessageEditorProps = {
   segment: FunnelSegment;
@@ -160,7 +150,6 @@ export function MessageEditor({
   const [tab, setTab] = useState<"edit" | "preview">("edit");
   const [timingOpen, setTimingOpen] = useState(() => !item || window.matchMedia("(min-width: 1024px)").matches);
   const [extrasOpen, setExtrasOpen] = useState(() => usesExtras(segment, draft));
-  const secondChance = segment === SECOND_CHANCE_SEGMENT;
   const [pickerOpen, setPickerOpen] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -269,7 +258,7 @@ export function MessageEditor({
 
   return (
     <>
-      <Sheet open onClose={onClose} title={sheetTitle(segment, draft, item !== null)} size="wide" footer={footer}>
+      <Sheet open onClose={onClose} title={item !== null ? copy.editTitle : copy.newTitle} size="wide" footer={footer}>
         <div className="flex flex-col gap-4">
           <div className="lg:hidden">
             <Segmented
@@ -299,22 +288,20 @@ export function MessageEditor({
                 }
               />
 
-              {!secondChance && (
-                <Disclosure
-                  title={copy.timingTitle}
-                  summary={timingSummary(draft.day, draft.timing, segment)}
-                  open={timingOpen || timingError !== null}
-                  onOpenChange={setTimingOpen}
-                >
-                  <TimingPicker
-                    day={draft.day}
-                    timing={draft.timing}
-                    segment={segment}
-                    onChange={patch}
-                    error={timingError}
-                  />
-                </Disclosure>
-              )}
+              <Disclosure
+                title={copy.timingTitle}
+                summary={timingSummary(draft.day, draft.timing, segment)}
+                open={timingOpen || timingError !== null}
+                onOpenChange={setTimingOpen}
+              >
+                <TimingPicker
+                  day={draft.day}
+                  timing={draft.timing}
+                  segment={segment}
+                  onChange={patch}
+                  error={timingError}
+                />
+              </Disclosure>
 
               <input
                 ref={fileInput}
@@ -391,7 +378,6 @@ export function MessageEditor({
                       {copy.buttonsTitle}
                     </h3>
                     <ButtonsEditor
-                      segment={segment}
                       buttons={draft.buttons}
                       onChange={(buttons) => patch({ buttons })}
                       prefillSupported={prefillSupported}

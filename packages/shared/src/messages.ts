@@ -4,9 +4,7 @@ import {
   funnelSegments,
   type FunnelStatus,
   funnelStatuses,
-  MAX_LINK_ATTEMPTS,
-  offerVariantOf,
-  offerVariantStatuses,
+  LINK_ATTEMPT_OPTIONS,
 } from "./funnel";
 import { formatMmSs } from "./time";
 
@@ -47,32 +45,24 @@ export const segmentStatuses: Record<FunnelSegment, readonly FunnelStatus[]> = {
   A: ["link_berildi"],
   B: ["korishni_boshladi", "dars_yarmida", "sotuvda_toxtadi"],
   C: ["narxni_kurdi"],
-  D: ["link_berildi", "korishni_boshladi", "dars_yarmida", "sotuvda_toxtadi"],
 };
 
 export const statusTargetSegments: readonly FunnelSegment[] = ["B"];
 
-export const SECOND_CHANCE_SEGMENT = "D" satisfies FunnelSegment;
-
 export const attemptTargetSegments: readonly FunnelSegment[] = ["A", "B"];
 
-export const linkAttempts: readonly number[] = Array.from({ length: MAX_LINK_ATTEMPTS }, (_, index) => index + 1);
+export const linkAttempts: readonly number[] = Array.from({ length: LINK_ATTEMPT_OPTIONS }, (_, index) => index + 1);
 
 export function normalizeStatuses(
   segment: FunnelSegment,
   statuses: readonly FunnelStatus[] | null,
 ): FunnelStatus[] | null {
   if (statuses === null) return null;
-  if (segment === SECOND_CHANCE_SEGMENT) {
-    const variant = offerVariantOf(statuses);
-    return variant ? [...offerVariantStatuses[variant]] : [...statuses];
-  }
   const chosen = segmentStatuses[segment].filter((status) => statuses.includes(status));
   return chosen.length === segmentStatuses[segment].length ? null : chosen;
 }
 
 export function statusesError(segment: FunnelSegment, statuses: readonly FunnelStatus[] | null): boolean {
-  if (segment === SECOND_CHANCE_SEGMENT) return offerVariantOf(statuses) === null;
   if (statuses === null) return false;
   if (!statusTargetSegments.includes(segment) || statuses.length === 0) return true;
   return statuses.some((status) => !segmentStatuses[segment].includes(status));
@@ -90,8 +80,13 @@ export function attemptsError(segment: FunnelSegment, attempts: readonly number[
   return attempts.some((attempt) => !linkAttempts.includes(attempt)) || new Set(attempts).size !== attempts.length;
 }
 
+export function attemptBucket(attempt: number): number {
+  return Math.min(attempt, LINK_ATTEMPT_OPTIONS);
+}
+
 export function templatesForAttempt<T extends { attempts?: readonly number[] | null }>(templates: T[], attempt: number): T[] {
-  return templates.filter((template) => !template.attempts || template.attempts.includes(attempt));
+  const bucket = attemptBucket(attempt);
+  return templates.filter((template) => !template.attempts || template.attempts.includes(bucket));
 }
 
 export type TemplateContext = {
@@ -444,13 +439,13 @@ export function validateTemplateText(text: string, hasMedia: boolean): TemplateT
   return null;
 }
 
-export const timingTypes = ["after_entry", "day_time", "before_expiry", "night_notice", "occasion"] as const;
+export const timingTypes = ["after_entry", "day_time", "before_expiry", "night_notice"] as const;
 
 export type TimingType = (typeof timingTypes)[number];
 
 export type TemplateTiming = { type: TimingType; value: number };
 
-export type TimingError = "out_of_range" | "outside_day" | "night" | "linked_only" | "occasion_only";
+export type TimingError = "out_of_range" | "outside_day" | "night" | "linked_only";
 
 export function isNightMinute(minuteOfDay: number): boolean {
   return minuteOfDay < NIGHT.end || minuteOfDay >= NIGHT.start;
@@ -468,13 +463,13 @@ export function validateTiming(day: number, timing: TemplateTiming): TimingError
     if (value < 0 || value >= MINUTES_PER_DAY) return "out_of_range";
     return isNightMinute(value) ? "night" : null;
   }
-  if (type === "night_notice" || type === "occasion") return value === 0 ? null : "out_of_range";
+  if (type === "night_notice") return value === 0 ? null : "out_of_range";
   return value >= 1 && value <= TEMPLATE_DAYS * MINUTES_PER_DAY ? null : "out_of_range";
 }
 
 export function dayForTiming(timing: TemplateTiming, fallbackDay: number): number {
   if (timing.type === "after_entry") return Math.floor(timing.value / MINUTES_PER_DAY) + 1;
-  if (timing.type === "day_time" || timing.type === "occasion") return fallbackDay;
+  if (timing.type === "day_time") return fallbackDay;
   return 1;
 }
 
@@ -562,20 +557,6 @@ export type TemplateButtonKind = TemplateButton["kind"];
 
 export const templateButtonKinds = ["resume", "offer", "again", "admin", "later", "link"] as const;
 
-const chainButtonKinds: readonly TemplateButtonKind[] = ["resume", "offer", "admin", "later", "link"];
-
-const secondChanceButtonKinds: readonly TemplateButtonKind[] = ["again", "later", "admin", "link"];
-
-export function buttonKindsFor(segment: FunnelSegment): readonly TemplateButtonKind[] {
-  return segment === SECOND_CHANCE_SEGMENT ? secondChanceButtonKinds : chainButtonKinds;
-}
-
-export function defaultButtonFor(segment: FunnelSegment): TemplateButton {
-  return segment === SECOND_CHANCE_SEGMENT
-    ? { kind: "again", text: buttonPresets.again }
-    : { kind: "resume", text: buttonPresets.resume };
-}
-
 export const templateMediaSchema = z.object({
   type: z.enum(templateMediaTypes),
   fileId: z.string().min(1).max(256),
@@ -597,7 +578,7 @@ export const messageTemplateBaseSchema = z.object({
   buttons: z.array(templateButtonSchema).max(MAX_TEMPLATE_BUTTONS),
   isActive: z.boolean(),
   statuses: z.array(z.enum(funnelStatuses)).min(1).max(funnelStatuses.length).nullable().default(null),
-  attempts: z.array(z.number().int()).min(1).max(MAX_LINK_ATTEMPTS).nullable().default(null),
+  attempts: z.array(z.number().int()).min(1).max(LINK_ATTEMPT_OPTIONS).nullable().default(null),
 });
 
 export type MessageTemplateInput = z.infer<typeof messageTemplateBaseSchema>;
@@ -617,13 +598,9 @@ export function validateTemplateInput(input: MessageTemplateInput): TemplateVali
   if (input.timing.type === "night_notice" && !linkBoundSegments.includes(input.segment)) {
     return { path: "timing", error: "linked_only" };
   }
-  if ((input.timing.type === "occasion") !== (input.segment === SECOND_CHANCE_SEGMENT)) {
-    return { path: "timing", error: "occasion_only" };
-  }
   if (statusesError(input.segment, input.statuses)) return { path: "statuses", error: "statuses_invalid" };
   if (attemptsError(input.segment, input.attempts)) return { path: "attempts", error: "attempts_invalid" };
-  const allowed = buttonKindsFor(input.segment);
-  if (input.buttons.some((button) => !allowed.includes(button.kind))) return { path: "buttons", error: "button_not_allowed" };
+  if (input.buttons.some((button) => !templateButtonKinds.includes(button.kind))) return { path: "buttons", error: "button_not_allowed" };
   return null;
 }
 

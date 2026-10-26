@@ -212,37 +212,8 @@ describe.skipIf(!testDbUrl)("Message constructor", () => {
     expect(body.videoMarks).toEqual({ introEndSec: 300, courseStartSec: 600, priceSec: 800 });
   });
 
-  describe("second chance pages", () => {
-    const page = {
-      ...draft,
-      segment: "D",
-      day: 2,
-      timing: { type: "occasion", value: 0 },
-      statuses: ["link_berildi"],
-      buttons: [
-        { kind: "again", text: "Ha, ko'raman" },
-        { kind: "later", text: "Keyinroq, ko'raman" },
-      ],
-    };
-
-    it("keeps one page per occasion and variant", async () => {
-      const first = await create(page);
-      expect(first).toMatchObject({ segment: "D", day: 2, statuses: ["link_berildi"], attempts: null });
-      const duplicate = await send("", "POST", page);
-      expect(duplicate.status).toBe(409);
-      expect(await duplicate.json()).toEqual({ error: "occasion_exists" });
-      const variant = await send("", "POST", { ...page, statuses: ["dars_yarmida", "korishni_boshladi", "sotuvda_toxtadi"] });
-      expect(variant.status).toBe(201);
-      expect((await variant.json()).statuses).toEqual(["korishni_boshladi", "dars_yarmida", "sotuvda_toxtadi"]);
-      const body = await (await request("?segment=D")).json();
-      expect(body.items).toHaveLength(2);
-    });
-
-    it("rejects chain buttons on a page and «Ha» in a chain", async () => {
-      const wrong = await send("", "POST", { ...page, buttons: [{ kind: "resume", text: "Davom" }] });
-      expect(wrong.status).toBe(422);
-      expect(await wrong.json()).toEqual({ error: "button_not_allowed" });
-    });
+  it("rejects the removed stage D", async () => {
+    expect((await request("?segment=D")).status).toBe(400);
   });
 
   it("stores the link attempts a chain text is meant for", async () => {

@@ -10,7 +10,7 @@ export const watchUz = {
   offerDoneNote: "Barakalla! Endi adminga yozishingiz yoki to‘liq darsni ko‘rishingiz mumkin.",
   offerWatchNote: "Videoni oxirigacha ko‘ring, keyin adminga yozing.",
   expiredTitle: "Afsus, bonus dars o‘chib ketdi",
-  expiredBody: "Sizga yana bir imkon beramiz. «Ha, ko‘raman» tugmasini bosing: dars yana ochiladi va to‘xtagan joyingizdan davom etasiz.",
+  expiredBody: "Sizga yana bir imkon beramiz. «Ha, ko‘raman» tugmasini bosing va dars siz uchun yana ochiladi.",
   reopenButton: "Ha, ko‘raman",
   reopenOpening: "Ochilmoqda…",
   reopenClosed: "Darsni qayta ochib bo‘lmadi. Savolingiz bo‘lsa, adminga yozing.",

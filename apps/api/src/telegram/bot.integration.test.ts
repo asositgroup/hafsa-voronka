@@ -5,8 +5,10 @@ import { closeDb, db } from "@/db";
 import { chatMessages, events, leads, settings, users } from "@/db/schema";
 import { runMigrations } from "@/db/migrate";
 import { setTestEnv } from "@/test/env";
+import { isolatedDatabase } from "@/test/isolatedDb";
 
-const testDbUrl = process.env.TEST_DATABASE_URL;
+const isolatedDb = isolatedDatabase("vf_bot");
+const testDbUrl = isolatedDb.url;
 const LEADS_CHAT_ID = -1_009_999_999_999;
 
 vi.mock("@/leads/notifier", async (importOriginal) => ({
@@ -23,6 +25,7 @@ describe.skipIf(!testDbUrl)("Bot registration flow", () => {
   let messageSeq = 1_000_000;
 
   beforeAll(async () => {
+    await isolatedDb.create();
     setTestEnv({ DATABASE_URL: testDbUrl!, LEADS_CHAT_ID: String(LEADS_CHAT_ID) });
     await runMigrations(testDbUrl!);
     const { bot } = await import("./bot");
@@ -51,6 +54,7 @@ describe.skipIf(!testDbUrl)("Bot registration flow", () => {
 
   afterAll(async () => {
     await closeDb();
+    await isolatedDb.drop();
   });
 
   function from(id: number) {

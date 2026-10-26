@@ -3,13 +3,16 @@ import { closeDb, db } from "@/db";
 import { runMigrations } from "@/db/migrate";
 import { settings } from "@/db/schema";
 import { setTestEnv } from "@/test/env";
+import { isolatedDatabase } from "@/test/isolatedDb";
 import { DEFAULT_MESSAGE_CAPS } from "@funnel/shared";
 import { chatCleanupHours, invalidateSettings, linkTtlHours, messageCaps } from "./service";
 
-const testDbUrl = process.env.TEST_DATABASE_URL;
+const isolatedDb = isolatedDatabase("vf_settings_service");
+const testDbUrl = isolatedDb.url;
 
 describe.skipIf(!testDbUrl)("Settings", () => {
   beforeAll(async () => {
+    await isolatedDb.create();
     setTestEnv({ DATABASE_URL: testDbUrl! });
     await runMigrations(testDbUrl!);
   });
@@ -21,6 +24,7 @@ describe.skipIf(!testDbUrl)("Settings", () => {
 
   afterAll(async () => {
     await closeDb();
+    await isolatedDb.drop();
   });
 
   it("defaults the link TTL to 24 hours", async () => {

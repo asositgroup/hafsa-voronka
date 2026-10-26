@@ -1,6 +1,6 @@
 "use client";
 
-import { type FunnelSegment, type TimingError } from "@funnel/shared";
+import { type FunnelSegment, linkBoundSegments, type TimingError } from "@funnel/shared";
 import { Field, Input } from "@/components/admin/ui/Field";
 import { TimePicker } from "@/components/admin/ui/TimePicker";
 import { adminUz } from "@/lib/i18n/admin";
@@ -87,6 +87,10 @@ export function TimingPicker({ segment, day, minute, onChange, error }: TimingPi
       )}
 
       <p className="m-0 text-[13px] text-qalam/70">{day === 1 ? copy.timingHints[segment] : copy.timingHints.clock}</p>
+
+      {day > 1 && linkBoundSegments.includes(segment) && (
+        <p className="m-0 text-[13px] text-qalam/70">{copy.timingHints.clockLinkOpen}</p>
+      )}
 
       <p className="m-0 text-[13px] text-qalam">{timingSummary(segment, day, minute)}</p>
 

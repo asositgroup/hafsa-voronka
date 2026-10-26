@@ -352,3 +352,77 @@ describe("caps", () => {
     expect(capReached({ today: DAILY_CAP - 1, runToday: 9, runTotal: 100 }, loose)).toBe(false);
   });
 });
+
+describe("day 2+ reminders while the link is still open", () => {
+  const planOpen = (segment: "A" | "B" | "C", templates: ScheduleTemplate[], given: string) =>
+    planChain(
+      segmentChainInput(templates, {
+        segment,
+        enteredAt: T(given),
+        linkExpiresAt: linkExpiryFor(T(given), 24),
+      }),
+    );
+
+  it("makes a day-2 reminder before the expiry due when the link closes", () => {
+    const afsus = template({ day: 2, timingValue: 600 });
+    const plan = planOpen("A", [afsus], "2026-10-20 15:00");
+    expect(plan.map((item) => localTime(item.sendAt))).toEqual(["2026-10-21T15:00"]);
+    expect(pickNext(plan, none, T("2026-10-21 10:00"), unused)).toBeNull();
+    expect(pickNext(plan, none, T("2026-10-21 14:59"), unused)).toBeNull();
+    expect(pickNext(plan, none, T("2026-10-21 15:00"), unused)).toBe(plan[0]);
+    expect(pickNext(plan, none, T("2026-10-21 15:30"), unused)).toBe(plan[0]);
+    expect(nextPendingDue(plan, none, T("2026-10-21 10:00"))).toEqual(T("2026-10-21 15:00"));
+  });
+
+  it("defers B the same way", () => {
+    const afsus = template({ day: 2, timingValue: 600 });
+    expect(planOpen("B", [afsus], "2026-10-20 15:00").map((item) => localTime(item.sendAt))).toEqual([
+      "2026-10-21T15:00",
+    ]);
+  });
+
+  it("defers to the night-extended expiry", () => {
+    const dayTwo = template({ day: 2, timingValue: 600 });
+    const early = template({ day: 3, timingValue: 480 });
+    const after = template({ day: 3, timingValue: 600 });
+    const plan = planOpen("A", [after, early, dayTwo], "2026-10-20 23:30");
+    expect(plan.map((item) => [item.template, localTime(item.sendAt)])).toEqual([
+      [dayTwo, "2026-10-22T09:00"],
+      [early, "2026-10-22T09:00"],
+      [after, "2026-10-22T10:00"],
+    ]);
+  });
+
+  it("keeps a reminder that falls after the expiry at its own time", () => {
+    const late = template({ day: 2, timingValue: 960 });
+    expect(planOpen("A", [late], "2026-10-20 15:00").map((item) => localTime(item.sendAt))).toEqual([
+      "2026-10-21T16:00",
+    ]);
+  });
+
+  it("sends every reminder deferred to the same expiry, one per tick, in order", () => {
+    const second = template({ day: 2, timingValue: 600, position: 1 });
+    const first = template({ day: 2, timingValue: 600, position: 0 });
+    const third = template({ day: 2, timingValue: 720 });
+    const plan = planOpen("A", [third, second, first], "2026-10-20 15:00");
+    expect(plan.map((item) => item.template)).toEqual([first, second, third]);
+    expect(pickNext(plan, none, T("2026-10-21 15:00"), unused)?.template).toBe(first);
+    expect(pickNext(plan, new Set([first.id]), T("2026-10-21 15:01"), unused)?.template).toBe(second);
+    expect(pickNext(plan, new Set([first.id, second.id]), T("2026-10-21 15:02"), unused)?.template).toBe(third);
+  });
+
+  it("leaves day 1 unchanged", () => {
+    const open = template({ day: 1, timingValue: 60 });
+    const closed = template({ day: 1, timingValue: 1500 });
+    expect(planOpen("A", [open, closed], "2026-10-20 15:00").map((item) => [item.template, localTime(item.sendAt)])).toEqual([
+      [open, "2026-10-20T16:00"],
+    ]);
+  });
+
+  it("leaves C unchanged", () => {
+    const progrev = template({ day: 2, timingValue: 600 });
+    expect(planOpen("C", [progrev], "2026-10-20 15:00").map((item) => localTime(item.sendAt))).toEqual([
+      "2026-10-21T10:00",
+    ]);
+  });
+});

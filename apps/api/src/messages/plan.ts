@@ -37,6 +37,7 @@ export type SendUsage = { today: number; runToday: number; runTotal: number };
 
 export type PlanItem<T extends ScheduleTemplate = ScheduleTemplate> = {
   template: T;
+  scheduledAt: Date;
   sendAt: Date;
 };
 
@@ -80,9 +81,15 @@ function sendTime(template: ScheduleTemplate, input: PlanInput): Date {
   return new Date(tashkentDayStart(input.enteredAt).getTime() + (template.day - 1) * DAY_MS + offset);
 }
 
+function effectiveSendAt(template: ScheduleTemplate, scheduledAt: Date, linkExpiresAt: Date | null | undefined): Date {
+  if (template.day <= 1 || !linkExpiresAt || scheduledAt.getTime() >= linkExpiresAt.getTime()) return scheduledAt;
+  return linkExpiresAt;
+}
+
 function compareItems<T extends ScheduleTemplate>(a: PlanItem<T>, b: PlanItem<T>): number {
   return (
     a.sendAt.getTime() - b.sendAt.getTime() ||
+    a.scheduledAt.getTime() - b.scheduledAt.getTime() ||
     a.template.day - b.template.day ||
     a.template.position - b.template.position ||
     a.template.id - b.template.id
@@ -90,12 +97,15 @@ function compareItems<T extends ScheduleTemplate>(a: PlanItem<T>, b: PlanItem<T>
 }
 
 function closedBeforeSend(item: PlanItem, linkExpiresAt: Date | null | undefined): boolean {
-  return item.template.day <= 1 && !!linkExpiresAt && item.sendAt.getTime() >= linkExpiresAt.getTime();
+  return item.template.day <= 1 && !!linkExpiresAt && item.scheduledAt.getTime() >= linkExpiresAt.getTime();
 }
 
 export function planChain<T extends ScheduleTemplate>(input: PlanInput<T>): PlanItem<T>[] {
   return input.templates
-    .map((template) => ({ template, sendAt: sendTime(template, input) }))
+    .map((template) => {
+      const scheduledAt = sendTime(template, input);
+      return { template, scheduledAt, sendAt: effectiveSendAt(template, scheduledAt, input.linkExpiresAt) };
+    })
     .filter((item) => !closedBeforeSend(item, input.linkExpiresAt))
     .sort(compareItems);
 }

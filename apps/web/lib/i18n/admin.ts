@@ -291,6 +291,7 @@ export const adminUz = {
         B: "Videoni to‘xtatganidan keyin hisoblanadi. Yana ko‘rib, yana to‘xtasa, vaqt qaytadan hisoblanadi",
         C: "Masalan: narxni ko‘rganidan 1 soat o‘tib",
         clock: "Toshkent vaqti bilan",
+        clockLinkOpen: "Shu vaqtda odamning darsi hali ochiq bo‘lsa, eslatma dars yopilganda boradi",
       },
       hours: "soat",
       minutes: "daqiqa",

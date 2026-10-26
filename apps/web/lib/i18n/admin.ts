@@ -221,11 +221,11 @@ export const adminUz = {
       clock: "{n}-kun, soat {time}",
     },
     attempts: {
-      title: "Qaysi havola",
-      all: "Hammasi",
-      item: "{n}-havola",
-      hint: "1 — birinchi berilgan havola. Dars har safar qayta ochilganda raqam bittaga oshadi. «8+» — 8-havola va undan keyingilari.",
-      badge: "{list}-havola",
+      title: "Darsni nechanchi marta olganlarga",
+      all: "Hammaga",
+      item: "{n}-marta olganlarga",
+      hint: "1 — darsni birinchi marta olganlar. Dars qayta ochilsa («Ha, ko‘raman», «Keyinroq» yoki /start), odam 2 ga o‘tadi, keyin 3 va hokazo. «8+» — 8 va undan ko‘p marta olganlar. Qaytib kelganlarga boshqa matn yozmoqchi bo‘lsangiz, 2 va undan keyingilarini tanlang.",
+      badge: "Faqat {list} marta olganlarga",
     },
     reorderFailed: "Tartib boshqa joyda o‘zgargan. Ro‘yxat yangilandi.",
     stopPoints: {

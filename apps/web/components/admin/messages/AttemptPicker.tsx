@@ -27,15 +27,15 @@ export function AttemptPicker({ value, onChange }: AttemptPickerProps) {
   }
 
   const chip = (pressed: boolean) =>
-    `flex min-h-11 min-w-0 items-center justify-center rounded-[10px] border px-3 text-sm tabular-nums focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-siyoh ${
+    `flex min-h-11 min-w-12 items-center justify-center rounded-[10px] border px-3 text-sm tabular-nums focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-siyoh ${
       pressed ? "border-siyoh bg-siyoh font-semibold text-varaq" : "border-chiziq bg-white font-medium text-siyoh"
     }`;
 
   return (
     <fieldset className="m-0 flex min-w-0 flex-col gap-2 border-0 p-0">
       <legend className="mb-2 p-0 text-sm font-medium text-siyoh">{copy.title}</legend>
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-9">
-        <button type="button" aria-pressed={value === null} onClick={() => onChange(null)} className={`${chip(value === null)} col-span-3 sm:col-span-1`}>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" aria-pressed={value === null} onClick={() => onChange(null)} className={`${chip(value === null)} px-4`}>
           {copy.all}
         </button>
         {linkAttempts.map((attempt) => {

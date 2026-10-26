@@ -24,12 +24,12 @@ export const adminUz = {
     A: {
       label: "Videoni ochmaganlar",
       explanation:
-        "Havolani olgan, lekin videoni hali ochmagan odamlar. Videoni ochishi bilan bu xabarlar to‘xtaydi va «Ko‘rib to‘xtaganlar» xabarlari boshlanadi.",
+        "Havolani olgan, lekin videoni hali ochmagan odamlar. 1-kun eslatmalari bosqichga kirgandan keyin o‘tgan vaqt bilan, 2–7-kunlar belgilangan soatda boradi. Videoni ochishi bilan «Ko‘rib to‘xtaganlar» xabarlari boshlanadi.",
     },
     B: {
       label: "Ko‘rib to‘xtaganlar",
       explanation:
-        "Videoni ochgan, lekin narx aytiladigan joyga yetmagan odamlar. Vaqt odam videoni oxirgi marta to‘xtatgan paytdan hisoblanadi, ko‘rib turgan paytda xabar bormaydi. Narxni eshitishi bilan bu xabarlar to‘xtaydi va «Narxni ko‘rib, yozmaganlar» xabarlari boshlanadi.",
+        "Videoni ochgan, lekin narx aytiladigan joyga yetmagan odamlar. 1-kunda vaqt videoni oxirgi to‘xtatgan paytdan hisoblanadi, ko‘rib turgan paytda xabar bormaydi. 2–7-kunlar belgilangan soatda. Narxni eshitishi bilan «Narxni ko‘rib, yozmaganlar» xabarlari boshlanadi.",
     },
     C: {
       label: "Narxni ko‘rib, yozmaganlar",
@@ -188,10 +188,10 @@ export const adminUz = {
   },
   messages: {
     dayLabel: "{n}-kun",
-    addMessage: "Eslatma qo‘shish",
-    emptyTitle: "Hali xabar yo‘q",
-    emptyHint: "Bu bosqich uchun birinchi xabarni yozing.",
-    writeFirst: "Birinchi xabarni yozish",
+    dayTabs: "Kunlar",
+    addForDay: "{n}-kunga eslatma qo‘shish",
+    emptyDay: "Bu kunga hali eslatma yozilmagan",
+    restartNote: "Dars qayta ochilsa («Ha, ko‘raman», «Keyinroq» yoki /start), bosqich 1-kundan qayta boshlanadi.",
     stages: {
       listTitle: "Bosqichlar",
       back: "Barcha bosqichlar",
@@ -240,7 +240,6 @@ export const adminUz = {
       },
     },
     editor: {
-      day: "Kun",
       newTitle: "Yangi eslatma",
       editTitle: "Eslatmani tahrirlash",
       close: "Yopish",

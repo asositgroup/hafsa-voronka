@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
-import { type FunnelSegment, funnelSegments, type MessageTemplate } from "@funnel/shared";
+import { defaultMinute, type FunnelSegment, funnelSegments, type MessageTemplate } from "@funnel/shared";
 import { MessageEditor, type MessagePreset } from "@/components/admin/messages/MessageEditor";
-import { ReminderChain } from "@/components/admin/messages/ReminderChain";
+import { DayTimeline } from "@/components/admin/messages/DayTimeline";
 import { StageOverview } from "@/components/admin/messages/StageOverview";
 import type { VideoMarks } from "@/components/admin/messages/StopPointPicker";
 import { buttonClass } from "@/components/admin/ui/Button";
@@ -45,11 +45,13 @@ function AdminMessagesContent() {
   const [editing, setEditing] = useState<Editing>(null);
   const [linkTtlHours, setLinkTtlHours] = useState<number | null>(null);
   const [shownStage, setShownStage] = useState(stage);
+  const [day, setDay] = useState(1);
 
   if (shownStage !== stage) {
     setShownStage(stage);
     setNotice(null);
     setEditing(null);
+    setDay(1);
   }
 
   const loaded = stage ? (cache[stage] ?? null) : null;
@@ -197,10 +199,13 @@ function AdminMessagesContent() {
       {stage && !loaded && !failed && <LoadingState variant="list" rows={3} />}
 
       {stage && loaded && (
-        <ReminderChain
+        <DayTimeline
+          segment={stage}
           items={loaded.items}
           videoMarks={loaded.videoMarks}
-          onAdd={(preset) => setEditing({ segment: stage, item: null, preset })}
+          day={day}
+          onDayChange={setDay}
+          onAdd={(targetDay) => setEditing({ segment: stage, item: null, preset: { day: targetDay, minute: defaultMinute(targetDay) } })}
           onEdit={(item) => setEditing({ segment: stage, item })}
           onToggle={(item, isActive) => void toggle(item, isActive)}
           onMove={(group, index, direction) => void move(group, index, direction)}
@@ -209,7 +214,7 @@ function AdminMessagesContent() {
 
       {editing && editingSource && (
         <MessageEditor
-          key={editing.item?.id ?? `new-${editing.segment}-${editing.preset?.day ?? 1}`}
+          key={editing.item?.id ?? `new-${editing.segment}-${day}`}
           segment={editing.segment}
           item={editing.item}
           preset={editing.preset}

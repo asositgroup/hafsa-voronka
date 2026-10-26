@@ -65,10 +65,10 @@ export function MessageCard({ item, videoMarks, onEdit, onToggle, onMoveUp, onMo
                 <span
                   role="img"
                   aria-label={copy.buttonsCount.replace("{n}", String(item.buttons.length))}
-                  className="inline-flex items-center gap-1 text-xs tabular-nums"
+                  className="inline-flex min-w-0 items-center gap-1 text-xs"
                 >
-                  <ButtonsIcon className="h-4 w-4" />
-                  {item.buttons.length}
+                  <ButtonsIcon className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{item.buttons.map((button) => button.text).join(" · ")}</span>
                 </span>
               )}
             </span>

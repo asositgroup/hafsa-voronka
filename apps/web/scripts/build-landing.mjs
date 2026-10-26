@@ -17,6 +17,7 @@ const apiUrl = required("NEXT_PUBLIC_API_URL");
 const botUsername = required("NEXT_PUBLIC_BOT_USERNAME");
 const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || "http://localhost:3000";
 const pixelId = process.env.NEXT_PUBLIC_FB_PIXEL_ID || "2585302615300650";
+const clarityId = process.env.NEXT_PUBLIC_CLARITY_ID || "z3mqc8x0cm";
 
 async function minifyCss(file) {
   const { code } = await transform(await readFile(join(src, "css", file), "utf8"), {
@@ -55,6 +56,7 @@ await writeFile(
   await minifyJs("main.js", {
     __API_URL__: JSON.stringify(apiUrl),
     __BOT_USERNAME__: JSON.stringify(botUsername),
+    __CLARITY_ID__: JSON.stringify(clarityId),
   }),
 );
 if (pixelId) {
@@ -95,4 +97,4 @@ if (violations.length) {
   process.exit(1);
 }
 
-console.log(`Landing built for ${appUrl} (pixel ${pixelId ? "on" : "off"})`);
+console.log(`Landing built for ${appUrl} (pixel ${pixelId ? "on" : "off"}, clarity ${clarityId ? "on" : "off"})`);

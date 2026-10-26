@@ -7,7 +7,6 @@ import {
   type FunnelSegment,
   type FunnelStatus,
   linkBoundSegments,
-  offerVariantFor,
   SECOND_CHANCE_SEGMENT,
   type TemplateButton,
 } from "@funnel/shared";
@@ -16,7 +15,6 @@ import {
   linkGrants,
   messageTemplates,
   type MessageTemplateRow,
-  secondChanceOffers,
   type SentLinkTarget,
   sentMessages,
   users,
@@ -26,13 +24,10 @@ import {
   watchProgress,
 } from "@/db/schema";
 import { env } from "@/env";
-import { nextOffer, offerDueStamp, pickOfferTemplate } from "@/funnel/secondChance";
 import { syncSegment } from "@/funnel/segments";
 import { NO_VIDEO_MARKS, statusFor } from "@/funnel/status";
 import { logEvent } from "@/funnel/users";
 import { refreshUserLeadCards } from "@/leads/service";
-import { pendingAppointmentUserIds } from "@/links/appointmentStore";
-import { offerHistories } from "@/links/offers";
 import { type LessonState, lessonState, reopenWithin } from "@/links/service";
 import { linkTtlHours, messageCaps } from "@/settings/service";
 import { isAdminTelegramId, notAdminTelegramId } from "@/telegram/admins";
@@ -47,7 +42,6 @@ import { activeTemplateRows, toTemplate } from "./repo";
 import {
   CHAIN_MS,
   DAY_MS,
-  isNightAt,
   isWatchingNow,
   nextPendingDue,
   pickNext,
@@ -70,7 +64,6 @@ const SWEEP_HARD_MS = 47 * HOUR_MS + 50 * 60_000;
 const DELETE_LIMIT_MS = 48 * HOUR_MS;
 const INTERRUPTED_MS = 10 * 60_000;
 const SWEEP_BATCH_SIZE = 500;
-const EXPIRE_BATCH_SIZE = 500;
 const APPOINTMENT_BATCH_SIZE = 500;
 const DEFAULT_RETRY_AFTER_SEC = 30;
 const MESSAGE_NOT_FOUND = "message to delete not found";
@@ -455,24 +448,7 @@ async function sendDue(api: Api, now: Date, pace: Pace, candidates: Candidate[])
   }
 }
 
-async function expireLinks(api: Api, now: Date, pace: Pace) {
-  const expiring = await db()
-    .select({ userId: segmentRuns.userId })
-    .from(segmentRuns)
-    .innerJoin(users, eq(users.id, segmentRuns.userId))
-    .where(
-      and(
-        isNull(segmentRuns.endedAt),
-        inArray(segmentRuns.segment, [...linkBoundSegments]),
-        lte(users.linkExpiresAt, now),
-      ),
-    )
-    .orderBy(asc(segmentRuns.id))
-    .limit(EXPIRE_BATCH_SIZE);
-  for (const { userId } of expiring) {
-    await syncSegment(userId, now).catch((error) => console.error("Segment sync failed:", error));
-  }
-
+async function sweepExpiredLinkMessages(api: Api, now: Date, pace: Pace) {
   if (now.getTime() < pausedUntil) return;
   const stale = await db()
     .select({
@@ -489,6 +465,7 @@ async function expireLinks(api: Api, now: Date, pace: Pace) {
       and(
         inArray(segmentRuns.segment, [...linkBoundSegments]),
         lte(linkGrants.expiresAt, now),
+        lt(sentMessages.sentAt, linkGrants.expiresAt),
         gt(sentMessages.sentAt, new Date(now.getTime() - DELETE_LIMIT_MS)),
         isNotNull(sentMessages.telegramMessageId),
         isNull(sentMessages.deletedAt),
@@ -637,74 +614,9 @@ async function processAppointments(api: Api, now: Date, pace: Pace) {
   }
 }
 
-async function settleOffer(offerId: number, candidate: Candidate, templateId: number) {
-  const [sent] = await db()
-    .select({ id: sentMessages.id, sentAt: sentMessages.sentAt, sendError: sentMessages.sendError })
-    .from(sentMessages)
-    .where(
-      and(
-        eq(sentMessages.segmentRunId, candidate.runId),
-        eq(sentMessages.templateId, templateId),
-        eq(sentMessages.slot, ""),
-      ),
-    );
-  const offer = eq(secondChanceOffers.id, offerId);
-  if (sent?.sentAt) {
-    await db().update(secondChanceOffers).set({ sentMessageId: sent.id }).where(offer);
-    await logEvent("second_chance_offer", { userId: candidate.userId, meta: { offerId, sentMessageId: sent.id } });
-    await refreshUserLeadCards(candidate.userId).catch((error) => console.error("Lead card refresh failed:", error));
-  } else if (sent?.sendError) {
-    await db().update(secondChanceOffers).set({ skipped: true }).where(offer);
-  } else {
-    await db().delete(secondChanceOffers).where(offer);
-  }
-}
-
-async function sendOffers(api: Api, now: Date, pace: Pace, all: Candidate[]) {
-  if (now.getTime() < pausedUntil) return;
-  const candidates = all.filter((candidate) => candidate.segment === SECOND_CHANCE_SEGMENT);
-  if (candidates.length === 0) return;
-  const templates = await activeTemplateRows(SECOND_CHANCE_SEGMENT);
-  const userIds = candidates.map((candidate) => candidate.userId);
-  const histories = await offerHistories(db(), userIds);
-  const waiting = await pendingAppointmentUserIds(db(), userIds);
-
-  for (const candidate of candidates) {
-    const history = histories.get(candidate.userId) ?? [];
-    const step = nextOffer({ history, expiresAt: candidate.linkExpiresAt, pendingAppointment: waiting.has(candidate.userId) }, now);
-    if (step.kind === "exhausted") {
-      if (now.getTime() >= step.at.getTime()) await syncSegment(candidate.userId, now);
-      continue;
-    }
-    if (step.kind !== "due" || step.dueAt.getTime() > now.getTime() || isNightAt(now)) continue;
-    const variant = offerVariantFor(candidate.status);
-    if (candidate.linkId === null || variant === null) continue;
-
-    const template = pickOfferTemplate(templates, step.occasion, candidate.status);
-    const dueAt = offerDueStamp(step.dueAt, now);
-    const [offer] = await db()
-      .insert(secondChanceOffers)
-      .values({
-        userId: candidate.userId,
-        occasion: step.occasion,
-        variant,
-        expiredLinkId: candidate.linkId,
-        dueAt,
-        skipped: template === null,
-      })
-      .onConflictDoNothing()
-      .returning({ id: secondChanceOffers.id });
-    if (!offer || !template) continue;
-
-    const result = await sendOne(api, { candidate, item: { template, sendAt: dueAt, slot: "", kind: "regular" } }, now, pace);
-    await settleOffer(offer.id, candidate, template.id);
-    if (result === "abort") return;
-  }
-}
-
 async function nextDueForUser(userId: number, now: Date) {
   const [candidate] = await loadCandidates(now, userId);
-  if (!candidate || candidate.segment === SECOND_CHANCE_SEGMENT) return null;
+  if (!candidate) return null;
   const templates = await activeTemplateRows(candidate.segment);
   return nextPendingDue(chainFor(candidate, templates), new Set(candidate.sentKeys), now);
 }
@@ -783,10 +695,9 @@ export async function dispatchMessages(options: DispatchOptions = {}): Promise<v
     if (!lock?.locked) return;
     try {
       await markInterrupted(clock());
-      await expireLinks(api, clock(), pace);
+      await sweepExpiredLinkMessages(api, clock(), pace);
       await processAppointments(api, clock(), pace);
       const candidates = await loadCandidates(clock());
-      await sendOffers(api, clock(), pace, candidates);
       await sendDue(api, clock(), pace, candidates);
       await sweep(api, clock(), pace);
       await cleanupChat(api, clock(), pace);

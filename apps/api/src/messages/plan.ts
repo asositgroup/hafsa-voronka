@@ -87,15 +87,6 @@ function nightMorningOf(date: Date): number | null {
   return null;
 }
 
-export function outOfNight(date: Date): Date {
-  const morning = nightMorningOf(date);
-  return morning === null ? date : new Date(morning + MORNING_SEND_MINUTE * MINUTE_MS);
-}
-
-export function isSameTashkentDay(a: Date, b: Date): boolean {
-  return tashkentDayStart(a).getTime() === tashkentDayStart(b).getTime();
-}
-
 function tashkentDate(dayStart: number): string {
   return new Date(dayStart + TASHKENT_OFFSET_MS).toISOString().slice(0, 10);
 }

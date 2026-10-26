@@ -1,7 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import type { FunnelStatus, LinkGrantKind } from "@funnel/shared";
 import { db } from "@/db";
-import { type LinkGrant, linkGrants, secondChanceOffers, type User, users, videos, watchProgress } from "@/db/schema";
+import { type LinkGrant, linkGrants, type User, users, videos, watchProgress } from "@/db/schema";
 import { syncSegment } from "@/funnel/segments";
 import { isLessonClosed, NO_VIDEO_MARKS, segmentFor, statusFor } from "@/funnel/status";
 import { logEvent } from "@/funnel/users";
@@ -79,22 +79,4 @@ export async function reopenLesson(userId: number, source: ReopenSource, now = n
   await logEvent("lesson_reopened", { userId, meta: { source } });
   await refreshUserLeadCards(userId).catch((error) => console.error("Lead card refresh failed:", error));
   return result;
-}
-
-export async function answerLater(userId: number, sentMessageId: number, now = new Date()): Promise<boolean> {
-  const [answered] = await db()
-    .update(secondChanceOffers)
-    .set({ answer: "later", answeredAt: now })
-    .where(
-      and(
-        eq(secondChanceOffers.userId, userId),
-        eq(secondChanceOffers.sentMessageId, sentMessageId),
-        sql`${secondChanceOffers.answer} is null`,
-      ),
-    )
-    .returning({ id: secondChanceOffers.id });
-  if (!answered) return false;
-  await logEvent("second_chance_later", { userId, meta: { offerId: answered.id } });
-  await refreshUserLeadCards(userId).catch((error) => console.error("Lead card refresh failed:", error));
-  return true;
 }

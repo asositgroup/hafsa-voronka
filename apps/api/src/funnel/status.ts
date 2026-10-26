@@ -38,21 +38,14 @@ export function isLessonClosed(
   );
 }
 
-export type LinkState = "live" | "expired" | "exhausted";
-
-function linkBound(segment: FunnelSegment, linkState: LinkState): FunnelSegment | null {
-  if (linkState === "live") return segment;
-  return linkState === "expired" ? "D" : null;
-}
-
-export function segmentFor(status: FunnelStatus | null, linkState: LinkState = "live"): FunnelSegment | null {
+export function segmentFor(status: FunnelStatus | null): FunnelSegment | null {
   switch (status) {
     case "link_berildi":
-      return linkBound("A", linkState);
+      return "A";
     case "korishni_boshladi":
     case "dars_yarmida":
     case "sotuvda_toxtadi":
-      return linkBound("B", linkState);
+      return "B";
     case "narxni_kurdi":
       return "C";
     default:
@@ -65,10 +58,6 @@ export function endReasonFor(
   target: FunnelSegment | null,
   user: { botBlocked: boolean; wroteAdmin: boolean },
 ): SegmentEndReason {
-  if (target === null) {
-    if (user.botBlocked) return "bot_blocked";
-    return user.wroteAdmin ? "wrote_admin" : "offers_exhausted";
-  }
-  if (open === "D" || open === target) return "relinked";
-  return target === "D" ? "expired" : "advanced";
+  if (target === null) return user.botBlocked ? "bot_blocked" : "wrote_admin";
+  return open === target ? "relinked" : "advanced";
 }

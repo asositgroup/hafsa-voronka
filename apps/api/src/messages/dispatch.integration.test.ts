@@ -5,7 +5,7 @@ import postgres from "postgres";
 import type { FunnelSegment, TemplateButton } from "@funnel/shared";
 import { closeDb, db } from "@/db";
 import { runMigrations } from "@/db/migrate";
-import { events, messageTemplates, segmentRuns, sentMessages, settings, users, type Video, watchProgress } from "@/db/schema";
+import { events, linkGrants, messageTemplates, segmentRuns, sentMessages, settings, users, type Video, watchProgress } from "@/db/schema";
 import { signInitData } from "@/telegram/initData";
 import { createTestVideo, ensureActiveTestVideo } from "@/test/videos";
 import { setTestEnv, TEST_BOT_TOKEN } from "@/test/env";
@@ -94,6 +94,8 @@ describe.skipIf(!testDbUrl)("Message dispatcher", () => {
     await db().delete(segmentRuns);
     await db().delete(messageTemplates);
     await db().delete(watchProgress);
+    await db().update(users).set({ linkId: null });
+    await db().delete(linkGrants);
     await db().delete(users);
   });
 
@@ -162,6 +164,49 @@ describe.skipIf(!testDbUrl)("Message dispatcher", () => {
     const template = await makeTemplate(overrides);
     return { user, run, template };
   }
+
+  async function linkedRunUser(segment: FunnelSegment, expiresAt: Date, overrides: Partial<typeof users.$inferInsert> = {}) {
+    const user = await makeUser({ linkExpiresAt: expiresAt, ...overrides });
+    const [grant] = await db()
+      .insert(linkGrants)
+      .values({ userId: user.id, attempt: 1, kind: "initial", givenAt: entry, expiresAt })
+      .returning();
+    await db().update(users).set({ linkId: grant.id }).where(eq(users.id, user.id));
+    const run = await openRun(user.id, segment);
+    return { user, grant, run };
+  }
+
+  it("deletes reminders sent while the link was open once it closes, and keeps later ones", async () => {
+    const { user, grant, run } = await linkedRunUser("A", at(24 * 60));
+    const sentRow = (key: string, sentAt: Date, telegramMessageId: number) =>
+      db()
+        .insert(sentMessages)
+        .values({
+          userId: user.id,
+          botTextKey: key,
+          linkId: grant.id,
+          segmentRunId: run.id,
+          dueAt: sentAt,
+          sentAt,
+          telegramMessageId,
+        });
+    await sentRow("before", at(23 * 60), 501);
+    await sentRow("after", at(25 * 60), 502);
+
+    await tick(at(25 * 60 + 30));
+    expect(deletes().map((call) => call.payload.message_id)).toEqual([501]);
+  });
+
+  it("keeps people who reached the price in the chain after expiry", async () => {
+    const { user } = await linkedRunUser("C", at(24 * 60), { offerWatchedAt: entry });
+    await makeTemplate({ segment: "C", text: "Progrev", timingValue: 25 * 60, day: 2 });
+
+    await tick(at(24 * 60));
+    await tick(at(25 * 60));
+    expect(sends().map((call) => call.payload.text)).toEqual(["Progrev"]);
+    expect((await db().select().from(segmentRuns).where(eq(segmentRuns.userId, user.id))).map((run) => [run.segment, run.endReason])).toEqual([["C", null]]);
+    expect(deletes()).toHaveLength(0);
+  });
 
   it("sends a due message with the rendered text", async () => {
     const { user, template } = await setup();

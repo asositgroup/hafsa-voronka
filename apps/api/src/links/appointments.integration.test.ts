@@ -1,14 +1,13 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { asc, eq } from "drizzle-orm";
 import type { Bot } from "grammy";
-import { type FunnelStatus, sessionResponseSchema, type TemplateButton } from "@funnel/shared";
+import { type FunnelSegment, sessionResponseSchema, type TemplateButton } from "@funnel/shared";
 import { closeDb, db } from "@/db";
 import { runMigrations } from "@/db/migrate";
 import {
   events,
   linkGrants,
   messageTemplates,
-  secondChanceOffers,
   segmentRuns,
   sentMessages,
   users,
@@ -25,7 +24,6 @@ const isolatedDb = isolatedDatabase("vf_appointments");
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
-const noPrice: FunnelStatus[] = ["korishni_boshladi", "dars_yarmida", "sotuvda_toxtadi"];
 const offerButtons: TemplateButton[] = [
   { kind: "again", text: "Ha, ko'raman" },
   { kind: "later", text: "Keyinroq, ko'raman" },
@@ -85,7 +83,6 @@ describe.skipIf(!isolatedDb.url)("«Keyinroq» time picker and appointments", ()
     testIndex += 1;
     entry = new Date(Date.UTC(2028, 0, 5, 5, 0, 0) + testIndex * 40 * DAY);
     await db().delete(watchAppointments);
-    await db().delete(secondChanceOffers);
     await db().delete(sentMessages);
     await db().delete(events);
     await db().delete(segmentRuns);
@@ -155,14 +152,12 @@ describe.skipIf(!isolatedDb.url)("«Keyinroq» time picker and appointments", ()
     return row;
   }
 
-  function afsus(day: number, text: string, statuses: FunnelStatus[] = ["link_berildi"]) {
-    return template({ segment: "D", day, text, timingType: "occasion", timingValue: 0, statuses, buttons: offerButtons });
+  function reminder(text: string, segment: FunnelSegment = "A") {
+    return template({ segment, text, buttons: offerButtons });
   }
 
   const runsOf = (userId: number) =>
     db().select().from(segmentRuns).where(eq(segmentRuns.userId, userId)).orderBy(asc(segmentRuns.id));
-  const offersOf = (userId: number) =>
-    db().select().from(secondChanceOffers).where(eq(secondChanceOffers.userId, userId)).orderBy(asc(secondChanceOffers.occasion));
   const grantsOf = (userId: number) =>
     db().select().from(linkGrants).where(eq(linkGrants.userId, userId)).orderBy(asc(linkGrants.attempt));
   const appointmentsOf = (userId: number) =>
@@ -203,27 +198,27 @@ describe.skipIf(!isolatedDb.url)("«Keyinroq» time picker and appointments", ()
 
   async function reopenForNoPriceUser() {
     const user = await linkedUser({ expiresAt: at(24 * 60), maxPosition: 30 });
-    await afsus(1, "Afsus 1", noPrice);
-    const offer = await firstAfsus(user);
+    await reminder("Eslatma", "B");
+    const offer = await firstReminder(user);
     const expiry = at(24 * 60);
-    await tap(user.telegramId, `mt:l:s${offer.sentMessageId}`, expiry);
+    await tap(user.telegramId, `mt:l:s${offer.id}`, expiry);
     await tap(user.telegramId, "lt:q:m", expiry);
     const chosen = at(22 * 60, expiry);
     await tick(chosen);
     return { user, chosen };
   }
 
-  async function firstAfsus(user: { id: number; telegramId: number }) {
-    await tick(at(24 * 60));
-    const [offer] = await offersOf(user.id);
-    return offer;
+  async function firstReminder(user: { id: number }) {
+    await tick(at(61));
+    const [sent] = await db().select().from(sentMessages).where(eq(sentMessages.userId, user.id)).orderBy(asc(sentMessages.id));
+    return sent;
   }
 
   it("asks when with the three TZ slots and a different-time button", async () => {
     const user = await linkedUser({ expiresAt: at(24 * 60) });
-    await afsus(1, "Afsus 1");
-    const offer = await firstAfsus(user);
-    await tap(user.telegramId, `mt:l:s${offer.sentMessageId}`, at(24 * 60));
+    await reminder("Eslatma");
+    const offer = await firstReminder(user);
+    await tap(user.telegramId, `mt:l:s${offer.id}`, at(24 * 60));
 
     expect(sentTexts().at(-1)).toContain("Qachon ko'rishingiz qulay?");
     expect(lastKeyboard().map((row) => [row[0].text, row[0].callback_data])).toEqual([
@@ -232,24 +227,22 @@ describe.skipIf(!isolatedDb.url)("«Keyinroq» time picker and appointments", ()
       ["🌙 Ertaga kechqurun (20:00)", "lt:q:e"],
       ["🕐 Boshqa vaqt", "lt:o"],
     ]);
-    const [answered] = await offersOf(user.id);
-    expect(answered.answer).toBe("later");
   });
 
   it("hides slots in the past", async () => {
     const user = await linkedUser({ expiresAt: at(24 * 60) });
-    await afsus(1, "Afsus 1");
-    const offer = await firstAfsus(user);
-    await tap(user.telegramId, `mt:l:s${offer.sentMessageId}`, at(11 * 60, at(24 * 60)));
+    await reminder("Eslatma");
+    const offer = await firstReminder(user);
+    await tap(user.telegramId, `mt:l:s${offer.id}`, at(11 * 60, at(24 * 60)));
     expect(lastKeyboard().map((row) => row[0].callback_data)).toEqual(["lt:q:m", "lt:q:e", "lt:o"]);
   });
 
   it("walks day then hour menus, hiding past hours, and stores the chosen time", async () => {
     const user = await linkedUser({ expiresAt: at(24 * 60) });
-    await afsus(1, "Afsus 1");
-    const offer = await firstAfsus(user);
+    await reminder("Eslatma");
+    const offer = await firstReminder(user);
     const expiry = at(24 * 60);
-    await tap(user.telegramId, `mt:l:s${offer.sentMessageId}`, expiry);
+    await tap(user.telegramId, `mt:l:s${offer.id}`, expiry);
 
     await tap(user.telegramId, "lt:o", expiry);
     expect(sentTexts().at(-1)).toContain("Qaysi kuni");
@@ -343,14 +336,11 @@ describe.skipIf(!isolatedDb.url)("«Keyinroq» time picker and appointments", ()
     expect((await db().select().from(events).where(eq(events.type, "later_reopened"))).length).toBe(1);
   });
 
-  it("keeps a pending reopen appointment made under the old offer valid", async () => {
+  it("keeps a pending reopen appointment valid", async () => {
     const user = await linkedUser({ expiresAt: at(24 * 60) });
-    await afsus(1, "Afsus 1");
-    const offer = await firstAfsus(user);
     const chosen = at(34 * 60);
     await db().insert(watchAppointments).values({
       userId: user.id,
-      offerId: offer.id,
       purpose: "reopen",
       chosenAt: chosen,
       preRemindAt: null,
@@ -422,52 +412,12 @@ describe.skipIf(!isolatedDb.url)("«Keyinroq» time picker and appointments", ()
     expect(body.startAt).toBe(300);
   });
 
-  it("does not send the next «afsus» while an appointment is pending", async () => {
-    const user = await linkedUser({ expiresAt: at(24 * 60) });
-    await afsus(1, "Afsus 1");
-    await afsus(2, "Afsus 2");
-    const offer = await firstAfsus(user);
-    const expiry = at(24 * 60);
-    await tap(user.telegramId, `mt:l:s${offer.sentMessageId}`, expiry);
-    await tap(user.telegramId, "lt:q:e", expiry);
-
-    calls.length = 0;
-    await tick(at(24 * 60, expiry));
-    await tick(at(30 * 60, expiry));
-    expect(sentTexts()).toEqual([]);
-    expect(await offersOf(user.id)).toHaveLength(1);
-    expect((await runsOf(user.id)).at(-1)).toMatchObject({ segment: "D", endedAt: null });
-  });
-
-  it("continues the daily «afsus» cadence when the reopened link is ignored too", async () => {
-    const user = await linkedUser({ expiresAt: at(24 * 60) });
-    await afsus(1, "Afsus 1");
-    await afsus(2, "Afsus 2");
-    const offer = await firstAfsus(user);
-    const expiry = at(24 * 60);
-    await tap(user.telegramId, `mt:l:s${offer.sentMessageId}`, expiry);
-    await tap(user.telegramId, "lt:q:m", expiry);
-    const chosen = at(22 * 60, expiry);
-    await tick(chosen);
-    const [, reopened] = await grantsOf(user.id);
-
-    calls.length = 0;
-    await tick(at(-1, reopened.expiresAt!));
-    expect(sentTexts()).toEqual([]);
-    await tick(reopened.expiresAt!);
-    expect(sentTexts()).toEqual(["Afsus 2"]);
-    expect((await offersOf(user.id)).map((row) => [row.occasion, row.expiredLinkId])).toEqual([
-      [1, user.linkId],
-      [2, reopened.id],
-    ]);
-  });
-
   it("overwrites the pending appointment when the user picks again", async () => {
     const user = await linkedUser({ expiresAt: at(24 * 60) });
-    await afsus(1, "Afsus 1");
-    const offer = await firstAfsus(user);
+    await reminder("Eslatma");
+    const offer = await firstReminder(user);
     const expiry = at(24 * 60);
-    await tap(user.telegramId, `mt:l:s${offer.sentMessageId}`, expiry);
+    await tap(user.telegramId, `mt:l:s${offer.id}`, expiry);
     await tap(user.telegramId, "lt:q:t", expiry);
     await tap(user.telegramId, "lt:q:m", at(HOUR / MINUTE, expiry));
 
@@ -483,10 +433,10 @@ describe.skipIf(!isolatedDb.url)("«Keyinroq» time picker and appointments", ()
 
   it("cancels the appointment when «Ha» reopens the lesson now", async () => {
     const user = await linkedUser({ expiresAt: at(24 * 60) });
-    await afsus(1, "Afsus 1");
-    const offer = await firstAfsus(user);
+    await reminder("Eslatma");
+    const offer = await firstReminder(user);
     const expiry = at(24 * 60);
-    await tap(user.telegramId, `mt:l:s${offer.sentMessageId}`, expiry);
+    await tap(user.telegramId, `mt:l:s${offer.id}`, expiry);
     await tap(user.telegramId, "lt:q:e", expiry);
 
     expect(await reopenLesson(user.id, "again", at(60, expiry))).toBe("reopened");
@@ -503,12 +453,12 @@ describe.skipIf(!isolatedDb.url)("«Keyinroq» time picker and appointments", ()
   it("cancels the appointment when the user writes to admin or blocks the bot", async () => {
     const writer = await linkedUser({ expiresAt: at(24 * 60) });
     const blocker = await linkedUser({ expiresAt: at(24 * 60) });
-    await afsus(1, "Afsus 1");
-    await tick(at(24 * 60));
+    await reminder("Eslatma");
+    await tick(at(61));
     const expiry = at(24 * 60);
     for (const user of [writer, blocker]) {
-      const [offer] = await offersOf(user.id);
-      await tap(user.telegramId, `mt:l:s${offer.sentMessageId}`, expiry);
+      const [offer] = await db().select().from(sentMessages).where(eq(sentMessages.userId, user.id));
+      await tap(user.telegramId, `mt:l:s${offer.id}`, expiry);
       await tap(user.telegramId, "lt:q:e", expiry);
       expect((await appointmentsOf(user.id))[0].cancelledAt).toBeNull();
     }
@@ -528,10 +478,10 @@ describe.skipIf(!isolatedDb.url)("«Keyinroq» time picker and appointments", ()
 
   it("answers an old button with the editable «closed» text", async () => {
     const user = await linkedUser({ expiresAt: at(24 * 60) });
-    await afsus(1, "Afsus 1");
-    const offer = await firstAfsus(user);
+    await reminder("Eslatma");
+    const offer = await firstReminder(user);
     const expiry = at(24 * 60);
-    await tap(user.telegramId, `mt:l:s${offer.sentMessageId}`, expiry);
+    await tap(user.telegramId, `mt:l:s${offer.id}`, expiry);
     await markWroteAdmin(user.id, null, at(60, expiry));
 
     await tap(user.telegramId, "lt:q:m", at(61, expiry));
@@ -541,10 +491,10 @@ describe.skipIf(!isolatedDb.url)("«Keyinroq» time picker and appointments", ()
 
   it("skips the pre-reminder when the chosen time is within the hour", async () => {
     const user = await linkedUser({ expiresAt: at(24 * 60) });
-    await afsus(1, "Afsus 1");
-    const offer = await firstAfsus(user);
+    await reminder("Eslatma");
+    const offer = await firstReminder(user);
     const expiry = at(24 * 60);
-    await tap(user.telegramId, `mt:l:s${offer.sentMessageId}`, expiry);
+    await tap(user.telegramId, `mt:l:s${offer.id}`, expiry);
     await tap(user.telegramId, "lt:h:0:11", expiry);
 
     const [appointment] = await appointmentsOf(user.id);
@@ -558,10 +508,10 @@ describe.skipIf(!isolatedDb.url)("«Keyinroq» time picker and appointments", ()
 
   it("skips the pre-reminder when it would fall at night", async () => {
     const user = await linkedUser({ expiresAt: at(24 * 60) });
-    await afsus(1, "Afsus 1");
-    const offer = await firstAfsus(user);
+    await reminder("Eslatma");
+    const offer = await firstReminder(user);
     const expiry = at(24 * 60);
-    await tap(user.telegramId, `mt:l:s${offer.sentMessageId}`, expiry);
+    await tap(user.telegramId, `mt:l:s${offer.id}`, expiry);
     await tap(user.telegramId, "lt:h:1:6", expiry);
     expect(await appointmentsOf(user.id)).toHaveLength(0);
     await tap(user.telegramId, "lt:h:1:7", expiry);

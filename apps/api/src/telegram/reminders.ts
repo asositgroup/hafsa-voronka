@@ -1,16 +1,11 @@
 import { Composer } from "grammy";
 import { findByTelegramId, logEvent } from "@/funnel/users";
-import { answerLater } from "@/links/service";
 import { recordMessageClick } from "@/messages/clicks";
 import { askWhen, laterComposer } from "@/telegram/later";
 import { sendBotText } from "@/telegram/texts";
 
 async function recordLater(userId: number, visitorId: string | null, ref: string, op: string) {
   const sentId = Number(ref.slice(1));
-  if (await answerLater(userId, sentId)) {
-    await recordMessageClick(sentId, userId, "callback", { op });
-    return;
-  }
   await logEvent("reminder_later", { userId, visitorId, meta: { ref, choice: null } });
   if (op !== "wa") await recordMessageClick(sentId, userId, "callback", { op });
 }

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { asc, eq, ne } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import type { Bot } from "grammy";
-import type { FunnelSegment, FunnelStatus, RolloutAudience, RolloutCreate, TemplateButton } from "@funnel/shared";
+import type { FunnelSegment, RolloutAudience, RolloutCreate, TemplateButton } from "@funnel/shared";
 import { hashPassword } from "@/admin/auth";
 import { closeDb, db } from "@/db";
 import { runMigrations } from "@/db/migrate";
@@ -10,7 +10,6 @@ import {
   leads,
   linkGrants,
   messageTemplates,
-  secondChanceOffers,
   segmentRuns,
   sentMessages,
   users,
@@ -34,10 +33,6 @@ const DAY = 24 * HOUR;
 const ADMIN_ID = 555_000;
 const TEST_PASSWORD = "rollout-admin-password-2026";
 const watchButton: TemplateButton[] = [{ kind: "resume", text: "Ko'rish" }];
-const offerButtons: TemplateButton[] = [
-  { kind: "again", text: "Ha, ko'raman" },
-  { kind: "later", text: "Keyinroq, ko'raman" },
-];
 
 type ApiCall = { method: string; payload: Record<string, unknown> };
 type Injection = { method: string; error_code: number; description: string; parameters?: Record<string, unknown> };
@@ -136,7 +131,6 @@ describe.skipIf(!isolatedDb.url)("Video rollout", () => {
     await db().delete(videoRolloutRecipients);
     await db().delete(videoRollouts);
     await db().delete(watchAppointments);
-    await db().delete(secondChanceOffers);
     await db().delete(sentMessages);
     await db().delete(events);
     await db().delete(segmentRuns);
@@ -224,7 +218,7 @@ describe.skipIf(!isolatedDb.url)("Video rollout", () => {
   async function template(values: Partial<typeof messageTemplates.$inferInsert>) {
     const [row] = await db()
       .insert(messageTemplates)
-      .values({ segment: "A", day: 1, position: 0, text: "Matn", timingType: "after_entry", timingValue: 60, ...values })
+      .values({ segment: "A", day: 1, position: 0, text: "Matn", timingValue: 60, ...values })
       .returning();
     return row;
   }
@@ -552,7 +546,6 @@ describe.skipIf(!isolatedDb.url)("Video rollout", () => {
       await template({ segment: "A", text: "A zanjir", buttons: watchButton });
       await template({ segment: "B", text: "B zanjir", buttons: watchButton });
       await template({ segment: "C", text: "C zanjir", buttons: watchButton });
-      await template({ segment: "D", day: 1, text: "Afsus", timingType: "occasion", timingValue: 0, statuses: ["link_berildi"], buttons: offerButtons });
       const bought = await makeUser({ lead: "won" });
       const boughtSawPrice = await makeUser({ lead: "won", position: 850 });
       const wrote = await makeUser({ wroteAdmin: true, position: 600 });
@@ -589,43 +582,30 @@ describe.skipIf(!isolatedDb.url)("Video rollout", () => {
         for (const user of [bought, boughtSawPrice, wrote]) expect(sendsTo(user.telegramId)).toHaveLength(0);
         if (minutes === 61) expect(sendsTo(chain.telegramId).map(textOf)).toEqual(["A zanjir"]);
       }
-      expect(await db().select().from(secondChanceOffers).where(ne(secondChanceOffers.userId, chain.id))).toHaveLength(0);
     });
   });
 
   describe("funnel epoch", () => {
-    async function history(user: { id: number; linkId: number }, statuses: FunnelStatus[]) {
+    async function history(user: { id: number; linkId: number }) {
       const oldAt = at(-2 * DAY / MINUTE);
       const [second] = await db()
         .insert(linkGrants)
         .values({ userId: user.id, attempt: 2, kind: "again", givenAt: oldAt, expiresAt: at(-DAY / MINUTE) })
         .returning();
       await db().update(users).set({ linkId: second.id, linkExpiresAt: second.expiresAt }).where(eq(users.id, user.id));
-      for (const occasion of [1, 2]) {
-        await db().insert(secondChanceOffers).values({
-          userId: user.id,
-          occasion,
-          variant: statuses.includes("link_berildi") ? "not_opened" : "no_price",
-          expiredLinkId: user.linkId,
-          dueAt: at((-2 * DAY + occasion * HOUR) / MINUTE),
-          skipped: true,
-        });
-      }
       await syncSegment(user.id, at(-DAY / MINUTE));
       return second;
     }
 
-    it("restarts attempt templates and second-chance occasions for rolled-out users only", async () => {
+    it("restarts attempt templates for rolled-out users only", async () => {
       const segment: FunnelSegment = "B";
       await template({ segment, text: "Birinchi link", attempts: [1], buttons: watchButton });
       await template({ segment, text: "Uchinchi link", attempts: [3], buttons: watchButton });
-      const halfway: FunnelStatus[] = ["korishni_boshladi", "dars_yarmida", "sotuvda_toxtadi"];
-      await template({ segment: "D", day: 1, text: "Afsus 1", timingType: "occasion", timingValue: 0, statuses: halfway, buttons: offerButtons });
 
       const rolled = await makeUser({ position: 150 });
       const untouched = await makeUser({ position: 150, createdAt: at(-30 * DAY / MINUTE) });
-      await history(rolled, halfway);
-      await history(untouched, halfway);
+      await history(rolled);
+      await history(untouched);
       await startRollout({ audiences: ["halfway"], sinceDays: 10 });
 
       await tick(now);
@@ -637,20 +617,6 @@ describe.skipIf(!isolatedDb.url)("Video rollout", () => {
       expect(sendsTo(rolled.telegramId).map(textOf)).toEqual(["Birinchi link"]);
 
       const expiry = (await userRow(rolled.id)).linkExpiresAt!;
-      calls.length = 0;
-      await tick(at(5, expiry));
-      expect(sendsTo(rolled.telegramId).map(textOf)).toEqual(["Afsus 1"]);
-      const offers = await db()
-        .select()
-        .from(secondChanceOffers)
-        .where(eq(secondChanceOffers.userId, rolled.id))
-        .orderBy(asc(secondChanceOffers.id));
-      expect(offers.map((offer) => [offer.epoch, offer.occasion])).toEqual([
-        [0, 1],
-        [0, 2],
-        [1, 1],
-      ]);
-      expect(sendsTo(untouched.telegramId)).toHaveLength(0);
 
       const before = await userRow(untouched.id);
       expect(before.funnelEpoch).toBe(0);

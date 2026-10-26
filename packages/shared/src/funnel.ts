@@ -9,11 +9,9 @@ export const funnelStatuses = [
 
 export type FunnelStatus = (typeof funnelStatuses)[number];
 
-export const funnelSegments = ["A", "B", "C", "D"] as const;
+export const funnelSegments = ["A", "B", "C"] as const;
 
 export type FunnelSegment = (typeof funnelSegments)[number];
-
-export const chainSegments = ["A", "B", "C"] as const satisfies readonly FunnelSegment[];
 
 export const segmentEndReasons = [
   "advanced",
@@ -31,13 +29,7 @@ export const startModes = ["resume", "offer", "again"] as const;
 
 export type StartMode = (typeof startModes)[number];
 
-export const SECOND_CHANCE_OCCASIONS = 7;
-
-export const SECOND_CHANCE_WINDOW_DAYS = 7;
-
-export const SECOND_CHANCE_INTERVAL_HOURS = 24;
-
-export const MAX_LINK_ATTEMPTS = SECOND_CHANCE_OCCASIONS + 1;
+export const LINK_ATTEMPT_OPTIONS = 8;
 
 export const linkGrantKinds = ["initial", "again", "scheduled", "rollout"] as const;
 
@@ -46,27 +38,6 @@ export type LinkGrantKind = (typeof linkGrantKinds)[number];
 export const offerVariants = ["not_opened", "no_price"] as const;
 
 export type OfferVariant = (typeof offerVariants)[number];
-
-export const offerVariantStatuses: Record<OfferVariant, readonly FunnelStatus[]> = {
-  not_opened: ["link_berildi"],
-  no_price: ["korishni_boshladi", "dars_yarmida", "sotuvda_toxtadi"],
-};
-
-export function offerVariantFor(status: FunnelStatus | null): OfferVariant | null {
-  for (const variant of offerVariants) {
-    if (status !== null && offerVariantStatuses[variant].includes(status)) return variant;
-  }
-  return null;
-}
-
-export function offerVariantOf(statuses: readonly FunnelStatus[] | null): OfferVariant | null {
-  if (statuses === null) return null;
-  for (const variant of offerVariants) {
-    const expected = offerVariantStatuses[variant];
-    if (statuses.length === expected.length && expected.every((status) => statuses.includes(status))) return variant;
-  }
-  return null;
-}
 
 export const offerAnswers = ["again", "later"] as const;
 

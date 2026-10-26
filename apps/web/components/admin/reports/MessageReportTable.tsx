@@ -1,6 +1,6 @@
 "use client";
 
-import { funnelSegments, type MessageReportRow, SECOND_CHANCE_SEGMENT } from "@funnel/shared";
+import { funnelSegments, type MessageReportRow } from "@funnel/shared";
 import { Badge } from "@/components/admin/ui/Badge";
 import { Section } from "@/components/admin/ui/Section";
 import { type StatColumn, StatTable } from "@/components/admin/ui/StatTable";
@@ -17,9 +17,7 @@ const columns: StatColumn<MessageReportRow>[] = [
     render: (row) => (
       <span className="block min-w-0">
         <span className="flex flex-wrap items-center gap-2 font-semibold">
-          {(row.segment === SECOND_CHANCE_SEGMENT ? copy.messages.rowTitleOccasion : copy.messages.rowTitle)
-            .replace("{day}", String(row.day))
-            .replace("{n}", String(row.position + 1))}
+          {copy.messages.rowTitle.replace("{day}", String(row.day)).replace("{n}", String(row.position + 1))}
           {row.deleted && <Badge tone="danger">{copy.messages.deleted}</Badge>}
         </span>
         <span className="mt-0.5 block max-w-[240px] truncate text-xs font-normal text-qalam">{row.preview}</span>

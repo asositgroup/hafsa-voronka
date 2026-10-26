@@ -4,15 +4,15 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import {
   attemptTargetSegments,
+  defaultMinute,
   type FunnelSegment,
+  type FunnelStatus,
   type MessageTemplate,
   type MessageTemplateInput,
-  offerVariantOf,
-  SECOND_CHANCE_SEGMENT,
   TEMPLATE_MEDIA_MIME_TYPES,
   templateTextLimit,
+  type TemplateButton,
   validateTemplateText,
-  dayForTiming,
   validateTiming,
   visibleLength,
   sanitizeTelegramHtml,
@@ -31,7 +31,7 @@ import { ButtonsEditor } from "@/components/admin/messages/ButtonsEditor";
 import { MessagePreview } from "@/components/admin/messages/MessagePreview";
 import { StopPointPicker, stopPointLabel, type VideoMarks } from "@/components/admin/messages/StopPointPicker";
 import { TextEditor } from "@/components/admin/messages/editor/TextEditor";
-import { stageTiming, TimingPicker, timingSummary } from "@/components/admin/messages/TimingPicker";
+import { TimingPicker, timingSummary } from "@/components/admin/messages/TimingPicker";
 import {
   createMessage,
   deleteMessage,
@@ -51,7 +51,6 @@ const acceptedMedia = Object.values(TEMPLATE_MEDIA_MIME_TYPES).flat().join(",");
 const extraErrorCodes = new Set([
   "statuses_invalid",
   "attempts_invalid",
-  "button_not_allowed",
   "unsupported_type",
   "too_large",
   "media_not_configured",
@@ -64,7 +63,7 @@ function usesExtras(segment: FunnelSegment, draft: MessageTemplateInput) {
     !draft.isActive ||
     draft.attempts !== null ||
     (statusTargetSegments.includes(segment) && draft.statuses !== null) ||
-    (segment !== SECOND_CHANCE_SEGMENT && draft.buttons.length > 0)
+    draft.buttons.length > 0
   );
 }
 
@@ -89,16 +88,13 @@ function errorText(code: string | undefined, variable?: string) {
 
 type Admin = { telegramId: number; label: string };
 
-export type MessagePreset = Pick<MessageTemplateInput, "text" | "timing"> &
-  Partial<Pick<MessageTemplateInput, "day" | "statuses" | "buttons">>;
-
-function sheetTitle(segment: FunnelSegment, draft: MessageTemplateInput, editing: boolean) {
-  const variant = segment === SECOND_CHANCE_SEGMENT ? offerVariantOf(draft.statuses) : null;
-  if (!variant) return editing ? copy.editTitle : copy.newTitle;
-  return adminUz.messages.secondChance.editorTitle
-    .replace("{n}", String(draft.day))
-    .replace("{slot}", adminUz.messages.secondChance.slots[variant]);
-}
+export type MessagePreset = {
+  day: number;
+  minute: number;
+  text?: string;
+  statuses?: FunnelStatus[] | null;
+  buttons?: TemplateButton[];
+};
 
 type MessageEditorProps = {
   segment: FunnelSegment;
@@ -132,7 +128,7 @@ export function MessageEditor({
           day: item.day,
           text: item.text,
           media: item.media,
-          timing: item.timing,
+          minute: item.minute,
           buttons: item.buttons,
           isActive: item.isActive,
           statuses: item.statuses,
@@ -143,7 +139,7 @@ export function MessageEditor({
           day: preset?.day ?? 1,
           text: preset?.text ?? "",
           media: null,
-          timing: preset?.timing ?? stageTiming(segment),
+          minute: preset?.minute ?? defaultMinute(preset?.day ?? 1),
           buttons: preset?.buttons ?? [],
           isActive: true,
           statuses: preset?.statuses ?? null,
@@ -160,7 +156,6 @@ export function MessageEditor({
   const [tab, setTab] = useState<"edit" | "preview">("edit");
   const [timingOpen, setTimingOpen] = useState(() => !item || window.matchMedia("(min-width: 1024px)").matches);
   const [extrasOpen, setExtrasOpen] = useState(() => usesExtras(segment, draft));
-  const secondChance = segment === SECOND_CHANCE_SEGMENT;
   const [pickerOpen, setPickerOpen] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -173,7 +168,7 @@ export function MessageEditor({
   const hasMedia = draft.media !== null;
   const sanitized = sanitizeTelegramHtml(draft.text);
   const textError = validateTemplateText(draft.text, hasMedia);
-  const timingError = validateTiming(draft.day, draft.timing);
+  const timingError = validateTiming(draft.day, draft.minute);
   const length = sanitized.ok ? visibleLength(sanitized.html) : draft.text.length;
   const limit = templateTextLimit(hasMedia);
   const valid = textError === null && timingError === null;
@@ -198,12 +193,10 @@ export function MessageEditor({
     after(result.data);
   }
 
-  const payload: MessageTemplateInput = { ...draft, day: dayForTiming(draft.timing, draft.day) };
-
   const save = () =>
     run(
       "save",
-      () => (item ? updateMessage(item.id, payload) : createMessage(payload)),
+      () => (item ? updateMessage(item.id, draft) : createMessage(draft)),
       (saved) => onSaved(saved),
     );
 
@@ -226,7 +219,7 @@ export function MessageEditor({
   const test = (adminTelegramId: number) =>
     run(
       "test",
-      () => sendTestMessage(payload, adminTelegramId, item?.id),
+      () => sendTestMessage(draft, adminTelegramId, item?.id),
       () => setTestNote(copy.testSent),
     );
 
@@ -269,7 +262,7 @@ export function MessageEditor({
 
   return (
     <>
-      <Sheet open onClose={onClose} title={sheetTitle(segment, draft, item !== null)} size="wide" footer={footer}>
+      <Sheet open onClose={onClose} title={item !== null ? copy.editTitle : copy.newTitle} size="wide" footer={footer}>
         <div className="flex flex-col gap-4">
           <div className="lg:hidden">
             <Segmented
@@ -299,22 +292,20 @@ export function MessageEditor({
                 }
               />
 
-              {!secondChance && (
-                <Disclosure
-                  title={copy.timingTitle}
-                  summary={timingSummary(draft.day, draft.timing, segment)}
-                  open={timingOpen || timingError !== null}
-                  onOpenChange={setTimingOpen}
-                >
-                  <TimingPicker
-                    day={draft.day}
-                    timing={draft.timing}
-                    segment={segment}
-                    onChange={patch}
-                    error={timingError}
-                  />
-                </Disclosure>
-              )}
+              <Disclosure
+                title={copy.timingTitle}
+                summary={timingSummary(segment, draft.day, draft.minute)}
+                open={timingOpen || timingError !== null}
+                onOpenChange={setTimingOpen}
+              >
+                <TimingPicker
+                  segment={segment}
+                  day={draft.day}
+                  minute={draft.minute}
+                  onChange={(minute) => patch({ minute })}
+                  error={timingError}
+                />
+              </Disclosure>
 
               <input
                 ref={fileInput}
@@ -391,7 +382,6 @@ export function MessageEditor({
                       {copy.buttonsTitle}
                     </h3>
                     <ButtonsEditor
-                      segment={segment}
                       buttons={draft.buttons}
                       onChange={(buttons) => patch({ buttons })}
                       prefillSupported={prefillSupported}

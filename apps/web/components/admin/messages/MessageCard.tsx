@@ -40,7 +40,7 @@ export function MessageCard({ item, videoMarks, onEdit, onToggle, onMoveUp, onMo
         <span
           className={`w-[4.5rem] shrink-0 pt-px text-[13px] font-semibold tabular-nums text-siyoh sm:w-24 ${item.isActive ? "" : "opacity-60"}`}
         >
-          {timelineLabel(item.timing)}
+          {timelineLabel(item.day, item.minute)}
         </span>
         <span className={`flex min-w-0 flex-1 flex-col gap-1 ${item.isActive ? "" : "opacity-60"}`}>
           {(item.statuses || item.attempts) && (
@@ -65,10 +65,10 @@ export function MessageCard({ item, videoMarks, onEdit, onToggle, onMoveUp, onMo
                 <span
                   role="img"
                   aria-label={copy.buttonsCount.replace("{n}", String(item.buttons.length))}
-                  className="inline-flex items-center gap-1 text-xs tabular-nums"
+                  className="inline-flex min-w-0 items-center gap-1 text-xs"
                 >
-                  <ButtonsIcon className="h-4 w-4" />
-                  {item.buttons.length}
+                  <ButtonsIcon className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{item.buttons.map((button) => button.text).join(" · ")}</span>
                 </span>
               )}
             </span>

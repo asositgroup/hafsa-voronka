@@ -97,6 +97,16 @@ describe.skipIf(!testDbUrl)("Segment runs", () => {
     expect(afterPrice[2]).toMatchObject({ segment: "C", endedAt: null });
   });
 
+  it("keeps the A run open after the link expires", async () => {
+    const { user } = await registeredUser();
+    const [openRun] = await runsOf(user.id);
+    await db().update(users).set({ linkExpiresAt: new Date(Date.now() - 60_000) }).where(eq(users.id, user.id));
+    await syncSegment(user.id);
+    const runs = await runsOf(user.id);
+    expect(runs).toHaveLength(1);
+    expect(runs[0]).toMatchObject({ id: openRun.id, segment: "A", endedAt: null });
+  });
+
   it("closes the open run with wrote_admin on channel click and opens nothing", async () => {
     const { user, telegramId } = await registeredUser();
     await recordProgress(telegramId, { position: 0, event: "play" });

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
-  chainSegments,
+  funnelSegments,
   MESSAGE_DAILY_CEILING,
   MESSAGE_TOTAL_MAX,
   type MessageCaps,
@@ -82,7 +82,7 @@ export function MessageCapsCard() {
   return (
     <Section title={copy.caps.title} description={copy.caps.description}>
       <div className="flex flex-col gap-4">
-        {chainSegments.map((segment) => (
+        {funnelSegments.map((segment) => (
           <fieldset key={segment} className="m-0 flex min-w-0 flex-col gap-2 border-0 p-0">
             <legend className="mb-2 p-0 text-sm font-semibold text-siyoh">{adminUz.segments[segment].label}</legend>
             <div className="grid grid-cols-2 gap-3 sm:max-w-md">

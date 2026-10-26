@@ -1,19 +1,17 @@
-import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
-import { type FunnelStatus, type LinkGrantKind, offerVariantFor } from "@funnel/shared";
+import { and, eq, sql } from "drizzle-orm";
+import type { FunnelStatus, LinkGrantKind } from "@funnel/shared";
 import { db } from "@/db";
-import { type LinkGrant, linkGrants, secondChanceOffers, type User, users, videos, watchProgress } from "@/db/schema";
-import { linkStateFor } from "@/funnel/secondChance";
-import { NO_VIDEO_MARKS, statusFor } from "@/funnel/status";
+import { type LinkGrant, linkGrants, type User, users, videos, watchProgress } from "@/db/schema";
 import { syncSegment } from "@/funnel/segments";
+import { isLessonClosed, NO_VIDEO_MARKS, segmentFor, statusFor } from "@/funnel/status";
 import { logEvent } from "@/funnel/users";
 import { refreshUserLeadCards } from "@/leads/service";
 import { linkExpiryFor } from "@/messages/plan";
 import { linkTtlHours } from "@/settings/service";
 import { cancelPendingAppointments } from "./appointmentStore";
-import { currentEpochOf, inCurrentEpoch, offerHistory } from "./offers";
 
 type Tx = Parameters<Parameters<ReturnType<typeof db>["transaction"]>[0]>[0];
-type Executor = Pick<ReturnType<typeof db>, "select">;
+type Reader = Pick<ReturnType<typeof db>, "select">;
 
 export type GrantRequest = {
   kind: LinkGrantKind;
@@ -22,6 +20,9 @@ export type GrantRequest = {
   ttlHours: number;
   silent?: boolean;
 };
+
+const currentEpochOf = (userId: number) =>
+  sql<number>`(select ${users.funnelEpoch} from ${users} where ${users.id} = ${userId})`;
 
 export async function insertGrant(tx: Tx, userId: number, request: GrantRequest): Promise<LinkGrant> {
   const expiresAt = linkExpiryFor(request.now, request.ttlHours);
@@ -46,113 +47,48 @@ export async function insertGrant(tx: Tx, userId: number, request: GrantRequest)
   return grant;
 }
 
-export async function openOffer(executor: Executor, user: Pick<User, "id" | "linkId" | "linkExpiresAt" | "wroteAdminAt">, now: Date) {
-  if (user.linkId === null || user.wroteAdminAt !== null) return null;
-  if (user.linkExpiresAt === null || user.linkExpiresAt.getTime() > now.getTime()) return null;
-  const [offer] = await executor
-    .select()
-    .from(secondChanceOffers)
-    .where(
-      and(
-        eq(secondChanceOffers.userId, user.id),
-        eq(secondChanceOffers.expiredLinkId, user.linkId),
-        eq(secondChanceOffers.skipped, false),
-        isNotNull(secondChanceOffers.sentMessageId),
-      ),
-    )
-    .orderBy(desc(secondChanceOffers.occasion))
-    .limit(1);
-  if (!offer || offer.answer === "again") return null;
-  const state = linkStateFor({ history: await offerHistory(executor, user.id), expiresAt: user.linkExpiresAt }, now);
-  return state === "expired" ? offer : null;
+export type LessonState = { status: FunnelStatus | null; closed: boolean };
+
+export async function lessonState(executor: Reader, user: User, now: Date): Promise<LessonState> {
+  const [row] = await executor
+    .select({ progress: watchProgress, video: videos })
+    .from(users)
+    .leftJoin(watchProgress, eq(watchProgress.userId, users.id))
+    .leftJoin(videos, eq(videos.id, users.videoId))
+    .where(eq(users.id, user.id));
+  const status = statusFor(row?.progress ?? undefined, row?.video ?? NO_VIDEO_MARKS, user);
+  return { status, closed: isLessonClosed(user, status, now) };
 }
 
-export function linkExpiredBeforePrice(
-  user: Pick<User, "registeredAt" | "linkExpiresAt" | "completedAt">,
-  status: FunnelStatus | null,
+export type ReopenResult = "reopened" | "open" | "closed";
+export type ReopenSource = "again" | "screen" | "start";
+
+export async function reopenWithin(
+  tx: Tx,
+  userId: number,
+  kind: "again" | "scheduled",
   now: Date,
-) {
-  return (
-    user.registeredAt !== null &&
-    user.linkExpiresAt !== null &&
-    now >= user.linkExpiresAt &&
-    user.completedAt === null &&
-    status !== "narxni_kurdi" &&
-    status !== "adminga_yozdi"
-  );
+  ttlHours: number,
+): Promise<ReopenResult> {
+  const [user] = await tx.select().from(users).where(eq(users.id, userId)).for("update");
+  if (!user || user.registeredAt === null || user.wroteAdminAt !== null || user.botBlocked) return "closed";
+  const state = await lessonState(tx, user, now);
+  if (!state.closed) return "open";
+  await insertGrant(tx, userId, { kind, offerFirst: segmentFor(state.status) === "B", now, ttlHours });
+  return "reopened";
 }
 
-async function expiredStatus(tx: Tx, user: User, now: Date) {
-  const [progress] = await tx.select().from(watchProgress).where(eq(watchProgress.userId, user.id)).limit(1);
-  const [video] =
-    user.videoId === null ? [] : await tx.select().from(videos).where(eq(videos.id, user.videoId)).limit(1);
-  const status = statusFor(progress, video ?? NO_VIDEO_MARKS, user);
-  return linkExpiredBeforePrice(user, status, now) ? status : undefined;
-}
-
-export type AcceptResult = "granted" | "already" | "closed";
-
-export async function acceptSecondChance(userId: number, now = new Date()): Promise<AcceptResult> {
+export async function reopenLesson(userId: number, source: ReopenSource, now = new Date()): Promise<ReopenResult> {
   const ttlHours = await linkTtlHours();
-  const result = await db().transaction(async (tx): Promise<AcceptResult> => {
-    const [user] = await tx.select().from(users).where(eq(users.id, userId)).for("update");
-    if (!user || user.registeredAt === null) return "closed";
-    const offer = await openOffer(tx, user, now);
-    if (!offer) {
-      const status = await expiredStatus(tx, user, now);
-      if (status !== undefined) {
-        await insertGrant(tx, userId, {
-          kind: "again",
-          offerFirst: offerVariantFor(status) === "no_price",
-          now,
-          ttlHours,
-        });
-        await cancelPendingAppointments(tx, userId, now, ["reopen"]);
-        return "granted";
-      }
-      const [latest] = await tx
-        .select({ answer: secondChanceOffers.answer, grantedLinkId: secondChanceOffers.grantedLinkId })
-        .from(secondChanceOffers)
-        .where(and(eq(secondChanceOffers.userId, userId), inCurrentEpoch))
-        .orderBy(desc(secondChanceOffers.occasion))
-        .limit(1);
-      return latest?.answer === "again" && latest.grantedLinkId === user.linkId ? "already" : "closed";
-    }
-    const grant = await insertGrant(tx, userId, {
-      kind: "again",
-      offerFirst: offer.variant === "no_price",
-      now,
-      ttlHours,
-    });
-    await tx
-      .update(secondChanceOffers)
-      .set({ answer: "again", answeredAt: now, grantedLinkId: grant.id })
-      .where(eq(secondChanceOffers.id, offer.id));
-    await cancelPendingAppointments(tx, userId, now, ["reopen"]);
-    return "granted";
+  const result = await db().transaction(async (tx) => {
+    const outcome = await reopenWithin(tx, userId, "again", now, ttlHours);
+    if (outcome === "reopened") await cancelPendingAppointments(tx, userId, now, ["reopen"]);
+    return outcome;
   });
 
-  if (result !== "granted") return result;
+  if (result !== "reopened") return result;
   await syncSegment(userId, now).catch((error) => console.error("Segment sync failed:", error));
-  await logEvent("second_chance_again", { userId });
+  await logEvent("lesson_reopened", { userId, meta: { source } });
   await refreshUserLeadCards(userId).catch((error) => console.error("Lead card refresh failed:", error));
   return result;
-}
-
-export async function answerLater(userId: number, sentMessageId: number, now = new Date()): Promise<boolean> {
-  const [answered] = await db()
-    .update(secondChanceOffers)
-    .set({ answer: "later", answeredAt: now })
-    .where(
-      and(
-        eq(secondChanceOffers.userId, userId),
-        eq(secondChanceOffers.sentMessageId, sentMessageId),
-        sql`${secondChanceOffers.answer} is null`,
-      ),
-    )
-    .returning({ id: secondChanceOffers.id });
-  if (!answered) return false;
-  await logEvent("second_chance_later", { userId, meta: { offerId: answered.id } });
-  await refreshUserLeadCards(userId).catch((error) => console.error("Lead card refresh failed:", error));
-  return true;
 }

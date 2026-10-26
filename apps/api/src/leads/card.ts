@@ -1,19 +1,11 @@
 import { InlineKeyboard } from "grammy";
-import { type OfferAnswer, SECOND_CHANCE_OCCASIONS } from "@funnel/shared";
 import type { Lead, User } from "@/db/schema";
 import { formatTashkentDate } from "@/sheets";
 
 export type CardUser = Pick<
   User,
   "telegramId" | "username" | "phone" | "phoneVerified" | "registeredAt" | "completedAt" | "wroteAdminAt" | "wroteAdminBy"
-> & { watchedPercent?: number; secondChance?: SecondChanceSummary };
-
-export type SecondChanceSummary = {
-  offered: number;
-  answer: OfferAnswer | null;
-  exhausted: boolean;
-  appointmentAt?: Date | null;
-};
+> & { watchedPercent?: number; linkAttempt?: number | null; appointmentAt?: Date | null };
 
 const PROGRESS_CELLS = 10;
 
@@ -40,18 +32,6 @@ function utmLine(lead: Lead) {
 function telegramLine(user: CardUser) {
   const handle = user.username ? `@${user.username.replace(/^@/, "")}` : "username yo'q";
   return `💬 ${handle} · ID ${user.telegramId}`;
-}
-
-function secondChanceLine({ offered, answer, exhausted }: SecondChanceSummary) {
-  if (offered === 0) return undefined;
-  const state = exhausted
-    ? "imkon tugadi"
-    : answer === "again"
-      ? "«Ha» bosdi"
-      : answer === "later"
-        ? "«Keyinroq» bosdi"
-        : "javob kutilmoqda";
-  return `🔁 Qayta imkon: ${offered}/${SECOND_CHANCE_OCCASIONS} · ${state}`;
 }
 
 function wroteAdminLine(lead: Lead, at: Date, by: number | null) {
@@ -98,11 +78,10 @@ export function renderLeadCard(lead: Lead, user: CardUser | null | undefined): s
   if (registered?.completedAt) lines.push("🎬 Videoni ko'rib bo'ldi");
   else if (registered) lines.push(progressLine(registered.watchedPercent));
 
-  const secondChance = registered?.secondChance && secondChanceLine(registered.secondChance);
-  if (secondChance) lines.push(secondChance);
-  if (registered?.secondChance?.appointmentAt) {
-    lines.push(`⏰ Tanlangan vaqt: ${tashkent(registered.secondChance.appointmentAt)}`);
+  if (registered?.linkAttempt && registered.linkAttempt > 1) {
+    lines.push(`🔁 Dars qayta ochildi: ${registered.linkAttempt - 1} marta`);
   }
+  if (registered?.appointmentAt) lines.push(`⏰ Tanlangan vaqt: ${tashkent(registered.appointmentAt)}`);
 
   if (user?.wroteAdminAt) lines.push(wroteAdminLine(lead, user.wroteAdminAt, user.wroteAdminBy));
   if (lead.assigneeTelegramId !== null) lines.push(`👨‍💼 Mas'ul: ${assigneeLabel(lead)}`);

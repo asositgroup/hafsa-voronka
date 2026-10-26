@@ -6,8 +6,6 @@ import {
   type MessageTemplatesResponse,
   messageTemplateSchema,
   messageTemplatesResponseSchema,
-  type SchedulePreview,
-  schedulePreviewSchema,
   templateMediaUploadSchema,
 } from "@funnel/shared";
 import { API_URL } from "@/lib/api";
@@ -86,11 +84,4 @@ export function sendTestMessage(draft: MessageTemplateInput, adminTelegramId: nu
 
 export function messageMediaUrl(item: Pick<MessageTemplate, "id" | "updatedAt">) {
   return `${API_URL}/admin/messages/${item.id}/media?v=${encodeURIComponent(item.updatedAt)}`;
-}
-
-export function previewSchedule(segment: FunnelSegment, linkGivenAt: string) {
-  return call("/preview-schedule", (json): SchedulePreview => schedulePreviewSchema.parse(json), {
-    method: "POST",
-    body: JSON.stringify({ segment, linkGivenAt }),
-  });
 }

@@ -216,39 +216,24 @@ describe("renderLeadKeyboard", () => {
   });
 });
 
-describe("renderLeadCard second chance line", () => {
+describe("renderLeadCard reopen line", () => {
   const linked: Lead = { ...webLead, userId: 5 };
 
-  it("shows how many second chances went out and the latest answer", () => {
-    const waiting = renderLeadCard(linked, { ...user, secondChance: { offered: 2, answer: null, exhausted: false } });
-    expect(waiting).toContain("🔁 Qayta imkon: 2/7 · javob kutilmoqda");
-    const again = renderLeadCard(linked, { ...user, secondChance: { offered: 1, answer: "again", exhausted: false } });
-    expect(again).toContain("🔁 Qayta imkon: 1/7 · «Ha» bosdi");
-    const later = renderLeadCard(linked, { ...user, secondChance: { offered: 3, answer: "later", exhausted: false } });
-    expect(later).toContain("🔁 Qayta imkon: 3/7 · «Keyinroq» bosdi");
-    const done = renderLeadCard(linked, { ...user, secondChance: { offered: 7, answer: null, exhausted: true } });
-    expect(done).toContain("🔁 Qayta imkon: 7/7 · imkon tugadi");
+  it("shows how many times the lesson was reopened", () => {
+    expect(renderLeadCard(linked, { ...user, linkAttempt: 3 })).toContain("🔁 Dars qayta ochildi: 2 marta");
   });
 
   it("shows the chosen time while an appointment is pending", () => {
     const appointmentAt = new Date("2026-10-21T03:00:00Z");
-    const card = renderLeadCard(linked, {
-      ...user,
-      secondChance: { offered: 1, answer: "later", exhausted: false, appointmentAt },
-    });
-    expect(card).toContain("🔁 Qayta imkon: 1/7 · «Keyinroq» bosdi");
-    expect(card).toContain("⏰ Tanlangan vaqt: 2026-10-21 08:00 (Toshkent)");
-    const remind = renderLeadCard(linked, {
-      ...user,
-      secondChance: { offered: 0, answer: null, exhausted: false, appointmentAt },
-    });
+    expect(renderLeadCard(linked, { ...user, linkAttempt: 2, appointmentAt })).toContain(
+      "⏰ Tanlangan vaqt: 2026-10-21 08:00 (Toshkent)",
+    );
+    const remind = renderLeadCard(linked, { ...user, linkAttempt: 1, appointmentAt });
     expect(remind).toContain("⏰ Tanlangan vaqt: 2026-10-21 08:00 (Toshkent)");
     expect(remind).not.toContain("🔁");
   });
 
-  it("shows nothing before the first second chance", () => {
-    expect(renderLeadCard(linked, { ...user, secondChance: { offered: 0, answer: null, exhausted: false } })).not.toContain(
-      "Qayta imkon",
-    );
+  it("shows nothing before the first reopen", () => {
+    expect(renderLeadCard(linked, { ...user, linkAttempt: 1 })).not.toContain("🔁");
   });
 });

@@ -1,5 +1,6 @@
 const API_URL = __API_URL__;
 const BOT_USERNAME = __BOT_USERNAME__;
+const CLARITY_ID = __CLARITY_ID__;
 const TIMER_MS = 60 * 60 * 1000;
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-";
 
@@ -32,6 +33,25 @@ function pixel(...args) {
   try {
     window.fbq?.(...args);
   } catch {}
+}
+
+function clarity(...args) {
+  try {
+    window.clarity?.(...args);
+  } catch {}
+}
+
+function loadClarity() {
+  const script = document.createElement("script");
+  script.async = true;
+  script.src = `https://www.clarity.ms/tag/${CLARITY_ID}`;
+  document.head.appendChild(script);
+}
+
+function afterLoad(callback) {
+  const idle = () => (window.requestIdleCallback ?? setTimeout)(callback);
+  if (document.readyState === "complete") idle();
+  else window.addEventListener("load", idle, { once: true });
 }
 
 function track(data) {
@@ -89,6 +109,14 @@ const vid = visitorId();
 
 track({ visitor_id: vid, type: "landing_view", ...utmParams(), referrer: document.referrer.slice(0, 500) || undefined });
 
+if (CLARITY_ID) {
+  window.clarity ??= function (...args) {
+    (window.clarity.q ??= []).push(args);
+  };
+  clarity("set", "vid", vid);
+  afterLoad(loadClarity);
+}
+
 const botUrl = botLink(vid);
 for (const cta of document.querySelectorAll("[data-cta]")) cta.href = botUrl;
 
@@ -97,6 +125,7 @@ document.addEventListener("click", (event) => {
   track({ visitor_id: vid, type: "cta_click" });
   pixel("trackCustom", "CTAClick");
   pixel("track", "CompleteRegistration");
+  clarity("event", "cta_click");
 });
 
 const sticky = document.getElementById("sticky");

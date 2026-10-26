@@ -284,6 +284,54 @@ describe("link attempts", () => {
   });
 });
 
+describe("link expiry", () => {
+  const expiresAt = T("2026-10-21 09:00");
+  const planWithExpiry = (segment: "A" | "B" | "C", templates: ScheduleTemplate[], lastBeatAt?: string) =>
+    planChain(
+      segmentChainInput(templates, {
+        segment,
+        enteredAt: T("2026-10-20 09:00"),
+        watch: lastBeatAt ? { lastBeatAt: T(lastBeatAt), playing: false } : null,
+        linkExpiresAt: expiresAt,
+      }),
+    );
+
+  it("drops day-1 reminders of A/B that fall at or after the link expiry", () => {
+    const closing = [1140, 1260, 1380].map((timingValue) => template({ day: 1, timingValue }));
+    const early = template({ day: 1, timingValue: 600 });
+    const nextDay = template({ day: 2, timingValue: 600 });
+    const plan = planWithExpiry("B", [...closing, early, nextDay], "2026-10-20 20:00");
+    expect(plan.map((item) => [item.template, localTime(item.sendAt)])).toEqual([
+      [early, "2026-10-21T06:00"],
+      [nextDay, "2026-10-21T10:00"],
+    ]);
+
+    const atExpiry = template({ day: 1, timingValue: 1440 });
+    const beforeExpiry = template({ day: 1, timingValue: 1439 });
+    expect(planWithExpiry("A", [atExpiry, beforeExpiry]).map((item) => item.template)).toEqual([beforeExpiry]);
+  });
+
+  it("keeps day-1 reminders for C after the link expiry", () => {
+    const late = template({ day: 1, timingValue: 1500 });
+    expect(planWithExpiry("C", [late]).map((item) => localTime(item.sendAt))).toEqual(["2026-10-21T10:00"]);
+  });
+
+  it("keeps day-2+ reminders after the link expiry", () => {
+    const days = [2, 3, 7].map((day) => template({ day, timingValue: 600 }));
+    expect(planWithExpiry("A", days).map((item) => localTime(item.sendAt))).toEqual([
+      "2026-10-21T10:00",
+      "2026-10-22T10:00",
+      "2026-10-26T10:00",
+    ]);
+  });
+
+  it("keeps every day-1 reminder when there is no link expiry", () => {
+    const late = template({ day: 1, timingValue: 1500 });
+    const plan = planChain(segmentChainInput([late], { segment: "A", enteredAt: T("2026-10-20 09:00"), linkExpiresAt: null }));
+    expect(plan.map((item) => localTime(item.sendAt))).toEqual(["2026-10-21T10:00"]);
+  });
+});
+
 describe("caps", () => {
   const bCap = { daily: 4, total: 7 };
   const plan = planFor([template({ timingValue: 60 })], { entered: "2026-10-19 10:00" });

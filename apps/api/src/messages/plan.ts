@@ -3,6 +3,7 @@ import {
   type FunnelSegment,
   type FunnelStatus,
   isNightMinute,
+  linkBoundSegments,
   MESSAGE_DAILY_CEILING,
   NIGHT,
   type SegmentCap,
@@ -43,6 +44,7 @@ export type PlanInput<T extends ScheduleTemplate = ScheduleTemplate> = {
   templates: T[];
   enteredAt: Date;
   anchorAt: Date;
+  linkExpiresAt?: Date | null;
 };
 
 export function tashkentDayStart(date: Date): Date {
@@ -87,8 +89,15 @@ function compareItems<T extends ScheduleTemplate>(a: PlanItem<T>, b: PlanItem<T>
   );
 }
 
+function closedBeforeSend(item: PlanItem, linkExpiresAt: Date | null | undefined): boolean {
+  return item.template.day <= 1 && !!linkExpiresAt && item.sendAt.getTime() >= linkExpiresAt.getTime();
+}
+
 export function planChain<T extends ScheduleTemplate>(input: PlanInput<T>): PlanItem<T>[] {
-  return input.templates.map((template) => ({ template, sendAt: sendTime(template, input) })).sort(compareItems);
+  return input.templates
+    .map((template) => ({ template, sendAt: sendTime(template, input) }))
+    .filter((item) => !closedBeforeSend(item, input.linkExpiresAt))
+    .sort(compareItems);
 }
 
 export function chainAnchor(run: { segment: FunnelSegment; enteredAt: Date }, watch: WatchSnapshot | null): Date {
@@ -119,6 +128,7 @@ export function segmentChainInput<T extends ScheduleTemplate>(
     status?: FunnelStatus | null;
     watch?: WatchSnapshot | null;
     attempt?: number;
+    linkExpiresAt?: Date | null;
   },
 ): PlanInput<T> {
   const forLink = run.attempt === undefined ? templates : templatesForAttempt(templates, run.attempt);
@@ -126,6 +136,7 @@ export function segmentChainInput<T extends ScheduleTemplate>(
     templates: run.status === undefined ? forLink : templatesForStatus(forLink, run.status),
     enteredAt: run.enteredAt,
     anchorAt: chainAnchor(run, run.watch ?? null),
+    linkExpiresAt: linkBoundSegments.includes(run.segment) ? run.linkExpiresAt : null,
   };
 }
 

@@ -280,21 +280,48 @@ describe.skipIf(!isolatedDb.url)("Reopening a closed lesson", () => {
 
   it("starts B at the sales part after a reopen", async () => {
     const video = await ensureActiveTestVideo();
-    await db()
-      .update(videos)
-      .set({ courseStartSec: 300, shortOfferVideoUrl: "https://video.example.com/short.mp4", shortOfferDuration: 90 })
-      .where(eq(videos.id, video.id));
+    const { courseStartSec, shortOfferVideoUrl, shortOfferDuration } = video;
+    try {
+      await db()
+        .update(videos)
+        .set({ courseStartSec: 300, shortOfferVideoUrl: "https://video.example.com/short.mp4", shortOfferDuration: 90 })
+        .where(eq(videos.id, video.id));
+      const user = await closedUser({ maxPosition: 30 });
+
+      const opened = await session(user.telegramId, { reason: "open", start: "again" });
+      expect((await grantsOf(user.id))[1]).toMatchObject({ kind: "again", offerFirst: true });
+      expect(opened.offerFirst).toEqual({ url: "https://video.example.com/short.mp4", duration: 90 });
+
+      await db()
+        .update(videos)
+        .set({ shortOfferVideoUrl: null, shortOfferDuration: null })
+        .where(eq(videos.id, video.id));
+      expect((await session(user.telegramId)).startsAtCourse).toBe(true);
+    } finally {
+      await db()
+        .update(videos)
+        .set({ courseStartSec, shortOfferVideoUrl, shortOfferDuration })
+        .where(eq(videos.id, video.id));
+    }
+  });
+
+  it("sends the reopened run the texts for its attempt with the new link and keeps the watch progress", async () => {
     const user = await closedUser({ maxPosition: 30 });
+    await db().update(watchProgress).set({ lastPosition: 20 }).where(eq(watchProgress.userId, user.id));
+    await template({ segment: "B", position: 0, text: "Birinchi link", timingValue: 10, attempts: [1] });
+    await template({ segment: "B", position: 1, text: "Qayta ochildi", timingValue: 10, attempts: [2] });
 
-    const opened = await session(user.telegramId, { reason: "open", start: "again" });
-    expect((await grantsOf(user.id))[1]).toMatchObject({ kind: "again", offerFirst: true });
-    expect(opened.offerFirst).toEqual({ url: "https://video.example.com/short.mp4", duration: 90 });
+    expect(await reopenLesson(user.id, "again", entry)).toBe("reopened");
+    const [, fresh] = await grantsOf(user.id);
+    expect((await runsOf(user.id)).at(-1)).toMatchObject({ segment: "B", attempt: 2, endedAt: null });
 
-    await db()
-      .update(videos)
-      .set({ shortOfferVideoUrl: null, shortOfferDuration: null })
-      .where(eq(videos.id, video.id));
-    expect((await session(user.telegramId)).startsAtCourse).toBe(true);
+    await tick(at(10));
+    await tick(at(11));
+    expect(sentTexts()).toEqual(["Qayta ochildi"]);
+    const sent = await db().select().from(sentMessages).where(eq(sentMessages.userId, user.id));
+    expect(sent.map((row) => row.linkId)).toEqual([fresh.id]);
+    const [progress] = await db().select().from(watchProgress).where(eq(watchProgress.userId, user.id));
+    expect(progress).toMatchObject({ maxPosition: 30, lastPosition: 20 });
   });
 
   it("resets the stage total cap after a reopen", async () => {

@@ -80,6 +80,7 @@ type Candidate = {
   attempt: number;
   telegramId: number;
   linkId: number | null;
+  linkExpiresAt: Date | null;
   sentTemplateIds: number[];
   usage: SendUsage;
   status: FunnelStatus | null;
@@ -130,6 +131,7 @@ async function loadCandidates(now: Date, userId?: number): Promise<Candidate[]> 
       attempt: segmentRuns.attempt,
       telegramId: users.telegramId,
       linkId: users.linkId,
+      linkExpiresAt: users.linkExpiresAt,
       registeredAt: users.registeredAt,
       wroteAdminAt: users.wroteAdminAt,
       offerWatchedAt: users.offerWatchedAt,
@@ -170,6 +172,7 @@ async function loadCandidates(now: Date, userId?: number): Promise<Candidate[]> 
     attempt: row.attempt,
     telegramId: row.telegramId,
     linkId: row.linkId,
+    linkExpiresAt: row.linkExpiresAt,
     sentTemplateIds: row.sentTemplateIds.map(Number),
     usage: { today: row.sentToday, runToday: row.runToday, runTotal: row.runTotal },
     status: statusFor(
@@ -412,6 +415,7 @@ function chainFor(candidate: Candidate, templates: MessageTemplateRow[]) {
       status: candidate.status,
       watch: candidate.watch,
       attempt: candidate.attempt,
+      linkExpiresAt: candidate.linkExpiresAt,
     }),
   );
 }

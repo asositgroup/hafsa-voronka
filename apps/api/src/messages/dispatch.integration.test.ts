@@ -683,6 +683,20 @@ describe.skipIf(!testDbUrl)("Message dispatcher", () => {
       expect(sends().map((call) => call.payload.text)).toEqual(["0-5", "15-narx"]);
     });
 
+    it("never sends day-1 texts after the link closed to a migrated B person who paused recently", async () => {
+      const now = at(2 * 1440);
+      const yesterdayStart = at(1440 - 600);
+      const user = await makeUser({ videoId: lesson.id, linkGivenAt: entry, linkExpiresAt: at(24 * 60) });
+      await db().insert(watchProgress).values({ userId: user.id, maxPosition: 400, lastPosition: 400, startedAt: entry, lastBeatAt: at(-120, now), playing: false });
+      await openRun(user.id, "B", yesterdayStart);
+      await makeTemplate({ segment: "B", day: 1, text: "Dars ochiq", timingValue: 90 });
+      await makeTemplate({ segment: "B", day: 2, text: "Ikkinchi kun", timingValue: 600 });
+
+      await tick(now);
+      await tick(at(1, now));
+      expect(sends().map((call) => call.payload.text)).toEqual(["Ikkinchi kun"]);
+    });
+
     it("sends nothing while the person is watching and keeps the item due", async () => {
       const { user } = await watcher(400, at(24 * 60 - 1), true);
       await makeTemplate({ segment: "B", day: 2, text: "Ikkinchi kun", timingValue: 600 });

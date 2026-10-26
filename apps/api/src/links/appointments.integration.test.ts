@@ -8,6 +8,7 @@ import {
   events,
   linkGrants,
   messageTemplates,
+  secondChanceOffers,
   segmentRuns,
   sentMessages,
   users,
@@ -83,6 +84,7 @@ describe.skipIf(!isolatedDb.url)("«Keyinroq» time picker and appointments", ()
     testIndex += 1;
     entry = new Date(Date.UTC(2028, 0, 5, 5, 0, 0) + testIndex * 40 * DAY);
     await db().delete(watchAppointments);
+    await db().delete(secondChanceOffers);
     await db().delete(sentMessages);
     await db().delete(events);
     await db().delete(segmentRuns);
@@ -227,6 +229,7 @@ describe.skipIf(!isolatedDb.url)("«Keyinroq» time picker and appointments", ()
       ["🌙 Ertaga kechqurun (20:00)", "lt:q:e"],
       ["🕐 Boshqa vaqt", "lt:o"],
     ]);
+    expect((await db().select().from(events).where(eq(events.type, "reminder_later"))).length).toBe(1);
   });
 
   it("hides slots in the past", async () => {
@@ -336,11 +339,16 @@ describe.skipIf(!isolatedDb.url)("«Keyinroq» time picker and appointments", ()
     expect((await db().select().from(events).where(eq(events.type, "later_reopened"))).length).toBe(1);
   });
 
-  it("keeps a pending reopen appointment valid", async () => {
+  it("keeps a pending reopen appointment made under the old offer valid", async () => {
     const user = await linkedUser({ expiresAt: at(24 * 60) });
     const chosen = at(34 * 60);
+    const [offer] = await db()
+      .insert(secondChanceOffers)
+      .values({ userId: user.id, occasion: 1, variant: "not_opened", expiredLinkId: user.linkId, dueAt: at(24 * 60) })
+      .returning();
     await db().insert(watchAppointments).values({
       userId: user.id,
+      offerId: offer.id,
       purpose: "reopen",
       chosenAt: chosen,
       preRemindAt: null,

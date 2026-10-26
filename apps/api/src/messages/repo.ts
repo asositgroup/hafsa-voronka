@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import {
   type FunnelSegment,
   type MessageTemplate,
@@ -7,7 +7,7 @@ import {
   normalizeStatuses,
 } from "@funnel/shared";
 import { db } from "@/db";
-import { type MessageTemplateRow, messageTemplates } from "@/db/schema";
+import { type MessageTemplateRow, messageTemplates, segmentRuns, sentMessages } from "@/db/schema";
 
 export class StaleOrderError extends Error {
   constructor() {
@@ -55,12 +55,23 @@ async function nextPosition(executor: Executor, segment: FunnelSegment, day: num
   return Number(row.next);
 }
 
-export async function activeTemplateRows(segment: FunnelSegment) {
+export async function chainTemplateRows(run?: { id: number; segment: FunnelSegment }) {
+  const sentInRuns = db()
+    .select({ id: sentMessages.templateId })
+    .from(sentMessages)
+    .innerJoin(segmentRuns, eq(segmentRuns.id, sentMessages.segmentRunId))
+    .where(run === undefined ? isNull(segmentRuns.endedAt) : eq(segmentRuns.id, run.id));
   return db()
     .select()
     .from(messageTemplates)
     .where(
-      and(eq(messageTemplates.segment, segment), eq(messageTemplates.isActive, true), isNull(messageTemplates.deletedAt)),
+      and(
+        run === undefined ? undefined : eq(messageTemplates.segment, run.segment),
+        or(
+          and(eq(messageTemplates.isActive, true), isNull(messageTemplates.deletedAt)),
+          inArray(messageTemplates.id, sentInRuns),
+        ),
+      ),
     );
 }
 

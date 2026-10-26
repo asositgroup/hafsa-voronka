@@ -54,7 +54,7 @@ import {
 } from "@/videos/rollout/run";
 import { templateContextFor } from "./context";
 import { renderTemplate, type ButtonWrap } from "./render";
-import { activeTemplateRows, toTemplate } from "./repo";
+import { chainTemplateRows, toTemplate } from "./repo";
 import {
   CHAIN_MS,
   DAY_MS,
@@ -444,8 +444,12 @@ async function sendSystem(
 }
 
 function chainFor(candidate: Candidate, templates: MessageTemplateRow[]) {
+  const sent = new Set(candidate.sentTemplateIds);
+  const chainTemplates = templates.filter(
+    (template) => (template.isActive && template.deletedAt === null) || sent.has(template.id),
+  );
   return planChain(
-    segmentChainInput(templates, {
+    segmentChainInput(chainTemplates, {
       segment: candidate.segment,
       enteredAt: candidate.enteredAt,
       status: candidate.status,
@@ -459,10 +463,7 @@ function chainFor(candidate: Candidate, templates: MessageTemplateRow[]) {
 async function sendDue(api: Api, now: Date, pace: Pace, candidates: Candidate[]) {
   if (now.getTime() < pausedUntil) return;
 
-  const templates = await db()
-    .select()
-    .from(messageTemplates)
-    .where(and(eq(messageTemplates.isActive, true), isNull(messageTemplates.deletedAt)));
+  const templates = await chainTemplateRows();
   const bySegment = new Map<FunnelSegment, MessageTemplateRow[]>();
   for (const template of templates) {
     bySegment.set(template.segment, [...(bySegment.get(template.segment) ?? []), template]);
@@ -742,7 +743,7 @@ async function processRollouts(api: Api, now: Date, pace: Pace) {
 async function nextDueForUser(userId: number, now: Date) {
   const [candidate] = await loadCandidates(now, userId);
   if (!candidate) return null;
-  const templates = await activeTemplateRows(candidate.segment);
+  const templates = await chainTemplateRows({ id: candidate.runId, segment: candidate.segment });
   return nextPendingDue(chainFor(candidate, templates), new Set(candidate.sentTemplateIds), now);
 }
 

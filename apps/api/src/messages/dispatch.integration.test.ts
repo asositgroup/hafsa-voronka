@@ -318,6 +318,22 @@ describe.skipIf(!testDbUrl)("Message dispatcher", () => {
     expect(row.deletedAt).toBeNull();
   });
 
+  it("sends only the first reminder deferred to the link expiry, even after it is turned off", async () => {
+    await linkedRunUser("A", at(29 * 60));
+    const first = await makeTemplate({ day: 2, text: "Afsus", timingValue: 600 });
+    await makeTemplate({ day: 2, text: "Ikkinchi", timingValue: 660 });
+    await makeTemplate({ day: 2, text: "Uchinchi", timingValue: 720 });
+    await makeTemplate({ day: 2, text: "Kechki", timingValue: 960 });
+    await tick(at(29 * 60));
+    await db().update(messageTemplates).set({ isActive: false }).where(eq(messageTemplates.id, first.id));
+    for (let minute = 29 * 60 + 1; minute <= 29 * 60 + 5; minute += 1) await tick(at(minute));
+    await tick(at(29 * 60 + 59));
+    expect(sends().map((call) => call.payload.text)).toEqual(["Afsus"]);
+    expect(deletes()).toHaveLength(0);
+    await tick(at(30 * 60));
+    expect(sends().map((call) => call.payload.text)).toEqual(["Afsus", "Kechki"]);
+  });
+
   it("sends a day-1 reminder at night as scheduled", async () => {
     await setup({ text: "Tunda", timingValue: 13 * 60 + 30 });
     await tick(at(13 * 60 + 29));
@@ -723,6 +739,21 @@ describe.skipIf(!testDbUrl)("Message dispatcher", () => {
       await moveTo(user.id, 420, at(24 * 60 + 1), false);
       await tick(at(24 * 60 + 2));
       expect(sends().map((call) => call.payload.text)).toEqual(["Ikkinchi kun"]);
+    });
+
+    it("keeps day-3 reminders within the B cap when day 2 is deferred to a night-extended expiry", async () => {
+      const user = await makeUser({ videoId: lesson.id, linkGivenAt: entry, linkExpiresAt: at(47 * 60) });
+      await db().insert(watchProgress).values({ userId: user.id, maxPosition: 100, lastPosition: 100, startedAt: entry, lastBeatAt: entry, playing: false });
+      await openRun(user.id, "B");
+      for (let position = 0; position < 5; position += 1) {
+        await makeTemplate({ segment: "B", day: 2, position, text: `d2-${position}`, timingValue: 600 + position * 60 });
+      }
+      for (let position = 0; position < 3; position += 1) {
+        await makeTemplate({ segment: "B", day: 3, position, text: `d3-${position}`, timingValue: 600 + position });
+      }
+      for (let minute = 47 * 60; minute <= 47 * 60 + 5; minute += 1) await tick(at(minute));
+      for (let minute = 48 * 60; minute <= 48 * 60 + 5; minute += 1) await tick(at(minute));
+      expect(sends().map((call) => call.payload.text)).toEqual(["d2-0", "d3-0", "d3-1", "d3-2"]);
     });
 
     it("caps B at four a day without a total cap", async () => {

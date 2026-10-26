@@ -100,14 +100,25 @@ function closedBeforeSend(item: PlanItem, linkExpiresAt: Date | null | undefined
   return item.template.day <= 1 && !!linkExpiresAt && item.scheduledAt.getTime() >= linkExpiresAt.getTime();
 }
 
+function isDeferred(item: PlanItem): boolean {
+  return item.sendAt.getTime() > item.scheduledAt.getTime();
+}
+
+function withinTimeline(at: Date, input: PlanInput): boolean {
+  return at.getTime() < tashkentDayStart(input.enteredAt).getTime() + CHAIN_MS;
+}
+
 export function planChain<T extends ScheduleTemplate>(input: PlanInput<T>): PlanItem<T>[] {
-  return input.templates
+  const items = input.templates
     .map((template) => {
       const scheduledAt = sendTime(template, input);
       return { template, scheduledAt, sendAt: effectiveSendAt(template, scheduledAt, input.linkExpiresAt) };
     })
     .filter((item) => !closedBeforeSend(item, input.linkExpiresAt))
     .sort(compareItems);
+  const firstDeferred = items.find(isDeferred);
+  const keptDeferred = firstDeferred && withinTimeline(firstDeferred.sendAt, input) ? firstDeferred : null;
+  return items.filter((item) => !isDeferred(item) || item === keptDeferred);
 }
 
 export function chainAnchor(run: { segment: FunnelSegment; enteredAt: Date }, watch: WatchSnapshot | null): Date {

@@ -381,15 +381,17 @@ describe("day 2+ reminders while the link is still open", () => {
     ]);
   });
 
-  it("defers to the night-extended expiry", () => {
+  it("defers only the first reminder to the night-extended expiry and keeps day 3", () => {
     const dayTwo = template({ day: 2, timingValue: 600 });
+    const dayTwoLater = template({ day: 2, timingValue: 1080 });
     const early = template({ day: 3, timingValue: 480 });
     const after = template({ day: 3, timingValue: 600 });
-    const plan = planOpen("A", [after, early, dayTwo], "2026-10-20 23:30");
+    const afterLater = template({ day: 3, timingValue: 660 });
+    const plan = planOpen("A", [afterLater, after, early, dayTwoLater, dayTwo], "2026-10-20 23:30");
     expect(plan.map((item) => [item.template, localTime(item.sendAt)])).toEqual([
       [dayTwo, "2026-10-22T09:00"],
-      [early, "2026-10-22T09:00"],
       [after, "2026-10-22T10:00"],
+      [afterLater, "2026-10-22T11:00"],
     ]);
   });
 
@@ -400,15 +402,49 @@ describe("day 2+ reminders while the link is still open", () => {
     ]);
   });
 
-  it("sends every reminder deferred to the same expiry, one per tick, in order", () => {
+  it("sends only the earliest deferred reminder and never the others", () => {
     const second = template({ day: 2, timingValue: 600, position: 1 });
     const first = template({ day: 2, timingValue: 600, position: 0 });
     const third = template({ day: 2, timingValue: 720 });
-    const plan = planOpen("A", [third, second, first], "2026-10-20 15:00");
-    expect(plan.map((item) => item.template)).toEqual([first, second, third]);
+    const late = template({ day: 2, timingValue: 960 });
+    const plan = planOpen("A", [late, third, second, first], "2026-10-20 15:00");
+    expect(plan.map((item) => [item.template, localTime(item.sendAt)])).toEqual([
+      [first, "2026-10-21T15:00"],
+      [late, "2026-10-21T16:00"],
+    ]);
+    const sent = new Set([first.id]);
     expect(pickNext(plan, none, T("2026-10-21 15:00"), unused)?.template).toBe(first);
-    expect(pickNext(plan, new Set([first.id]), T("2026-10-21 15:01"), unused)?.template).toBe(second);
-    expect(pickNext(plan, new Set([first.id, second.id]), T("2026-10-21 15:02"), unused)?.template).toBe(third);
+    for (const minute of ["15:01", "15:02", "15:30", "15:59"]) {
+      expect(pickNext(plan, sent, T(`2026-10-21 ${minute}`), unused)).toBeNull();
+    }
+    expect(pickNext(plan, sent, T("2026-10-21 16:00"), unused)?.template).toBe(late);
+  });
+
+  it("chooses the same deferred reminder whatever has been sent", () => {
+    const first = template({ day: 2, timingValue: 600 });
+    const second = template({ day: 2, timingValue: 660 });
+    const plan = planOpen("A", [second, first], "2026-10-20 15:00");
+    expect(plan.map((item) => item.template)).toEqual([first]);
+    expect(nextPendingDue(plan, new Set([first.id]), T("2026-10-21 15:01"))).toBeNull();
+  });
+
+  it("lets the next deferred reminder stand in when the first is gone", () => {
+    const second = template({ day: 2, timingValue: 660 });
+    const third = template({ day: 2, timingValue: 720 });
+    expect(planOpen("A", [third, second], "2026-10-20 15:00").map((item) => item.template)).toEqual([second]);
+  });
+
+  it("drops deferred reminders when the link outlives day 7", () => {
+    const deferred = template({ day: 2, timingValue: 600 });
+    const lastDay = template({ day: 7, timingValue: 1380 });
+    const plan = planChain(
+      segmentChainInput([deferred, lastDay], {
+        segment: "A",
+        enteredAt: T("2026-10-20 15:00"),
+        linkExpiresAt: T("2026-10-27 00:00"),
+      }),
+    );
+    expect(plan).toEqual([]);
   });
 
   it("leaves day 1 unchanged", () => {

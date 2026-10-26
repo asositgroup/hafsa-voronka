@@ -31,7 +31,8 @@ Segment **D («Qayta imkon») is removed** as a stage. A person whose link has c
 
 ### Link and «afsus»
 
-- The link still closes after `LINK_TTL_HOURS` (default 24h). Nothing about the timeline depends on the link being open.
+- The link still closes after `LINK_TTL_HOURS` (default 24h).
+- **Day 2+ reminders while the link is still open (owner decision, A and B only):** a day 2–7 reminder whose time falls before the current link closes is not sent at its time. Among those reminders only the earliest (by time, then day, then manual order) is kept; it is sent when the link closes, so its «Ha, ko'raman» button is never removed by the expired-link cleanup. The other ones are skipped for good. If the link closes after the end of day 7, none of them is sent. Reminders timed at or after the link closes, day-1 reminders and stage C are unaffected. The admin editor says this under the day 2–7 time field.
 - «Afsus» is no longer a mechanism; it is an ordinary reminder an admin writes (typically day 2), with the existing `again` («Ha, ko'raman») and `later` («Keyinroq») buttons available to any reminder.
 - **«Ha»** reopens the lesson immediately with a fresh link. **«Keyinroq»** lets the person pick a time (existing picker flow) and reopens the lesson then.
 - **Restart rule:** any reopen of a closed lesson issues a new link and restarts the person's current stage timeline at day 1. Reopen paths: «Ha» on any reminder, «Keyinroq» firing at the picked time, the reopen button on the mini-app "lesson closed" screen, and /start after the link has closed. This is deliberate: it keeps "lesson open" reminders on day 1 and "lesson closed" reminders on day 2+ always true.
@@ -82,7 +83,7 @@ One migration, run once, idempotent:
    - `day_time` → unchanged meaning (day N, clock time).
    - `before_expiry` → day-1 relative at `LINK_TTL_HOURS − X` (current TTL at migration time).
    - `night_notice` → deleted (soft-delete like other deletions).
-3. **People currently in D:** end their D run and put them back in A or B by their watch status with a fresh day-1 start time of "now", without sending anything immediately and without issuing a new link. Pending «Keyinroq» appointments stay valid.
+3. **People currently in D:** end their D run and put them back by their watch status: A if they never opened the video, B if they stopped before the price, C if they already reached the price. The new run starts at the start of yesterday in Tashkent, so they are on day 2 at migration time and only see day 2+ reminders. Nothing is sent immediately and no new link is issued. Pending «Keyinroq» appointments stay valid.
 4. Old D offer history is kept for reports; no new rows are written to it.
 
 ## Reports
@@ -103,7 +104,7 @@ One migration, run once, idempotent:
 - **Goal:** what admins see in the day tabs is exactly what a person gets, with no hidden switching.
 - **Goal:** less code: removing D, night rules and extra timing kinds should shrink the dispatcher and planner.
 - **Non-goal:** new analytics, schedule simulator, A/B testing of texts.
-- **Anti-goal:** any rule that silently drops or delays a reminder an admin wrote (other than "already passed", the daily cap, and the person writing to the admin / blocking the bot).
+- **Anti-goal:** any rule that silently drops or delays a reminder an admin wrote (other than "already passed", the daily cap, the person writing to the admin / blocking the bot, and the day 2+ while-the-link-is-open rule: the earliest one is delayed to the link closing and the rest are skipped).
 
 ## Calls made by the design author (not owner decisions)
 

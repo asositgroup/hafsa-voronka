@@ -548,8 +548,7 @@ export type TemplateValidationIssue =
   | { path: "text"; error: TemplateTextError["error"]; variable?: string }
   | { path: "minute"; error: TimingError }
   | { path: "statuses"; error: "statuses_invalid" }
-  | { path: "attempts"; error: "attempts_invalid" }
-  | { path: "buttons"; error: "button_not_allowed" };
+  | { path: "attempts"; error: "attempts_invalid" };
 
 export function validateTemplateInput(input: MessageTemplateInput): TemplateValidationIssue | null {
   const textError = validateTemplateText(input.text, input.media !== null);
@@ -558,7 +557,6 @@ export function validateTemplateInput(input: MessageTemplateInput): TemplateVali
   if (timingError) return { path: "minute", error: timingError };
   if (statusesError(input.segment, input.statuses)) return { path: "statuses", error: "statuses_invalid" };
   if (attemptsError(input.segment, input.attempts)) return { path: "attempts", error: "attempts_invalid" };
-  if (input.buttons.some((button) => !templateButtonKinds.includes(button.kind))) return { path: "buttons", error: "button_not_allowed" };
   return null;
 }
 

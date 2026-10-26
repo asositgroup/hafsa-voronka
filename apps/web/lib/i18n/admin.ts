@@ -279,7 +279,6 @@ export const adminUz = {
       preview: "Ko‘rinishi",
       previewEmpty: "Matn kiriting",
       media: "Media",
-      addMedia: "Media qo‘shish",
       replaceMedia: "Almashtirish",
       removeMedia: "Olib tashlash",
       uploading: "Yuklanmoqda...",
@@ -323,7 +322,6 @@ export const adminUz = {
       delete: "Eslatmani o‘chirish",
       deleteConfirmTitle: "Eslatmani o‘chirasizmi?",
       deleteConfirm: "Bu eslatma endi hech kimga yuborilmaydi.",
-      deleting: "O‘chirilmoqda...",
     },
     errors: {
       empty: "Matn bo‘sh bo‘lmasligi kerak",
@@ -335,7 +333,6 @@ export const adminUz = {
       out_of_range: "Vaqt ruxsat etilgan oraliqdan tashqarida",
       statuses_invalid: "To‘xtagan joy bo‘yicha tanlash faqat «Ko‘rib to‘xtaganlar» uchun",
       attempts_invalid: "Havola tanlovi faqat «Videoni ochmaganlar» va «Ko‘rib to‘xtaganlar» uchun",
-      button_not_allowed: "Bu tugma bu bo‘limda ishlamaydi",
       unsupported_type: "Fayl turi qo‘llab-quvvatlanmaydi",
       too_large: "Fayl juda katta",
       media_not_configured: "Media yuklash sozlanmagan",

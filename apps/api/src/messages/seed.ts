@@ -16,8 +16,6 @@ type SeedTemplate = {
   statuses?: FunnelStatus[];
 };
 
-export type SeedSegment = FunnelSegment;
-
 const MINUTES_PER_HOUR = 60;
 
 const watchButton: TemplateButton = { kind: "resume", text: "▶ Videoni ko‘rish" };
@@ -182,13 +180,13 @@ const segmentC: SeedTemplate[] = [
   },
 ];
 
-export const seedTemplates: Record<SeedSegment, SeedTemplate[]> = {
+export const seedTemplates: Record<FunnelSegment, SeedTemplate[]> = {
   A: segmentA,
   B: segmentB,
   C: segmentC,
 };
 
-export function seedInputs(segment: SeedSegment): MessageTemplateInput[] {
+export function seedInputs(segment: FunnelSegment): MessageTemplateInput[] {
   return seedTemplates[segment].map((template) => ({
     segment,
     day: template.day,
@@ -202,7 +200,7 @@ export function seedInputs(segment: SeedSegment): MessageTemplateInput[] {
   }));
 }
 
-async function seedSegment(segment: SeedSegment) {
+async function seedSegment(segment: FunnelSegment) {
   return db().transaction(async (tx) => {
     const [existing] = await tx
       .select({ total: count() })
@@ -229,6 +227,6 @@ async function seedSegment(segment: SeedSegment) {
   });
 }
 
-export async function seedStartingTemplates(): Promise<Record<SeedSegment, number>> {
+export async function seedStartingTemplates(): Promise<Record<FunnelSegment, number>> {
   return { A: await seedSegment("A"), B: await seedSegment("B"), C: await seedSegment("C") };
 }

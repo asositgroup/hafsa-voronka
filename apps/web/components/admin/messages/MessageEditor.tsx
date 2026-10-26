@@ -51,7 +51,6 @@ const acceptedMedia = Object.values(TEMPLATE_MEDIA_MIME_TYPES).flat().join(",");
 const extraErrorCodes = new Set([
   "statuses_invalid",
   "attempts_invalid",
-  "button_not_allowed",
   "unsupported_type",
   "too_large",
   "media_not_configured",
@@ -193,7 +192,6 @@ export function MessageEditor({
     }
     after(result.data);
   }
-
 
   const save = () =>
     run(

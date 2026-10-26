@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  type FunnelSegment,
   messageTemplateInputSchema,
   segmentStatuses,
   templateButtonSchema,
   validateTemplateInput,
 } from "@funnel/shared";
-import { type SeedSegment, seedInputs } from "./seed";
+import { seedInputs } from "./seed";
 
-const seedSegments: SeedSegment[] = ["A", "B", "C"];
+const seedSegments: FunnelSegment[] = ["A", "B", "C"];
 
 describe("Seed templates", () => {
   for (const segment of seedSegments) {

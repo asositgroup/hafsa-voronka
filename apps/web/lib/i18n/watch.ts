@@ -18,8 +18,6 @@ export const watchUz = {
   reopenFailed: "Darsni ochib bo‘lmadi. Qayta urinib ko‘ring.",
   play: "Ijro etish",
   pause: "To‘xtatish",
-  mute: "Ovozni o‘chirish",
-  unmute: "Ovozni yoqish",
   fullscreen: "To‘liq ekran",
   exitFullscreen: "Kichik ekran",
   lessonTitle: "Arab tilini o‘rganishdagi 5 muhim qadam",

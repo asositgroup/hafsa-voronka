@@ -23,6 +23,21 @@ export function statusFor(
   return position >= lessonStart ? "dars_yarmida" : "korishni_boshladi";
 }
 
+export function isLessonClosed(
+  user: Pick<User, "registeredAt" | "linkExpiresAt" | "completedAt">,
+  status: FunnelStatus | null,
+  now: Date,
+): boolean {
+  return (
+    user.registeredAt !== null &&
+    user.linkExpiresAt !== null &&
+    now >= user.linkExpiresAt &&
+    user.completedAt === null &&
+    status !== "narxni_kurdi" &&
+    status !== "adminga_yozdi"
+  );
+}
+
 export type LinkState = "live" | "expired" | "exhausted";
 
 function linkBound(segment: FunnelSegment, linkState: LinkState): FunnelSegment | null {

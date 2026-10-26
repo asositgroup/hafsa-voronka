@@ -18,6 +18,7 @@ export const eventTypes = [
   "price_reached",
   "offer_video_complete",
   "second_chance_offer",
+  "lesson_reopened",
   "second_chance_again",
   "second_chance_later",
   "later_scheduled",

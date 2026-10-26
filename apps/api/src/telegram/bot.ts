@@ -6,6 +6,7 @@ import { findByTelegramId, logEvent, setBotBlocked, upsertUser } from "@/funnel/
 import { syncSegment } from "@/funnel/segments";
 import { uz } from "@/i18n/uz";
 import { applyLeadAction } from "@/leads/actions";
+import { reopenLesson } from "@/links/service";
 import type { LeadAction } from "@/leads/card";
 import { markBlockedByTelegramId } from "@/telegram/blocked";
 import { adminVideoComposer } from "@/telegram/admin-video/handlers";
@@ -92,6 +93,8 @@ function createBot() {
       await registerFromChat(ctx, user);
       return;
     }
+
+    await reopenLesson(user.id, "start").catch((error) => console.error("Lesson reopen failed:", error));
 
     const completed = user.completedAt !== null;
     const keyboard = await watchKeyboard(completed);

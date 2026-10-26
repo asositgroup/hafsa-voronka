@@ -530,7 +530,6 @@ export const watchAppointments = pgTable(
     index("watch_appointments_due_idx")
       .on(t.chosenAt)
       .where(sql`${t.firedAt} is null and ${t.cancelledAt} is null`),
-    check("watch_appointments_offer_shape", sql`(${t.purpose} = 'reopen') = (${t.offerId} is not null)`),
     check("watch_appointments_closed_once", sql`${t.firedAt} is null or ${t.cancelledAt} is null`),
   ],
 );

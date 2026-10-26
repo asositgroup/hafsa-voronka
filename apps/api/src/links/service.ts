@@ -1,18 +1,17 @@
-import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
-import type { LinkGrantKind } from "@funnel/shared";
+import { and, eq, sql } from "drizzle-orm";
+import type { FunnelStatus, LinkGrantKind } from "@funnel/shared";
 import { db } from "@/db";
-import { type LinkGrant, linkGrants, secondChanceOffers, type User, users } from "@/db/schema";
-import { linkStateFor } from "@/funnel/secondChance";
+import { type LinkGrant, linkGrants, secondChanceOffers, type User, users, videos, watchProgress } from "@/db/schema";
 import { syncSegment } from "@/funnel/segments";
+import { isLessonClosed, NO_VIDEO_MARKS, segmentFor, statusFor } from "@/funnel/status";
 import { logEvent } from "@/funnel/users";
 import { refreshUserLeadCards } from "@/leads/service";
 import { linkExpiryFor } from "@/messages/plan";
 import { linkTtlHours } from "@/settings/service";
 import { cancelPendingAppointments } from "./appointmentStore";
-import { offerHistory } from "./offers";
 
 type Tx = Parameters<Parameters<ReturnType<typeof db>["transaction"]>[0]>[0];
-type Executor = Pick<ReturnType<typeof db>, "select">;
+type Reader = Pick<ReturnType<typeof db>, "select">;
 
 export type GrantRequest = { kind: LinkGrantKind; offerFirst: boolean; now: Date; ttlHours: number };
 
@@ -36,61 +35,48 @@ export async function insertGrant(tx: Tx, userId: number, request: GrantRequest)
   return grant;
 }
 
-export async function openOffer(executor: Executor, user: Pick<User, "id" | "linkId" | "linkExpiresAt" | "wroteAdminAt">, now: Date) {
-  if (user.linkId === null || user.wroteAdminAt !== null) return null;
-  if (user.linkExpiresAt === null || user.linkExpiresAt.getTime() > now.getTime()) return null;
-  const [offer] = await executor
-    .select()
-    .from(secondChanceOffers)
-    .where(
-      and(
-        eq(secondChanceOffers.userId, user.id),
-        eq(secondChanceOffers.expiredLinkId, user.linkId),
-        eq(secondChanceOffers.skipped, false),
-        isNotNull(secondChanceOffers.sentMessageId),
-      ),
-    )
-    .orderBy(desc(secondChanceOffers.occasion))
-    .limit(1);
-  if (!offer || offer.answer === "again") return null;
-  const state = linkStateFor({ history: await offerHistory(executor, user.id), expiresAt: user.linkExpiresAt }, now);
-  return state === "expired" ? offer : null;
+export type LessonState = { status: FunnelStatus | null; closed: boolean };
+
+export async function lessonState(executor: Reader, user: User, now: Date): Promise<LessonState> {
+  const [row] = await executor
+    .select({ progress: watchProgress, video: videos })
+    .from(users)
+    .leftJoin(watchProgress, eq(watchProgress.userId, users.id))
+    .leftJoin(videos, eq(videos.id, users.videoId))
+    .where(eq(users.id, user.id));
+  const status = statusFor(row?.progress ?? undefined, row?.video ?? NO_VIDEO_MARKS, user);
+  return { status, closed: isLessonClosed(user, status, now) };
 }
 
-export type AcceptResult = "granted" | "already" | "closed";
+export type ReopenResult = "reopened" | "open" | "closed";
+export type ReopenSource = "again" | "screen" | "start";
 
-export async function acceptSecondChance(userId: number, now = new Date()): Promise<AcceptResult> {
+export async function reopenWithin(
+  tx: Tx,
+  userId: number,
+  kind: "again" | "scheduled",
+  now: Date,
+  ttlHours: number,
+): Promise<ReopenResult> {
+  const [user] = await tx.select().from(users).where(eq(users.id, userId)).for("update");
+  if (!user || user.registeredAt === null || user.wroteAdminAt !== null || user.botBlocked) return "closed";
+  const state = await lessonState(tx, user, now);
+  if (!state.closed) return "open";
+  await insertGrant(tx, userId, { kind, offerFirst: segmentFor(state.status) === "B", now, ttlHours });
+  return "reopened";
+}
+
+export async function reopenLesson(userId: number, source: ReopenSource, now = new Date()): Promise<ReopenResult> {
   const ttlHours = await linkTtlHours();
-  const result = await db().transaction(async (tx): Promise<AcceptResult> => {
-    const [user] = await tx.select().from(users).where(eq(users.id, userId)).for("update");
-    if (!user || user.registeredAt === null) return "closed";
-    const offer = await openOffer(tx, user, now);
-    if (!offer) {
-      const [latest] = await tx
-        .select({ answer: secondChanceOffers.answer, grantedLinkId: secondChanceOffers.grantedLinkId })
-        .from(secondChanceOffers)
-        .where(eq(secondChanceOffers.userId, userId))
-        .orderBy(desc(secondChanceOffers.occasion))
-        .limit(1);
-      return latest?.answer === "again" && latest.grantedLinkId === user.linkId ? "already" : "closed";
-    }
-    const grant = await insertGrant(tx, userId, {
-      kind: "again",
-      offerFirst: offer.variant === "no_price",
-      now,
-      ttlHours,
-    });
-    await tx
-      .update(secondChanceOffers)
-      .set({ answer: "again", answeredAt: now, grantedLinkId: grant.id })
-      .where(eq(secondChanceOffers.id, offer.id));
-    await cancelPendingAppointments(tx, userId, now, ["reopen"]);
-    return "granted";
+  const result = await db().transaction(async (tx) => {
+    const outcome = await reopenWithin(tx, userId, "again", now, ttlHours);
+    if (outcome === "reopened") await cancelPendingAppointments(tx, userId, now, ["reopen"]);
+    return outcome;
   });
 
-  if (result !== "granted") return result;
+  if (result !== "reopened") return result;
   await syncSegment(userId, now).catch((error) => console.error("Segment sync failed:", error));
-  await logEvent("second_chance_again", { userId });
+  await logEvent("lesson_reopened", { userId, meta: { source } });
   await refreshUserLeadCards(userId).catch((error) => console.error("Lead card refresh failed:", error));
   return result;
 }

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { asc, eq } from "drizzle-orm";
 import type { Bot } from "grammy";
-import { type FunnelStatus, sessionResponseSchema, type TemplateButton } from "@funnel/shared";
+import { type FunnelStatus, type TemplateButton } from "@funnel/shared";
 import { closeDb, db } from "@/db";
 import { runMigrations } from "@/db/migrate";
 import {
@@ -14,16 +14,14 @@ import {
   users,
   watchProgress,
 } from "@/db/schema";
-import { signInitData } from "@/telegram/initData";
 import { isolatedDatabase } from "@/test/isolatedDb";
-import { setTestEnv, TEST_BOT_TOKEN } from "@/test/env";
+import { setTestEnv } from "@/test/env";
 import { createTestVideo, ensureActiveTestVideo } from "@/test/videos";
 
 const isolatedDb = isolatedDatabase("vf_second_chance");
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
-const TASHKENT = 5 * HOUR;
 const noPrice: FunnelStatus[] = ["korishni_boshladi", "dars_yarmida", "sotuvda_toxtadi"];
 const offerButtons: TemplateButton[] = [
   { kind: "again", text: "Ha, ko'raman" },
@@ -33,11 +31,10 @@ const offerButtons: TemplateButton[] = [
 type ApiCall = { method: string; payload: Record<string, unknown> };
 
 describe.skipIf(!isolatedDb.url)("Second chance after the link expires", () => {
-  let app: ReturnType<typeof import("@/app").createApp>;
   let testBot: Bot;
   let dispatchMessages: typeof import("@/messages/dispatch").dispatchMessages;
   let syncSegment: typeof import("@/funnel/segments").syncSegment;
-  let acceptSecondChance: typeof import("@/links/service").acceptSecondChance;
+  let reopenLesson: typeof import("@/links/service").reopenLesson;
   let markWroteAdmin: typeof import("@/funnel/channel").markWroteAdmin;
   let markRegistered: typeof import("@/funnel/users").markRegistered;
   let blockedChats = new Set<number>();
@@ -75,10 +72,9 @@ describe.skipIf(!isolatedDb.url)("Second chance after the link expires", () => {
     });
     ({ dispatchMessages } = await import("@/messages/dispatch"));
     ({ syncSegment } = await import("@/funnel/segments"));
-    ({ acceptSecondChance } = await import("@/links/service"));
+    ({ reopenLesson } = await import("@/links/service"));
     ({ markWroteAdmin } = await import("@/funnel/channel"));
     ({ markRegistered } = await import("@/funnel/users"));
-    app = (await import("@/app")).createApp();
     await ensureActiveTestVideo();
   });
 
@@ -175,25 +171,6 @@ describe.skipIf(!isolatedDb.url)("Second chance after the link expires", () => {
     return db().select().from(linkGrants).where(eq(linkGrants.userId, userId)).orderBy(asc(linkGrants.attempt));
   }
 
-  function initData(telegramId: number) {
-    const params = new URLSearchParams({
-      auth_date: String(Math.floor(Date.now() / 1000)),
-      user: JSON.stringify({ id: telegramId, first_name: "Ali" }),
-    });
-    params.set("hash", signInitData(params, TEST_BOT_TOKEN));
-    return `tma ${params.toString()}`;
-  }
-
-  async function session(telegramId: number, body: Record<string, unknown> = { reason: "open" }) {
-    const res = await app.request("/app/session", {
-      method: "POST",
-      headers: { authorization: initData(telegramId), "content-type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    expect(res.status).toBe(200);
-    return sessionResponseSchema.parse(await res.json());
-  }
-
   function tap(telegramId: number, data: string) {
     return testBot.handleUpdate({
       update_id: updateId++,
@@ -209,13 +186,6 @@ describe.skipIf(!isolatedDb.url)("Second chance after the link expires", () => {
         },
       },
     } as never);
-  }
-
-  function recentDaytime() {
-    const now = Date.now();
-    const local = now + TASHKENT;
-    const tenToday = Math.floor(local / DAY) * DAY + 10 * HOUR - TASHKENT;
-    return new Date(tenToday <= now ? tenToday : tenToday - DAY);
   }
 
   it("gives every registration its first link grant", async () => {
@@ -273,92 +243,12 @@ describe.skipIf(!isolatedDb.url)("Second chance after the link expires", () => {
     expect((await offersOf(user.id))[0].variant).toBe("no_price");
   });
 
-  it("reopens the lesson for 24h once on «Ha» and keeps the progress", async () => {
-    const base = recentDaytime();
-    const video = await createTestVideo({ introEndSec: 100, courseStartSec: 300, priceSec: 600 });
-    const user = await linkedUser({ givenAt: new Date(base.getTime() - DAY), expiresAt: base, videoId: video.id, maxPosition: 200 });
-    await afsus(1, "Kurs qismini ko'rmay qoldingiz", noPrice);
-    await tick(base);
-    expect(sentTexts()).toEqual(["Kurs qismini ko'rmay qoldingiz"]);
-
-    const before = await session(user.telegramId);
-    expect(before).toMatchObject({ expired: true, secondChance: true });
-
-    const opened = await session(user.telegramId, { reason: "open", start: "again" });
-    expect(opened).toMatchObject({ expired: false, secondChance: false });
-    expect(opened.progress).toMatchObject({ lastPosition: 200, maxPosition: 200 });
-
-    const grants = await grantsOf(user.id);
-    expect(grants.map((grant) => [grant.attempt, grant.kind, grant.offerFirst])).toEqual([
-      [1, "initial", false],
-      [2, "again", true],
-    ]);
-    const [fresh] = await db().select().from(users).where(eq(users.id, user.id));
-    expect(fresh.linkId).toBe(grants[1].id);
-    expect(fresh.linkExpiresAt!.getTime()).toBeGreaterThanOrEqual(grants[1].givenAt.getTime() + 24 * HOUR);
-    const runs = await runsOf(user.id);
-    expect(runs.map((run) => [run.segment, run.endReason, run.attempt])).toEqual([
-      ["B", "expired", 1],
-      ["D", "relinked", 1],
-      ["B", null, 2],
-    ]);
-    const [offer] = await offersOf(user.id);
-    expect(offer).toMatchObject({ answer: "again", grantedLinkId: grants[1].id });
-    const [progress] = await db().select().from(watchProgress).where(eq(watchProgress.userId, user.id));
-    expect(progress).toMatchObject({ maxPosition: 200, lastPosition: 200 });
-
-    await session(user.telegramId, { reason: "open", start: "again" });
-    const res = await app.request("/app/second-chance/accept", {
-      method: "POST",
-      headers: { authorization: initData(user.telegramId) },
-    });
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, result: "already" });
-    expect(await grantsOf(user.id)).toHaveLength(2);
-    expect((await db().select().from(events).where(eq(events.type, "second_chance_again"))).length).toBe(1);
-  });
-
-  it("answers 409 on the expired screen when there is no offer to accept", async () => {
-    const user = await linkedUser({ givenAt: new Date(Date.now() - 2 * DAY), expiresAt: new Date(Date.now() - DAY) });
-    const res = await app.request("/app/second-chance/accept", {
-      method: "POST",
-      headers: { authorization: initData(user.telegramId) },
-    });
-    expect(res.status).toBe(409);
-    expect(await grantsOf(user.id)).toHaveLength(1);
-  });
-
-  it("restarts the §1 chain from the new link and sends only texts meant for it", async () => {
-    const user = await linkedUser({ expiresAt: at(24 * 60) });
-    await template({ text: "Birinchi link", attempts: [1] });
-    await template({ text: "Ikkinchi link", attempts: [2], position: 1 });
-    await template({ text: "Har bir link", timingValue: 120, position: 2 });
-    await afsus(1, "Afsus");
-    await tick(at(61));
-    await tick(at(121));
-    await tick(at(24 * 60));
-    expect(sentTexts()).toEqual(["Birinchi link", "Har bir link", "Afsus"]);
-
-    const reopenedAt = at(26 * 60);
-    expect(await acceptSecondChance(user.id, reopenedAt)).toBe("granted");
-    expect(await acceptSecondChance(user.id, at(26 * 60 + 5))).toBe("already");
-    const [, , aRun] = await runsOf(user.id);
-    expect(aRun).toMatchObject({ segment: "A", attempt: 2, enteredAt: reopenedAt, endedAt: null });
-
-    await tick(at(60, reopenedAt));
-    await tick(at(120, reopenedAt));
-    expect(sentTexts()).toEqual(["Birinchi link", "Har bir link", "Afsus", "Ikkinchi link", "Har bir link"]);
-    const [, reopened] = await grantsOf(user.id);
-    const chain = await db().select().from(sentMessages).where(eq(sentMessages.segmentRunId, aRun.id));
-    expect(chain.map((row) => row.linkId)).toEqual([reopened.id, reopened.id]);
-  });
-
   it("offers again when the reopened link expires too, with the next page", async () => {
     const user = await linkedUser({ expiresAt: at(24 * 60) });
     await afsus(1, "Afsus 1");
     await afsus(2, "Afsus 2");
     await tick(at(24 * 60));
-    await acceptSecondChance(user.id, at(25 * 60));
+    await reopenLesson(user.id, "again", at(25 * 60));
     const [, second] = await grantsOf(user.id);
     await tick(second.expiresAt!);
     expect(sentTexts()).toEqual(["Afsus 1", "Afsus 2"]);

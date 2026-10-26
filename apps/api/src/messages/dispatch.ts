@@ -33,7 +33,7 @@ import { logEvent } from "@/funnel/users";
 import { refreshUserLeadCards } from "@/leads/service";
 import { pendingAppointmentUserIds } from "@/links/appointmentStore";
 import { offerHistories } from "@/links/offers";
-import { insertGrant } from "@/links/service";
+import { type LessonState, lessonState, reopenWithin } from "@/links/service";
 import { linkTtlHours, messageCaps } from "@/settings/service";
 import { isAdminTelegramId, notAdminTelegramId } from "@/telegram/admins";
 import { bot } from "@/telegram/bot";
@@ -512,25 +512,21 @@ async function expireLinks(api: Api, now: Date, pace: Pace) {
 type AppointmentRow = {
   appointment: typeof watchAppointments.$inferSelect;
   user: typeof users.$inferSelect;
-  offer: typeof secondChanceOffers.$inferSelect | null;
+  state: LessonState;
   lastBeatAt: Date | null;
 };
 
-function appointmentStillValid({ appointment, user, offer, lastBeatAt }: AppointmentRow, now: Date): boolean {
+function appointmentStillValid({ appointment, user, state, lastBeatAt }: AppointmentRow): boolean {
   if (user.botBlocked || user.wroteAdminAt !== null || isAdminTelegramId(user.telegramId)) return false;
-  if (appointment.purpose === "reopen") {
-    return offer !== null && offer.answer !== "again" && user.linkId === offer.expiredLinkId;
-  }
-  const linkLive = user.linkExpiresAt === null || user.linkExpiresAt.getTime() > now.getTime();
-  return linkLive && !(lastBeatAt && lastBeatAt.getTime() > appointment.createdAt.getTime());
+  if (appointment.purpose === "reopen") return state.closed;
+  return !state.closed && !(lastBeatAt && lastBeatAt.getTime() > appointment.createdAt.getTime());
 }
 
 async function fireReopen(row: AppointmentRow, now: Date): Promise<boolean> {
-  const { appointment, user, offer } = row;
-  if (!offer) return false;
+  const { appointment, user } = row;
   const ttlHours = await linkTtlHours();
   return db().transaction(async (tx) => {
-    const [locked] = await tx.select().from(users).where(eq(users.id, user.id)).for("update");
+    await tx.select({ id: users.id }).from(users).where(eq(users.id, user.id)).for("update");
     const [open] = await tx
       .select({ id: watchAppointments.id })
       .from(watchAppointments)
@@ -540,17 +536,10 @@ async function fireReopen(row: AppointmentRow, now: Date): Promise<boolean> {
           isNull(watchAppointments.firedAt),
           isNull(watchAppointments.cancelledAt),
         ),
-      );
-    if (!locked || !open || locked.linkId !== offer.expiredLinkId || locked.botBlocked || locked.wroteAdminAt) {
-      return false;
-    }
-    const grant = await insertGrant(tx, user.id, {
-      kind: "scheduled",
-      offerFirst: offer.variant === "no_price",
-      now,
-      ttlHours,
-    });
-    await tx.update(secondChanceOffers).set({ grantedLinkId: grant.id }).where(eq(secondChanceOffers.id, offer.id));
+      )
+      .for("update");
+    if (!open) return false;
+    if ((await reopenWithin(tx, user.id, "scheduled", now, ttlHours)) !== "reopened") return false;
     await tx.update(watchAppointments).set({ firedAt: now }).where(eq(watchAppointments.id, appointment.id));
     return true;
   });
@@ -573,16 +562,14 @@ async function fireRemind(row: AppointmentRow, now: Date): Promise<boolean> {
 
 async function processAppointments(api: Api, now: Date, pace: Pace) {
   if (now.getTime() < pausedUntil) return;
-  const due = await db()
+  const dueRows = await db()
     .select({
       appointment: watchAppointments,
       user: users,
-      offer: secondChanceOffers,
       lastBeatAt: watchProgress.lastBeatAt,
     })
     .from(watchAppointments)
     .innerJoin(users, eq(users.id, watchAppointments.userId))
-    .leftJoin(secondChanceOffers, eq(secondChanceOffers.id, watchAppointments.offerId))
     .leftJoin(watchProgress, eq(watchProgress.userId, users.id))
     .where(
       and(
@@ -601,10 +588,11 @@ async function processAppointments(api: Api, now: Date, pace: Pace) {
     .orderBy(asc(watchAppointments.chosenAt))
     .limit(APPOINTMENT_BATCH_SIZE);
 
-  for (const row of due) {
+  for (const dueRow of dueRows) {
+    const row: AppointmentRow = { ...dueRow, state: await lessonState(db(), dueRow.user, now) };
     const { appointment, user } = row;
     const userId = user.id;
-    if (!appointmentStillValid(row, now)) {
+    if (!appointmentStillValid(row)) {
       await db().update(watchAppointments).set({ cancelledAt: now }).where(eq(watchAppointments.id, appointment.id));
       await refreshUserLeadCards(userId).catch((error) => console.error("Lead card refresh failed:", error));
       continue;

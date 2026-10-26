@@ -1,0 +1,1 @@
+ALTER TABLE "watch_appointments" DROP CONSTRAINT "watch_appointments_offer_shape";

@@ -15,20 +15,6 @@ export class StaleOrderError extends Error {
   }
 }
 
-function constraintOf(error: unknown): string | undefined {
-  const candidate = error as { constraint_name?: string; cause?: { constraint_name?: string } } | null;
-  return candidate?.constraint_name ?? candidate?.cause?.constraint_name;
-}
-
-export type TemplateConflict = "night_notice_exists" | "occasion_exists";
-
-export function templateConflict(error: unknown): TemplateConflict | null {
-  const constraint = constraintOf(error);
-  if (constraint === "message_templates_night_notice_idx") return "night_notice_exists";
-  if (constraint === "message_templates_occasion_slot_idx") return "occasion_exists";
-  return null;
-}
-
 type Executor = Pick<ReturnType<typeof db>, "select" | "insert" | "update">;
 
 export function toTemplate(row: MessageTemplateRow): MessageTemplate {
@@ -39,7 +25,7 @@ export function toTemplate(row: MessageTemplateRow): MessageTemplate {
     position: row.position,
     text: row.text,
     media: row.mediaType && row.mediaFileId ? { type: row.mediaType, fileId: row.mediaFileId } : null,
-    timing: { type: row.timingType, value: row.timingValue },
+    minute: row.timingValue,
     buttons: row.buttons,
     isActive: row.isActive,
     statuses: row.statuses,
@@ -53,8 +39,7 @@ function columns(input: MessageTemplateInput) {
     text: input.text,
     mediaType: input.media?.type ?? null,
     mediaFileId: input.media?.fileId ?? null,
-    timingType: input.timing.type,
-    timingValue: input.timing.value,
+    timingValue: input.minute,
     buttons: input.buttons,
     isActive: input.isActive,
     statuses: normalizeStatuses(input.segment, input.statuses),

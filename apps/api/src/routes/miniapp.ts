@@ -5,9 +5,9 @@ import type { AppEnv } from "@/auth";
 import { db } from "@/db";
 import { linkGrants, watchProgress } from "@/db/schema";
 import { env } from "@/env";
-import { NO_VIDEO_MARKS, statusFor } from "@/funnel/status";
+import { isLessonClosed, NO_VIDEO_MARKS, statusFor } from "@/funnel/status";
 import { logEvent, upsertUser } from "@/funnel/users";
-import { acceptSecondChance, linkExpiredBeforePrice, openOffer } from "@/links/service";
+import { reopenLesson } from "@/links/service";
 import { recordMessageClick } from "@/messages/clicks";
 import { videoForUser } from "@/videos/service";
 import { remainingWatchSecs } from "@/watch/credit";
@@ -30,7 +30,7 @@ miniappRoutes.post("/session", async (c) => {
   const now = new Date();
   const profile = c.get("telegramUser");
   let { user } = await upsertUser(profile, c.get("startParam"));
-  if (reason === "open" && start === "again" && (await acceptSecondChance(user.id, now)) === "granted") {
+  if (reason === "open" && start === "again" && (await reopenLesson(user.id, "again", now)) === "reopened") {
     ({ user } = await upsertUser(profile, undefined));
   }
   const video = await videoForUser(user);
@@ -64,8 +64,7 @@ miniappRoutes.post("/session", async (c) => {
     start,
   });
   const status = statusFor(progress, video ?? NO_VIDEO_MARKS, user);
-  const expired = linkExpiredBeforePrice(user, status, now);
-  const secondChance = expired && (await openOffer(db(), user, now)) !== null;
+  const expired = isLessonClosed(user, status, now);
 
   return c.json({
     registered: user.registeredAt !== null,
@@ -77,7 +76,6 @@ miniappRoutes.post("/session", async (c) => {
     videoId: video.id,
     priceSec: video.priceSec,
     expired,
-    secondChance,
     startAt: plan.startAt,
     startsAtCourse: plan.startsAtCourse,
     offerFirst: plan.offerFirst,
@@ -101,11 +99,11 @@ miniappRoutes.post("/session", async (c) => {
   } satisfies SessionResponse);
 });
 
-miniappRoutes.post("/second-chance/accept", async (c) => {
+miniappRoutes.post("/reopen", async (c) => {
   c.header("cache-control", "no-store");
   const { user } = await upsertUser(c.get("telegramUser"), c.get("startParam"));
-  const result = await acceptSecondChance(user.id);
-  return result === "closed" ? c.json({ error: "offer_closed" }, 409) : c.json({ ok: true, result });
+  const result = await reopenLesson(user.id, "screen");
+  return result === "closed" ? c.json({ error: "reopen_closed" }, 409) : c.json({ ok: true, result });
 });
 
 miniappRoutes.post("/register", (c) => c.json({ error: "register_in_bot" }, 403));

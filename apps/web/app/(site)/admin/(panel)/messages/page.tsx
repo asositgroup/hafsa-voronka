@@ -3,16 +3,9 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
-import {
-  type FunnelSegment,
-  funnelSegments,
-  linkBoundSegments,
-  type MessageTemplate,
-  SECOND_CHANCE_SEGMENT,
-} from "@funnel/shared";
+import { defaultMinute, type FunnelSegment, funnelSegments, type MessageTemplate } from "@funnel/shared";
 import { MessageEditor, type MessagePreset } from "@/components/admin/messages/MessageEditor";
-import { ReminderChain } from "@/components/admin/messages/ReminderChain";
-import { SecondChancePages } from "@/components/admin/messages/SecondChancePages";
+import { DayTimeline } from "@/components/admin/messages/DayTimeline";
 import { StageOverview } from "@/components/admin/messages/StageOverview";
 import type { VideoMarks } from "@/components/admin/messages/StopPointPicker";
 import { buttonClass } from "@/components/admin/ui/Button";
@@ -52,11 +45,13 @@ function AdminMessagesContent() {
   const [editing, setEditing] = useState<Editing>(null);
   const [linkTtlHours, setLinkTtlHours] = useState<number | null>(null);
   const [shownStage, setShownStage] = useState(stage);
+  const [day, setDay] = useState(1);
 
   if (shownStage !== stage) {
     setShownStage(stage);
     setNotice(null);
     setEditing(null);
+    setDay(1);
   }
 
   const loaded = stage ? (cache[stage] ?? null) : null;
@@ -179,7 +174,7 @@ function AdminMessagesContent() {
   const editingSource = editing ? cache[editing.segment] : undefined;
 
   return (
-    <Page width={stage === "C" ? "wide" : "narrow"}>
+    <Page width="narrow">
       {stage ? (
         <div className="flex flex-col gap-3">
           <Link href="/admin/messages" className={`${buttonClass({ variant: "ghost", size: "sm" })} -ml-3 self-start`}>
@@ -203,68 +198,23 @@ function AdminMessagesContent() {
 
       {stage && !loaded && !failed && <LoadingState variant="list" rows={3} />}
 
-      {stage && loaded && stage === SECOND_CHANCE_SEGMENT && (
-        <SecondChancePages
-          items={loaded.items}
-          onEdit={(item) => setEditing({ segment: stage, item })}
-          onAdd={(preset) => setEditing({ segment: stage, item: null, preset })}
-          onToggle={(item, isActive) => void toggle(item, isActive)}
-        />
-      )}
-
-      {stage && loaded && stage !== SECOND_CHANCE_SEGMENT && !linkBoundSegments.includes(stage) && (
-        <ReminderChain
+      {stage && loaded && (
+        <DayTimeline
           segment={stage}
           items={loaded.items}
           videoMarks={loaded.videoMarks}
-          onAdd={(preset) => setEditing({ segment: stage, item: null, preset })}
+          day={day}
+          onDayChange={setDay}
+          onAdd={(targetDay) => setEditing({ segment: stage, item: null, preset: { day: targetDay, minute: defaultMinute(targetDay) } })}
           onEdit={(item) => setEditing({ segment: stage, item })}
           onToggle={(item, isActive) => void toggle(item, isActive)}
           onMove={(group, index, direction) => void move(group, index, direction)}
         />
       )}
 
-      {stage && loaded && linkBoundSegments.includes(stage) && (
-        <>
-          <section aria-labelledby="link-open-title" className="flex flex-col gap-3">
-            <div>
-              <h2 id="link-open-title" className="m-0 text-lg font-semibold text-siyoh">
-                {copy.board.linkOpenTitle}
-              </h2>
-              <p className="m-0 text-sm text-qalam">{copy.board.linkOpenHint}</p>
-            </div>
-            <ReminderChain
-              segment={stage}
-              items={loaded.items}
-              videoMarks={loaded.videoMarks}
-              onAdd={(preset) => setEditing({ segment: stage, item: null, preset })}
-              onEdit={(item) => setEditing({ segment: stage, item })}
-              onToggle={(item, isActive) => void toggle(item, isActive)}
-              onMove={(group, index, direction) => void move(group, index, direction)}
-            />
-          </section>
-          {cache[SECOND_CHANCE_SEGMENT] && (
-            <section aria-labelledby="after-close-title" className="flex flex-col gap-3 pt-4">
-              <div>
-                <h2 id="after-close-title" className="m-0 text-lg font-semibold text-siyoh">
-                  {copy.board.afterCloseTitle}
-                </h2>
-                <p className="m-0 text-sm text-qalam">{copy.board.afterCloseHint}</p>
-              </div>
-              <SecondChancePages
-                items={cache[SECOND_CHANCE_SEGMENT].items}
-                onEdit={(item) => setEditing({ segment: SECOND_CHANCE_SEGMENT, item })}
-                onAdd={(preset) => setEditing({ segment: SECOND_CHANCE_SEGMENT, item: null, preset })}
-                onToggle={(item, isActive) => void toggle(item, isActive)}
-              />
-            </section>
-          )}
-        </>
-      )}
-
       {editing && editingSource && (
         <MessageEditor
-          key={editing.item?.id ?? `new-${editing.segment}-${editing.preset?.timing.type ?? ""}-${editing.preset?.day ?? 0}-${editing.preset?.statuses?.join() ?? ""}`}
+          key={editing.item?.id ?? `new-${editing.segment}-${day}`}
           segment={editing.segment}
           item={editing.item}
           preset={editing.preset}

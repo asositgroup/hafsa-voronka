@@ -19,7 +19,6 @@ export const sessionResponseSchema = z.object({
   videoId: z.number(),
   priceSec: z.number().nullable(),
   expired: z.boolean(),
-  secondChance: z.boolean(),
   startAt: z.number(),
   startsAtCourse: z.boolean(),
   offerFirst: z.object({ url: z.string(), duration: z.number() }).nullable(),

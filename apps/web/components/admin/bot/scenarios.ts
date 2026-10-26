@@ -1,6 +1,6 @@
 import type { BotButtonKey, BotMessageKey } from "@funnel/shared";
 
-export type ScenarioId = "newUser" | "returning" | "afterLesson" | "secondChance";
+export type ScenarioId = "newUser" | "returning" | "afterLesson" | "later";
 
 export type ChatButton = { key: BotButtonKey; placement: "reply" | "inline" };
 
@@ -18,7 +18,7 @@ const watch: ChatButton = { key: "watchButton", placement: "inline" };
 const channel: ChatButton = { key: "channelButton", placement: "inline" };
 const inline = (key: BotButtonKey): ChatButton => ({ key, placement: "inline" });
 
-export const scenarioOrder: ScenarioId[] = ["newUser", "returning", "afterLesson", "secondChance"];
+export const scenarioOrder: ScenarioId[] = ["newUser", "returning", "afterLesson", "later"];
 
 export const scenarios: Record<ScenarioId, ScenarioCard[]> = {
   newUser: [
@@ -31,7 +31,7 @@ export const scenarios: Record<ScenarioId, ScenarioCard[]> = {
     { key: "rolloutPrompt", trigger: { kind: "note" }, buttons: [watch] },
   ],
   afterLesson: [{ key: "completion", trigger: { kind: "note" }, buttons: [channel] }],
-  secondChance: [
+  later: [
     {
       key: "laterAsk",
       trigger: { kind: "user", text: "later" },

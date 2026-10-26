@@ -1,13 +1,10 @@
 import { z } from "zod";
 import {
-  chainSegments,
   type FunnelSegment,
   funnelSegments,
   type FunnelStatus,
   funnelStatuses,
-  MAX_LINK_ATTEMPTS,
-  offerVariantOf,
-  offerVariantStatuses,
+  LINK_ATTEMPT_OPTIONS,
 } from "./funnel";
 import { formatMmSs } from "./time";
 
@@ -40,8 +37,6 @@ export const TEMPLATE_DAYS = 7;
 export const MINUTES_PER_DAY = 1440;
 export const NIGHT = { start: 1380, end: 420 } as const;
 export const TASHKENT_OFFSET_MS = 5 * 60 * 60 * 1000;
-export const NIGHT_NOTICE_MINUTE = 22 * 60;
-export const MORNING_SEND_MINUTE = 7 * 60 + 30;
 export const EXTENDED_EXPIRY_MINUTE = 9 * 60;
 export const linkBoundSegments: readonly FunnelSegment[] = ["A", "B"];
 
@@ -49,32 +44,24 @@ export const segmentStatuses: Record<FunnelSegment, readonly FunnelStatus[]> = {
   A: ["link_berildi"],
   B: ["korishni_boshladi", "dars_yarmida", "sotuvda_toxtadi"],
   C: ["narxni_kurdi"],
-  D: ["link_berildi", "korishni_boshladi", "dars_yarmida", "sotuvda_toxtadi"],
 };
 
 export const statusTargetSegments: readonly FunnelSegment[] = ["B"];
 
-export const SECOND_CHANCE_SEGMENT = "D" satisfies FunnelSegment;
-
 export const attemptTargetSegments: readonly FunnelSegment[] = ["A", "B"];
 
-export const linkAttempts: readonly number[] = Array.from({ length: MAX_LINK_ATTEMPTS }, (_, index) => index + 1);
+export const linkAttempts: readonly number[] = Array.from({ length: LINK_ATTEMPT_OPTIONS }, (_, index) => index + 1);
 
 export function normalizeStatuses(
   segment: FunnelSegment,
   statuses: readonly FunnelStatus[] | null,
 ): FunnelStatus[] | null {
   if (statuses === null) return null;
-  if (segment === SECOND_CHANCE_SEGMENT) {
-    const variant = offerVariantOf(statuses);
-    return variant ? [...offerVariantStatuses[variant]] : [...statuses];
-  }
   const chosen = segmentStatuses[segment].filter((status) => statuses.includes(status));
   return chosen.length === segmentStatuses[segment].length ? null : chosen;
 }
 
 export function statusesError(segment: FunnelSegment, statuses: readonly FunnelStatus[] | null): boolean {
-  if (segment === SECOND_CHANCE_SEGMENT) return offerVariantOf(statuses) === null;
   if (statuses === null) return false;
   if (!statusTargetSegments.includes(segment) || statuses.length === 0) return true;
   return statuses.some((status) => !segmentStatuses[segment].includes(status));
@@ -92,8 +79,13 @@ export function attemptsError(segment: FunnelSegment, attempts: readonly number[
   return attempts.some((attempt) => !linkAttempts.includes(attempt)) || new Set(attempts).size !== attempts.length;
 }
 
+export function attemptBucket(attempt: number): number {
+  return Math.min(attempt, LINK_ATTEMPT_OPTIONS);
+}
+
 export function templatesForAttempt<T extends { attempts?: readonly number[] | null }>(templates: T[], attempt: number): T[] {
-  return templates.filter((template) => !template.attempts || template.attempts.includes(attempt));
+  const bucket = attemptBucket(attempt);
+  return templates.filter((template) => !template.attempts || template.attempts.includes(bucket));
 }
 
 export type TemplateContext = {
@@ -446,65 +438,32 @@ export function validateTemplateText(text: string, hasMedia: boolean): TemplateT
   return null;
 }
 
-export const timingTypes = ["after_entry", "day_time", "before_expiry", "night_notice", "occasion"] as const;
-
-export type TimingType = (typeof timingTypes)[number];
-
-export type TemplateTiming = { type: TimingType; value: number };
-
-export type TimingError = "out_of_range" | "outside_day" | "night" | "linked_only" | "occasion_only";
+export type TimingError = "out_of_range";
 
 export function isNightMinute(minuteOfDay: number): boolean {
   return minuteOfDay < NIGHT.end || minuteOfDay >= NIGHT.start;
 }
 
-export function validateTiming(day: number, timing: TemplateTiming): TimingError | null {
-  const { type, value } = timing;
-  if (!Number.isInteger(value)) return "out_of_range";
-  if (type === "after_entry") {
-    if (value < 0 || value >= TEMPLATE_DAYS * MINUTES_PER_DAY) return "out_of_range";
-    const start = (day - 1) * MINUTES_PER_DAY;
-    return value >= start && value < start + MINUTES_PER_DAY ? null : "outside_day";
-  }
-  if (type === "day_time") {
-    if (value < 0 || value >= MINUTES_PER_DAY) return "out_of_range";
-    return isNightMinute(value) ? "night" : null;
-  }
-  if (type === "night_notice" || type === "occasion") return value === 0 ? null : "out_of_range";
-  return value >= 1 && value <= TEMPLATE_DAYS * MINUTES_PER_DAY ? null : "out_of_range";
+export function validateTiming(day: number, minute: number): TimingError | null {
+  if (!Number.isInteger(day) || day < 1 || day > TEMPLATE_DAYS) return "out_of_range";
+  return Number.isInteger(minute) && minute >= 0 && minute < MINUTES_PER_DAY ? null : "out_of_range";
 }
 
-export function dayForTiming(timing: TemplateTiming, fallbackDay: number): number {
-  if (timing.type === "after_entry") return Math.floor(timing.value / MINUTES_PER_DAY) + 1;
-  if (timing.type === "day_time" || timing.type === "occasion") return fallbackDay;
-  return 1;
+export function defaultMinute(day: number): number {
+  return day === 1 ? 60 : 600;
 }
 
-export function isExpiryTiming(type: TimingType): boolean {
-  return type === "before_expiry" || type === "night_notice";
+type TimelinePoint = Pick<MessageTemplate, "day" | "minute">;
+
+export function compareTimeline(
+  a: Pick<MessageTemplate, "day" | "minute" | "position" | "id">,
+  b: Pick<MessageTemplate, "day" | "minute" | "position" | "id">,
+): number {
+  return a.day - b.day || a.minute - b.minute || a.position - b.position || a.id - b.id;
 }
 
-export const EXPIRY_TIMELINE_GROUP = "expiry" as const;
-
-export type TimelineGroupKey = number | typeof EXPIRY_TIMELINE_GROUP;
-
-export type TimelineEntry = { day: number; timing: TemplateTiming; position: number; id: number };
-
-export function timelineGroupKey(entry: Pick<TimelineEntry, "day" | "timing">): TimelineGroupKey {
-  if (isExpiryTiming(entry.timing.type)) return EXPIRY_TIMELINE_GROUP;
-  return dayForTiming(entry.timing, entry.day);
-}
-
-export function timelineSortKey(entry: Pick<TimelineEntry, "day" | "timing">): number {
-  const { type, value } = entry.timing;
-  if (type === "night_notice") return -(TEMPLATE_DAYS * MINUTES_PER_DAY + 1);
-  if (type === "before_expiry") return -value;
-  if (type === "day_time") return (entry.day - 1) * MINUTES_PER_DAY + value;
-  return value;
-}
-
-export function compareTimeline(a: TimelineEntry, b: TimelineEntry): number {
-  return timelineSortKey(a) - timelineSortKey(b) || a.position - b.position || a.id - b.id;
+export function isSameMoment(a: TimelinePoint, b: TimelinePoint): boolean {
+  return a.day === b.day && a.minute === b.minute;
 }
 
 export const templateMediaTypes = ["photo", "video", "voice"] as const;
@@ -564,20 +523,6 @@ export type TemplateButtonKind = TemplateButton["kind"];
 
 export const templateButtonKinds = ["resume", "offer", "again", "admin", "later", "link"] as const;
 
-const chainButtonKinds: readonly TemplateButtonKind[] = ["resume", "offer", "admin", "later", "link"];
-
-const secondChanceButtonKinds: readonly TemplateButtonKind[] = ["again", "later", "admin", "link"];
-
-export function buttonKindsFor(segment: FunnelSegment): readonly TemplateButtonKind[] {
-  return segment === SECOND_CHANCE_SEGMENT ? secondChanceButtonKinds : chainButtonKinds;
-}
-
-export function defaultButtonFor(segment: FunnelSegment): TemplateButton {
-  return segment === SECOND_CHANCE_SEGMENT
-    ? { kind: "again", text: buttonPresets.again }
-    : { kind: "resume", text: buttonPresets.resume };
-}
-
 export const templateMediaSchema = z.object({
   type: z.enum(templateMediaTypes),
   fileId: z.string().min(1).max(256),
@@ -585,47 +530,33 @@ export const templateMediaSchema = z.object({
 
 export type TemplateMedia = z.infer<typeof templateMediaSchema>;
 
-export const templateTimingSchema = z.object({
-  type: z.enum(timingTypes),
-  value: z.number().int(),
-});
-
 export const messageTemplateBaseSchema = z.object({
   segment: z.enum(funnelSegments),
   day: z.number().int().min(1).max(TEMPLATE_DAYS),
   text: z.string().max(TEMPLATE_TEXT_LIMITS.message * 3),
   media: templateMediaSchema.nullable(),
-  timing: templateTimingSchema,
+  minute: z.number().int(),
   buttons: z.array(templateButtonSchema).max(MAX_TEMPLATE_BUTTONS),
   isActive: z.boolean(),
   statuses: z.array(z.enum(funnelStatuses)).min(1).max(funnelStatuses.length).nullable().default(null),
-  attempts: z.array(z.number().int()).min(1).max(MAX_LINK_ATTEMPTS).nullable().default(null),
+  attempts: z.array(z.number().int()).min(1).max(LINK_ATTEMPT_OPTIONS).nullable().default(null),
 });
 
 export type MessageTemplateInput = z.infer<typeof messageTemplateBaseSchema>;
 
 export type TemplateValidationIssue =
   | { path: "text"; error: TemplateTextError["error"]; variable?: string }
-  | { path: "timing"; error: TimingError }
+  | { path: "minute"; error: TimingError }
   | { path: "statuses"; error: "statuses_invalid" }
-  | { path: "attempts"; error: "attempts_invalid" }
-  | { path: "buttons"; error: "button_not_allowed" };
+  | { path: "attempts"; error: "attempts_invalid" };
 
 export function validateTemplateInput(input: MessageTemplateInput): TemplateValidationIssue | null {
   const textError = validateTemplateText(input.text, input.media !== null);
   if (textError) return { path: "text", ...textError };
-  const timingError = validateTiming(input.day, input.timing);
-  if (timingError) return { path: "timing", error: timingError };
-  if (input.timing.type === "night_notice" && !linkBoundSegments.includes(input.segment)) {
-    return { path: "timing", error: "linked_only" };
-  }
-  if ((input.timing.type === "occasion") !== (input.segment === SECOND_CHANCE_SEGMENT)) {
-    return { path: "timing", error: "occasion_only" };
-  }
+  const timingError = validateTiming(input.day, input.minute);
+  if (timingError) return { path: "minute", error: timingError };
   if (statusesError(input.segment, input.statuses)) return { path: "statuses", error: "statuses_invalid" };
   if (attemptsError(input.segment, input.attempts)) return { path: "attempts", error: "attempts_invalid" };
-  const allowed = buttonKindsFor(input.segment);
-  if (input.buttons.some((button) => !allowed.includes(button.kind))) return { path: "buttons", error: "button_not_allowed" };
   return null;
 }
 
@@ -635,7 +566,7 @@ export const messageTemplateInputSchema = messageTemplateBaseSchema.superRefine(
   ctx.addIssue({
     code: "custom",
     message: issue.error,
-    path: issue.path === "timing" ? ["timing", "value"] : [issue.path],
+    path: [issue.path],
   });
 });
 
@@ -685,30 +616,3 @@ export const templateMediaUploadSchema = z.object({
   type: z.enum(templateMediaTypes),
   fileId: z.string().min(1),
 });
-
-export const schedulePreviewRequestSchema = z.object({
-  segment: z.enum(chainSegments),
-  linkGivenAt: z.iso.datetime({ offset: true }),
-});
-
-export type SchedulePreviewRequest = z.infer<typeof schedulePreviewRequestSchema>;
-
-export const schedulePreviewKinds = ["regular", "collapsed", "night_notice", "swallowed", "dropped"] as const;
-
-export type SchedulePreviewKind = (typeof schedulePreviewKinds)[number];
-
-export const schedulePreviewSchema = z.object({
-  linkGivenAt: z.string(),
-  linkExpiresAt: z.string(),
-  extended: z.boolean(),
-  items: z.array(
-    z.object({
-      templateId: z.number().int(),
-      at: z.string(),
-      kind: z.enum(schedulePreviewKinds),
-      remaining: z.string(),
-    }),
-  ),
-});
-
-export type SchedulePreview = z.infer<typeof schedulePreviewSchema>;

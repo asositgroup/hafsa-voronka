@@ -9,13 +9,10 @@ import {
   type MessageTemplateInput,
   reorderSchema,
   SAMPLE_CONTEXT,
-  type SchedulePreview,
-  schedulePreviewRequestSchema,
   TEMPLATE_MEDIA_LIMITS,
   templateMediaTypeFor,
   testSendSchema,
   validateTemplateInput,
-  variableValues,
 } from "@funnel/shared";
 import { requireAdminAuth } from "@/admin/auth";
 import { db } from "@/db";
@@ -23,9 +20,7 @@ import { users, videos } from "@/db/schema";
 import { env } from "@/env";
 import { templateContextFor } from "@/messages/context";
 import { renderTemplate } from "@/messages/render";
-import { linkExpiryFor, previewChain, segmentChainInput } from "@/messages/plan";
 import {
-  activeTemplateRows,
   createTemplate,
   findTemplate,
   listTemplates,
@@ -33,12 +28,9 @@ import {
   setActive,
   softDelete,
   StaleOrderError,
-  type TemplateConflict,
-  templateConflict,
   updateTemplate,
 } from "@/messages/repo";
 import { sendRendered } from "@/messages/send";
-import { linkTtlHours } from "@/settings/service";
 import { isAdminTelegramId } from "@/telegram/admins";
 import { bot } from "@/telegram/bot";
 import { MediaChatUnavailableError, botMediaChat, downloadBotMedia, uploadToMediaChat } from "@/telegram/media";
@@ -77,22 +69,6 @@ function invalidInput(input: MessageTemplateInput) {
   return issue.path === "text" ? { error: issue.error, variable: issue.variable } : { error: issue.error };
 }
 
-function remainingAt(now: Date, linkExpiresAt: Date) {
-  return variableValues({ name: null, firstName: null, lastPositionSec: 0, durationSec: null, linkExpiresAt, now });
-}
-
-async function saveTemplate<T>(
-  save: () => Promise<T>,
-): Promise<{ ok: true; value: T } | { ok: false; error: TemplateConflict }> {
-  try {
-    return { ok: true, value: await save() };
-  } catch (error) {
-    const conflict = templateConflict(error);
-    if (conflict) return { ok: false, error: conflict };
-    throw error;
-  }
-}
-
 adminMessageRoutes.get("/", async (c) => {
   const segment = funnelSegments.find((value) => value === c.req.query("segment"));
   if (!segment) return c.json({ error: "invalid_request" }, 400);
@@ -110,46 +86,7 @@ adminMessageRoutes.post("/", async (c) => {
   if (!body.success) return c.json({ error: "invalid_request" }, 400);
   const invalid = invalidInput(body.data);
   if (invalid) return c.json(invalid, 422);
-  const created = await saveTemplate(() => createTemplate(body.data));
-  return created.ok ? c.json(created.value, 201) : c.json({ error: created.error }, 409);
-});
-
-adminMessageRoutes.post("/preview-schedule", async (c) => {
-  const body = schedulePreviewRequestSchema.safeParse(await c.req.json().catch(() => null));
-  if (!body.success) return c.json({ error: "invalid_request" }, 400);
-  const givenAt = new Date(body.data.linkGivenAt);
-  const ttlHours = await linkTtlHours();
-  const linkExpiresAt = linkExpiryFor(givenAt, ttlHours);
-  const preview = previewChain(
-    segmentChainInput(await activeTemplateRows(body.data.segment), {
-      segment: body.data.segment,
-      enteredAt: givenAt,
-      linkExpiresAt,
-    }),
-  );
-  const items: SchedulePreview["items"] = [
-    ...preview.items.map((item) => {
-      const values = remainingAt(item.sendAt, linkExpiresAt);
-      return {
-        templateId: item.template.id,
-        at: item.sendAt.toISOString(),
-        kind: item.kind,
-        remaining: item.kind === "night_notice" ? values.link_tugash_soati : values.qolgan_vaqt,
-      };
-    }),
-    ...preview.skipped.map((item) => ({
-      templateId: item.template.id,
-      at: item.rawAt.toISOString(),
-      kind: item.reason,
-      remaining: remainingAt(item.rawAt, linkExpiresAt).qolgan_vaqt,
-    })),
-  ].sort((a, b) => a.at.localeCompare(b.at));
-  return c.json({
-    linkGivenAt: givenAt.toISOString(),
-    linkExpiresAt: linkExpiresAt.toISOString(),
-    extended: linkExpiresAt.getTime() !== givenAt.getTime() + ttlHours * 3_600_000,
-    items,
-  } satisfies SchedulePreview);
+  return c.json(await createTemplate(body.data), 201);
 });
 
 adminMessageRoutes.put("/order", async (c) => {
@@ -214,9 +151,8 @@ adminMessageRoutes.put("/:id{[0-9]+}", async (c) => {
   if (!body.success) return c.json({ error: "invalid_request" }, 400);
   const invalid = invalidInput(body.data);
   if (invalid) return c.json(invalid, 422);
-  const updated = await saveTemplate(() => updateTemplate(Number(c.req.param("id")), body.data));
-  if (!updated.ok) return c.json({ error: updated.error }, 409);
-  return updated.value ? c.json(updated.value) : c.json({ error: "not_found" }, 404);
+  const updated = await updateTemplate(Number(c.req.param("id")), body.data);
+  return updated ? c.json(updated) : c.json({ error: "not_found" }, 404);
 });
 
 adminMessageRoutes.patch("/:id{[0-9]+}/active", async (c) => {

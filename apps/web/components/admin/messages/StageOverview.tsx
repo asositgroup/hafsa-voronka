@@ -1,14 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {
-  type FunnelSegment,
-  funnelSegments,
-  type MessageTemplate,
-  SECOND_CHANCE_OCCASIONS,
-  SECOND_CHANCE_SEGMENT,
-} from "@funnel/shared";
-import { filledOccasions } from "@/components/admin/messages/SecondChancePages";
+import { type FunnelSegment, funnelSegments, type MessageTemplate } from "@funnel/shared";
 import { Badge } from "@/components/admin/ui/Badge";
 import { ChevronRightIcon } from "@/components/icons";
 import { adminUz } from "@/lib/i18n/admin";
@@ -19,21 +12,10 @@ export function stageHref(segment: FunnelSegment) {
   return `/admin/messages?stage=${segment}`;
 }
 
-export function chainItems(items: MessageTemplate[]) {
-  return items.filter((item) => item.timing.type !== "night_notice");
-}
-
 type StageStatus = { text: string; attention: boolean };
 
 function stageStatus(segment: FunnelSegment, items: MessageTemplate[], linkTtlHours: number | null): StageStatus {
-  if (segment === SECOND_CHANCE_SEGMENT) {
-    const done = filledOccasions(items);
-    return {
-      text: copy.stages.occasionsFilled.replace("{done}", String(done)).replace("{total}", String(SECOND_CHANCE_OCCASIONS)),
-      attention: done < SECOND_CHANCE_OCCASIONS,
-    };
-  }
-  const count = chainItems(items).length;
+  const count = items.length;
   if (count === 0) return { text: copy.stages.empty, attention: true };
   const parts = [copy.count.replace("{n}", String(count))];
   if (segment === "A" && linkTtlHours !== null) parts.push(copy.stages.linkOpen.replace("{n}", String(linkTtlHours)));

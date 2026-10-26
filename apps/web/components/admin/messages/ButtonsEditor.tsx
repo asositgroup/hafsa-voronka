@@ -1,13 +1,11 @@
 "use client";
 
 import {
-  buttonKindsFor,
   buttonPresets,
-  defaultButtonFor,
-  type FunnelSegment,
   MAX_TEMPLATE_BUTTONS,
   type TemplateButton,
   type TemplateButtonKind,
+  templateButtonKinds,
 } from "@funnel/shared";
 import { Button } from "@/components/admin/ui/Button";
 import { Field, Input } from "@/components/admin/ui/Field";
@@ -18,9 +16,7 @@ import { adminUz } from "@/lib/i18n/admin";
 
 const copy = adminUz.messages.editor;
 
-function buttonKindOptions(segment: FunnelSegment) {
-  return buttonKindsFor(segment).map((kind) => ({ value: kind, label: copy.buttonKinds[kind] }));
-}
+const kindOptions = templateButtonKinds.map((kind) => ({ value: kind, label: copy.buttonKinds[kind] }));
 
 function presetText(kind: TemplateButtonKind) {
   return kind in buttonPresets ? buttonPresets[kind as keyof typeof buttonPresets] : "";
@@ -37,14 +33,12 @@ function convert(button: TemplateButton, kind: TemplateButtonKind): TemplateButt
 }
 
 type ButtonsEditorProps = {
-  segment: FunnelSegment;
   buttons: TemplateButton[];
   onChange: (buttons: TemplateButton[]) => void;
   prefillSupported: boolean;
 };
 
-export function ButtonsEditor({ segment, buttons, onChange, prefillSupported }: ButtonsEditorProps) {
-  const kindOptions = buttonKindOptions(segment);
+export function ButtonsEditor({ buttons, onChange, prefillSupported }: ButtonsEditorProps) {
   const update = (index: number, button: TemplateButton) =>
     onChange(buttons.map((current, i) => (i === index ? button : current)));
 
@@ -120,7 +114,7 @@ export function ButtonsEditor({ segment, buttons, onChange, prefillSupported }: 
           <Button
             variant="secondary"
             icon={<PlusIcon className="h-4 w-4" />}
-            onClick={() => onChange([...buttons, defaultButtonFor(segment)])}
+            onClick={() => onChange([...buttons, { kind: "resume", text: buttonPresets.resume }])}
           >
             {copy.addButton}
           </Button>

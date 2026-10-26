@@ -5,22 +5,22 @@ import { isSlotOpen, preReminderAt } from "@/funnel/laterPicker";
 import { logEvent } from "@/funnel/users";
 import { refreshUserLeadCards } from "@/leads/service";
 import { cancelPendingAppointments } from "./appointmentStore";
-import { openOffer } from "./service";
+import { lessonState } from "./service";
 
 type Reader = Pick<ReturnType<typeof db>, "select">;
 
 export type LaterContext =
-  | { purpose: "reopen"; offerId: number; expiresAt: null }
-  | { purpose: "remind"; offerId: null; expiresAt: Date | null };
+  | { purpose: "reopen"; expiresAt: null }
+  | { purpose: "remind"; expiresAt: Date | null };
 
 export type ScheduleResult = "scheduled" | "unavailable" | "closed";
 
 export async function laterContextFor(executor: Reader, user: User, now: Date): Promise<LaterContext | null> {
   if (user.registeredAt === null || user.wroteAdminAt !== null || user.botBlocked) return null;
-  const offer = await openOffer(executor, user, now);
-  if (offer) return { purpose: "reopen", offerId: offer.id, expiresAt: null };
-  if (user.linkExpiresAt !== null && user.linkExpiresAt.getTime() <= now.getTime()) return null;
-  return { purpose: "remind", offerId: null, expiresAt: user.linkExpiresAt };
+  const state = await lessonState(executor, user, now);
+  if (state.closed) return { purpose: "reopen", expiresAt: null };
+  const live = user.linkExpiresAt !== null && user.linkExpiresAt.getTime() > now.getTime();
+  return { purpose: "remind", expiresAt: live ? user.linkExpiresAt : null };
 }
 
 export async function scheduleAppointment(userId: number, chosenAt: Date, now = new Date()): Promise<ScheduleResult> {
@@ -33,7 +33,7 @@ export async function scheduleAppointment(userId: number, chosenAt: Date, now = 
     await cancelPendingAppointments(tx, userId, now);
     await tx.insert(watchAppointments).values({
       userId,
-      offerId: context.offerId,
+      offerId: null,
       purpose: context.purpose,
       chosenAt,
       preRemindAt: context.purpose === "reopen" ? preReminderAt(chosenAt, now) : null,

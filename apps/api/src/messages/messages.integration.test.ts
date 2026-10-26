@@ -25,7 +25,7 @@ const draft = {
   day: 1,
   text: "Salom, <b>{ism}</b>!",
   media: null,
-  timing: { type: "after_entry", value: 60 },
+  minute: 60,
   buttons: [],
   isActive: true,
 };
@@ -151,9 +151,9 @@ describe.skipIf(!testDbUrl)("Message constructor", () => {
     const second = await create();
     expect([first.position, second.position]).toEqual([0, 1]);
 
-    const moved = await send(`/${first.id}`, "PUT", { ...draft, day: 2, timing: { type: "after_entry", value: 1500 } });
+    const moved = await send(`/${first.id}`, "PUT", { ...draft, day: 2, minute: 60 });
     expect(await moved.json()).toMatchObject({ day: 2, position: 0 });
-    const other = await create({ day: 2, timing: { type: "after_entry", value: 1600 } });
+    const other = await create({ day: 2, minute: 160 });
     expect(other.position).toBe(1);
   });
 
@@ -173,17 +173,21 @@ describe.skipIf(!testDbUrl)("Message constructor", () => {
     expect((await list()).map((item) => item.id)).toEqual([c.id, a.id, b.id]);
   });
 
-  it("rejects unknown variables and night timings with 422", async () => {
+  it("rejects unknown variables and out-of-day minutes with 422 but accepts night times", async () => {
     const unknown = await send("", "POST", { ...draft, text: "Salom {familiya}" });
     expect(unknown.status).toBe(422);
     expect(await unknown.json()).toEqual({ error: "unknown_variable", variable: "familiya" });
 
-    const night = await send("", "POST", { ...draft, timing: { type: "day_time", value: 23 * 60 + 30 } });
-    expect(night.status).toBe(422);
-    expect(await night.json()).toEqual({ error: "night" });
+    const outside = await send("", "POST", { ...draft, minute: 1440 });
+    expect(outside.status).toBe(422);
+    expect(await outside.json()).toEqual({ error: "out_of_range" });
 
     expect((await send("", "POST", { ...draft, day: 9 })).status).toBe(400);
     expect(await list()).toEqual([]);
+
+    const night = await send("", "POST", { ...draft, day: 3, minute: 23 * 60 + 30 });
+    expect(night.status).toBe(201);
+    expect(await night.json()).toMatchObject({ day: 3, minute: 23 * 60 + 30 });
   });
 
   it("saves a stop-point filter in B and refuses it elsewhere", async () => {
@@ -212,37 +216,8 @@ describe.skipIf(!testDbUrl)("Message constructor", () => {
     expect(body.videoMarks).toEqual({ introEndSec: 300, courseStartSec: 600, priceSec: 800 });
   });
 
-  describe("second chance pages", () => {
-    const page = {
-      ...draft,
-      segment: "D",
-      day: 2,
-      timing: { type: "occasion", value: 0 },
-      statuses: ["link_berildi"],
-      buttons: [
-        { kind: "again", text: "Ha, ko'raman" },
-        { kind: "later", text: "Keyinroq, ko'raman" },
-      ],
-    };
-
-    it("keeps one page per occasion and variant", async () => {
-      const first = await create(page);
-      expect(first).toMatchObject({ segment: "D", day: 2, statuses: ["link_berildi"], attempts: null });
-      const duplicate = await send("", "POST", page);
-      expect(duplicate.status).toBe(409);
-      expect(await duplicate.json()).toEqual({ error: "occasion_exists" });
-      const variant = await send("", "POST", { ...page, statuses: ["dars_yarmida", "korishni_boshladi", "sotuvda_toxtadi"] });
-      expect(variant.status).toBe(201);
-      expect((await variant.json()).statuses).toEqual(["korishni_boshladi", "dars_yarmida", "sotuvda_toxtadi"]);
-      const body = await (await request("?segment=D")).json();
-      expect(body.items).toHaveLength(2);
-    });
-
-    it("rejects chain buttons on a page and «Ha» in a chain", async () => {
-      const wrong = await send("", "POST", { ...page, buttons: [{ kind: "resume", text: "Davom" }] });
-      expect(wrong.status).toBe(422);
-      expect(await wrong.json()).toEqual({ error: "button_not_allowed" });
-    });
+  it("rejects the removed stage D", async () => {
+    expect((await request("?segment=D")).status).toBe(400);
   });
 
   it("stores the link attempts a chain text is meant for", async () => {
@@ -252,80 +227,6 @@ describe.skipIf(!testDbUrl)("Message constructor", () => {
     expect(everyone.attempts).toBeNull();
     const inC = await send("", "POST", { ...draft, segment: "C", attempts: [1] });
     expect(await inC.json()).toEqual({ error: "attempts_invalid" });
-  });
-
-  describe("night notice", () => {
-    const notice = { ...draft, text: "Ertaga soat {link_tugash_soati} gacha", timing: { type: "night_notice", value: 0 } };
-
-    it("allows one per linked segment", async () => {
-      const first = await create(notice);
-      const second = await send("", "POST", notice);
-      expect(second.status).toBe(409);
-      expect(await second.json()).toEqual({ error: "night_notice_exists" });
-      expect((await send("", "POST", { ...notice, segment: "B" })).status).toBe(201);
-
-      const plain = await create();
-      const moved = await send(`/${plain.id}`, "PUT", notice);
-      expect(moved.status).toBe(409);
-
-      expect((await request(`/${first.id}`, { method: "DELETE" })).status).toBe(200);
-      expect((await send(`/${plain.id}`, "PUT", notice)).status).toBe(200);
-    });
-
-    it("refuses segment C and a non-zero value", async () => {
-      const segmentC = await send("", "POST", { ...notice, segment: "C" });
-      expect(segmentC.status).toBe(422);
-      expect(await segmentC.json()).toEqual({ error: "linked_only" });
-      const valued = await send("", "POST", { ...notice, timing: { type: "night_notice", value: 5 } });
-      expect(valued.status).toBe(422);
-      expect(await valued.json()).toEqual({ error: "out_of_range" });
-    });
-  });
-
-  describe("schedule preview", () => {
-    const local = (value: string) => new Date(`${value}+05:00`).toISOString();
-
-    it("plans the TZ 10:00 row for the admin's own templates", async () => {
-      const ids = new Map<number, string>();
-      for (const hours of [23, 21, 19, 17, 15, 10, 5, 4, 3, 2, 1]) {
-        const created = await create({ timing: { type: "before_expiry", value: hours * 60 } });
-        ids.set(created.id, `${hours}h`);
-      }
-      const notice = await create({ text: "Ertaga soat {link_tugash_soati} gacha", timing: { type: "night_notice", value: 0 } });
-      ids.set(notice.id, "notice");
-      await create({ segment: "B", timing: { type: "before_expiry", value: 120 } });
-
-      const res = await send("/preview-schedule", "POST", { segment: "A", linkGivenAt: local("2026-10-19T10:00:00") });
-      expect(res.status).toBe(200);
-      const body = (await res.json()) as {
-        linkExpiresAt: string;
-        extended: boolean;
-        items: { templateId: number; at: string; kind: string; remaining: string }[];
-      };
-      expect(body.linkExpiresAt).toBe(local("2026-10-20T10:00:00"));
-      expect(body.extended).toBe(false);
-      expect(body.items.map((item) => [ids.get(item.templateId), item.at, item.kind, item.remaining])).toEqual([
-        ["23h", local("2026-10-19T11:00:00"), "regular", "23 soat"],
-        ["21h", local("2026-10-19T13:00:00"), "regular", "21 soat"],
-        ["19h", local("2026-10-19T15:00:00"), "regular", "19 soat"],
-        ["17h", local("2026-10-19T17:00:00"), "regular", "17 soat"],
-        ["15h", local("2026-10-19T19:00:00"), "regular", "15 soat"],
-        ["notice", local("2026-10-19T22:00:00"), "night_notice", "10:00"],
-        ["10h", local("2026-10-20T00:00:00"), "swallowed", "10 soat"],
-        ["5h", local("2026-10-20T05:00:00"), "swallowed", "5 soat"],
-        ["4h", local("2026-10-20T06:00:00"), "dropped", "4 soat"],
-        ["3h", local("2026-10-20T07:00:00"), "regular", "3 soat"],
-        ["2h", local("2026-10-20T08:00:00"), "regular", "2 soat"],
-        ["1h", local("2026-10-20T09:00:00"), "regular", "1 soat"],
-      ]);
-    });
-
-    it("reports an extended expiry and validates the request", async () => {
-      const res = await send("/preview-schedule", "POST", { segment: "A", linkGivenAt: local("2026-10-19T02:00:00") });
-      expect(await res.json()).toMatchObject({ linkExpiresAt: local("2026-10-20T09:00:00"), extended: true, items: [] });
-      expect((await send("/preview-schedule", "POST", { segment: "D", linkGivenAt: local("2026-10-19T02:00:00") })).status).toBe(400);
-      expect((await send("/preview-schedule", "POST", { segment: "A", linkGivenAt: "kecha" })).status).toBe(400);
-    });
   });
 
   it("uploads media through the media chat and removes it there", async () => {

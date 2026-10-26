@@ -37,7 +37,6 @@ export const TEMPLATE_DAYS = 7;
 export const MINUTES_PER_DAY = 1440;
 export const NIGHT = { start: 1380, end: 420 } as const;
 export const TASHKENT_OFFSET_MS = 5 * 60 * 60 * 1000;
-export const NIGHT_NOTICE_MINUTE = 22 * 60;
 export const EXTENDED_EXPIRY_MINUTE = 9 * 60;
 export const linkBoundSegments: readonly FunnelSegment[] = ["A", "B"];
 
@@ -439,65 +438,32 @@ export function validateTemplateText(text: string, hasMedia: boolean): TemplateT
   return null;
 }
 
-export const timingTypes = ["after_entry", "day_time", "before_expiry", "night_notice"] as const;
-
-export type TimingType = (typeof timingTypes)[number];
-
-export type TemplateTiming = { type: TimingType; value: number };
-
-export type TimingError = "out_of_range" | "outside_day" | "night" | "linked_only";
+export type TimingError = "out_of_range";
 
 export function isNightMinute(minuteOfDay: number): boolean {
   return minuteOfDay < NIGHT.end || minuteOfDay >= NIGHT.start;
 }
 
-export function validateTiming(day: number, timing: TemplateTiming): TimingError | null {
-  const { type, value } = timing;
-  if (!Number.isInteger(value)) return "out_of_range";
-  if (type === "after_entry") {
-    if (value < 0 || value >= TEMPLATE_DAYS * MINUTES_PER_DAY) return "out_of_range";
-    const start = (day - 1) * MINUTES_PER_DAY;
-    return value >= start && value < start + MINUTES_PER_DAY ? null : "outside_day";
-  }
-  if (type === "day_time") {
-    if (value < 0 || value >= MINUTES_PER_DAY) return "out_of_range";
-    return isNightMinute(value) ? "night" : null;
-  }
-  if (type === "night_notice") return value === 0 ? null : "out_of_range";
-  return value >= 1 && value <= TEMPLATE_DAYS * MINUTES_PER_DAY ? null : "out_of_range";
+export function validateTiming(day: number, minute: number): TimingError | null {
+  if (!Number.isInteger(day) || day < 1 || day > TEMPLATE_DAYS) return "out_of_range";
+  return Number.isInteger(minute) && minute >= 0 && minute < MINUTES_PER_DAY ? null : "out_of_range";
 }
 
-export function dayForTiming(timing: TemplateTiming, fallbackDay: number): number {
-  if (timing.type === "after_entry") return Math.floor(timing.value / MINUTES_PER_DAY) + 1;
-  if (timing.type === "day_time") return fallbackDay;
-  return 1;
+export function defaultMinute(day: number): number {
+  return day === 1 ? 60 : 600;
 }
 
-export function isExpiryTiming(type: TimingType): boolean {
-  return type === "before_expiry" || type === "night_notice";
+type TimelinePoint = Pick<MessageTemplate, "day" | "minute">;
+
+export function compareTimeline(
+  a: Pick<MessageTemplate, "day" | "minute" | "position" | "id">,
+  b: Pick<MessageTemplate, "day" | "minute" | "position" | "id">,
+): number {
+  return a.day - b.day || a.minute - b.minute || a.position - b.position || a.id - b.id;
 }
 
-export const EXPIRY_TIMELINE_GROUP = "expiry" as const;
-
-export type TimelineGroupKey = number | typeof EXPIRY_TIMELINE_GROUP;
-
-export type TimelineEntry = { day: number; timing: TemplateTiming; position: number; id: number };
-
-export function timelineGroupKey(entry: Pick<TimelineEntry, "day" | "timing">): TimelineGroupKey {
-  if (isExpiryTiming(entry.timing.type)) return EXPIRY_TIMELINE_GROUP;
-  return dayForTiming(entry.timing, entry.day);
-}
-
-export function timelineSortKey(entry: Pick<TimelineEntry, "day" | "timing">): number {
-  const { type, value } = entry.timing;
-  if (type === "night_notice") return -(TEMPLATE_DAYS * MINUTES_PER_DAY + 1);
-  if (type === "before_expiry") return -value;
-  if (type === "day_time") return (entry.day - 1) * MINUTES_PER_DAY + value;
-  return value;
-}
-
-export function compareTimeline(a: TimelineEntry, b: TimelineEntry): number {
-  return timelineSortKey(a) - timelineSortKey(b) || a.position - b.position || a.id - b.id;
+export function isSameMoment(a: TimelinePoint, b: TimelinePoint): boolean {
+  return a.day === b.day && a.minute === b.minute;
 }
 
 export const templateMediaTypes = ["photo", "video", "voice"] as const;
@@ -564,17 +530,12 @@ export const templateMediaSchema = z.object({
 
 export type TemplateMedia = z.infer<typeof templateMediaSchema>;
 
-export const templateTimingSchema = z.object({
-  type: z.enum(timingTypes),
-  value: z.number().int(),
-});
-
 export const messageTemplateBaseSchema = z.object({
   segment: z.enum(funnelSegments),
   day: z.number().int().min(1).max(TEMPLATE_DAYS),
   text: z.string().max(TEMPLATE_TEXT_LIMITS.message * 3),
   media: templateMediaSchema.nullable(),
-  timing: templateTimingSchema,
+  minute: z.number().int(),
   buttons: z.array(templateButtonSchema).max(MAX_TEMPLATE_BUTTONS),
   isActive: z.boolean(),
   statuses: z.array(z.enum(funnelStatuses)).min(1).max(funnelStatuses.length).nullable().default(null),
@@ -585,7 +546,7 @@ export type MessageTemplateInput = z.infer<typeof messageTemplateBaseSchema>;
 
 export type TemplateValidationIssue =
   | { path: "text"; error: TemplateTextError["error"]; variable?: string }
-  | { path: "timing"; error: TimingError }
+  | { path: "minute"; error: TimingError }
   | { path: "statuses"; error: "statuses_invalid" }
   | { path: "attempts"; error: "attempts_invalid" }
   | { path: "buttons"; error: "button_not_allowed" };
@@ -593,11 +554,8 @@ export type TemplateValidationIssue =
 export function validateTemplateInput(input: MessageTemplateInput): TemplateValidationIssue | null {
   const textError = validateTemplateText(input.text, input.media !== null);
   if (textError) return { path: "text", ...textError };
-  const timingError = validateTiming(input.day, input.timing);
-  if (timingError) return { path: "timing", error: timingError };
-  if (input.timing.type === "night_notice" && !linkBoundSegments.includes(input.segment)) {
-    return { path: "timing", error: "linked_only" };
-  }
+  const timingError = validateTiming(input.day, input.minute);
+  if (timingError) return { path: "minute", error: timingError };
   if (statusesError(input.segment, input.statuses)) return { path: "statuses", error: "statuses_invalid" };
   if (attemptsError(input.segment, input.attempts)) return { path: "attempts", error: "attempts_invalid" };
   if (input.buttons.some((button) => !templateButtonKinds.includes(button.kind))) return { path: "buttons", error: "button_not_allowed" };
@@ -610,7 +568,7 @@ export const messageTemplateInputSchema = messageTemplateBaseSchema.superRefine(
   ctx.addIssue({
     code: "custom",
     message: issue.error,
-    path: issue.path === "timing" ? ["timing", "value"] : [issue.path],
+    path: [issue.path],
   });
 });
 

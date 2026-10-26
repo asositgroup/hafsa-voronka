@@ -10,7 +10,6 @@ import { setTestEnv } from "@/test/env";
 
 const database = isolatedDatabase("vf_settings");
 const PASSWORD = "settings-admin-password";
-const MIGRATED_CAPS = { ...DEFAULT_MESSAGE_CAPS, B: { daily: 4, total: 7 } };
 
 describe.skipIf(!database.url)("Admin settings", () => {
   let app: ReturnType<typeof import("@/app").createApp>;
@@ -59,7 +58,7 @@ describe.skipIf(!database.url)("Admin settings", () => {
   it("returns the default link TTL", async () => {
     const res = await app.request("/admin/settings", { headers: { cookie } });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ linkTtlHours: 24, messageCaps: MIGRATED_CAPS });
+    expect(await res.json()).toEqual({ linkTtlHours: 24, messageCaps: DEFAULT_MESSAGE_CAPS });
   });
 
   it("rejects out-of-range and non-numeric values", async () => {
@@ -73,10 +72,10 @@ describe.skipIf(!database.url)("Admin settings", () => {
   it("saves the TTL and applies it to users registered afterwards", async () => {
     const saved = await put({ linkTtlHours: 48 });
     expect(saved.status).toBe(200);
-    expect(await saved.json()).toEqual({ linkTtlHours: 48, messageCaps: MIGRATED_CAPS });
+    expect(await saved.json()).toEqual({ linkTtlHours: 48, messageCaps: DEFAULT_MESSAGE_CAPS });
 
     const res = await app.request("/admin/settings", { headers: { cookie } });
-    expect(await res.json()).toEqual({ linkTtlHours: 48, messageCaps: MIGRATED_CAPS });
+    expect(await res.json()).toEqual({ linkTtlHours: 48, messageCaps: DEFAULT_MESSAGE_CAPS });
 
     const { linkTtlHours } = await import("./service");
     expect(await linkTtlHours()).toBe(48);

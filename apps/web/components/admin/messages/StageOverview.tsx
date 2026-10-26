@@ -12,14 +12,10 @@ export function stageHref(segment: FunnelSegment) {
   return `/admin/messages?stage=${segment}`;
 }
 
-export function chainItems(items: MessageTemplate[]) {
-  return items.filter((item) => item.timing.type !== "night_notice");
-}
-
 type StageStatus = { text: string; attention: boolean };
 
 function stageStatus(segment: FunnelSegment, items: MessageTemplate[], linkTtlHours: number | null): StageStatus {
-  const count = chainItems(items).length;
+  const count = items.length;
   if (count === 0) return { text: copy.stages.empty, attention: true };
   const parts = [copy.count.replace("{n}", String(count))];
   if (segment === "A" && linkTtlHours !== null) parts.push(copy.stages.linkOpen.replace("{n}", String(linkTtlHours)));

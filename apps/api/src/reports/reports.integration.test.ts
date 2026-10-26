@@ -108,7 +108,7 @@ describe.skipIf(!testDbUrl)("Admin reports", () => {
   async function seedTemplate(key: string, segment: "A" | "B" | "C", day: number, position: number, text: string) {
     const [row] = await db()
       .insert(messageTemplates)
-      .values({ segment, day, position, text, timingType: "after_entry", timingValue: 60 })
+      .values({ segment, day, position, text, timingValue: 60 })
       .returning();
     templates[key] = row.id;
   }

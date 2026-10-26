@@ -281,7 +281,7 @@ describe.skipIf(!database.url)("Admin home in the bot", () => {
     ]);
     await db()
       .insert(messageTemplates)
-      .values({ segment: "A", day: 1, position: 0, text: "Salom", timingType: "after_entry", timingValue: 60 });
+      .values({ segment: "A", day: 1, position: 0, text: "Salom", timingValue: 60 });
     const [appointment] = await db()
       .insert(watchAppointments)
       .values({ userId: admin.id, purpose: "remind", chosenAt: new Date(entry.getTime() + 30 * MINUTE) })

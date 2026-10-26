@@ -4,13 +4,15 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import {
   attemptTargetSegments,
+  defaultMinute,
   type FunnelSegment,
+  type FunnelStatus,
   type MessageTemplate,
   type MessageTemplateInput,
   TEMPLATE_MEDIA_MIME_TYPES,
   templateTextLimit,
+  type TemplateButton,
   validateTemplateText,
-  dayForTiming,
   validateTiming,
   visibleLength,
   sanitizeTelegramHtml,
@@ -29,7 +31,7 @@ import { ButtonsEditor } from "@/components/admin/messages/ButtonsEditor";
 import { MessagePreview } from "@/components/admin/messages/MessagePreview";
 import { StopPointPicker, stopPointLabel, type VideoMarks } from "@/components/admin/messages/StopPointPicker";
 import { TextEditor } from "@/components/admin/messages/editor/TextEditor";
-import { stageTiming, TimingPicker, timingSummary } from "@/components/admin/messages/TimingPicker";
+import { TimingPicker, timingSummary } from "@/components/admin/messages/TimingPicker";
 import {
   createMessage,
   deleteMessage,
@@ -87,8 +89,13 @@ function errorText(code: string | undefined, variable?: string) {
 
 type Admin = { telegramId: number; label: string };
 
-export type MessagePreset = Pick<MessageTemplateInput, "text" | "timing"> &
-  Partial<Pick<MessageTemplateInput, "day" | "statuses" | "buttons">>;
+export type MessagePreset = {
+  day: number;
+  minute: number;
+  text?: string;
+  statuses?: FunnelStatus[] | null;
+  buttons?: TemplateButton[];
+};
 
 type MessageEditorProps = {
   segment: FunnelSegment;
@@ -122,7 +129,7 @@ export function MessageEditor({
           day: item.day,
           text: item.text,
           media: item.media,
-          timing: item.timing,
+          minute: item.minute,
           buttons: item.buttons,
           isActive: item.isActive,
           statuses: item.statuses,
@@ -133,7 +140,7 @@ export function MessageEditor({
           day: preset?.day ?? 1,
           text: preset?.text ?? "",
           media: null,
-          timing: preset?.timing ?? stageTiming(segment),
+          minute: preset?.minute ?? defaultMinute(preset?.day ?? 1),
           buttons: preset?.buttons ?? [],
           isActive: true,
           statuses: preset?.statuses ?? null,
@@ -162,7 +169,7 @@ export function MessageEditor({
   const hasMedia = draft.media !== null;
   const sanitized = sanitizeTelegramHtml(draft.text);
   const textError = validateTemplateText(draft.text, hasMedia);
-  const timingError = validateTiming(draft.day, draft.timing);
+  const timingError = validateTiming(draft.day, draft.minute);
   const length = sanitized.ok ? visibleLength(sanitized.html) : draft.text.length;
   const limit = templateTextLimit(hasMedia);
   const valid = textError === null && timingError === null;
@@ -187,12 +194,11 @@ export function MessageEditor({
     after(result.data);
   }
 
-  const payload: MessageTemplateInput = { ...draft, day: dayForTiming(draft.timing, draft.day) };
 
   const save = () =>
     run(
       "save",
-      () => (item ? updateMessage(item.id, payload) : createMessage(payload)),
+      () => (item ? updateMessage(item.id, draft) : createMessage(draft)),
       (saved) => onSaved(saved),
     );
 
@@ -215,7 +221,7 @@ export function MessageEditor({
   const test = (adminTelegramId: number) =>
     run(
       "test",
-      () => sendTestMessage(payload, adminTelegramId, item?.id),
+      () => sendTestMessage(draft, adminTelegramId, item?.id),
       () => setTestNote(copy.testSent),
     );
 
@@ -290,15 +296,15 @@ export function MessageEditor({
 
               <Disclosure
                 title={copy.timingTitle}
-                summary={timingSummary(draft.day, draft.timing, segment)}
+                summary={timingSummary(segment, draft.day, draft.minute)}
                 open={timingOpen || timingError !== null}
                 onOpenChange={setTimingOpen}
               >
                 <TimingPicker
-                  day={draft.day}
-                  timing={draft.timing}
                   segment={segment}
-                  onChange={patch}
+                  day={draft.day}
+                  minute={draft.minute}
+                  onChange={(minute) => patch({ minute })}
                   error={timingError}
                 />
               </Disclosure>

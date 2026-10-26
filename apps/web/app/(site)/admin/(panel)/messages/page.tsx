@@ -198,7 +198,6 @@ function AdminMessagesContent() {
 
       {stage && loaded && (
         <ReminderChain
-          segment={stage}
           items={loaded.items}
           videoMarks={loaded.videoMarks}
           onAdd={(preset) => setEditing({ segment: stage, item: null, preset })}
@@ -210,7 +209,7 @@ function AdminMessagesContent() {
 
       {editing && editingSource && (
         <MessageEditor
-          key={editing.item?.id ?? `new-${editing.segment}-${editing.preset?.timing.type ?? ""}-${editing.preset?.day ?? 0}-${editing.preset?.statuses?.join() ?? ""}`}
+          key={editing.item?.id ?? `new-${editing.segment}-${editing.preset?.day ?? 1}`}
           segment={editing.segment}
           item={editing.item}
           preset={editing.preset}

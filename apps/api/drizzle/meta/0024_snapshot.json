@@ -1,5 +1,5 @@
 {
-  "id": "bbafb0dc-5dc9-4ce2-8388-532a68566801",
+  "id": "2528326e-a757-4d88-9135-f7f7ac815f0d",
   "prevId": "edfea309-be61-48d6-9899-915c6bb6630e",
   "version": "7",
   "dialect": "postgresql",
@@ -1030,12 +1030,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "timing_type": {
-          "name": "timing_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
         "timing_value": {
           "name": "timing_value",
           "type": "integer",
@@ -1117,44 +1111,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "message_templates_occasion_slot_idx": {
-          "name": "message_templates_occasion_slot_idx",
-          "columns": [
-            {
-              "expression": "day",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "statuses",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"message_templates\".\"segment\" = 'D' and \"message_templates\".\"deleted_at\" is null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "message_templates_night_notice_idx": {
-          "name": "message_templates_night_notice_idx",
-          "columns": [
-            {
-              "expression": "segment",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"message_templates\".\"timing_type\" = 'night_notice' and \"message_templates\".\"deleted_at\" is null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {},
@@ -1168,23 +1124,15 @@
         },
         "message_templates_segment_values": {
           "name": "message_templates_segment_values",
-          "value": "\"message_templates\".\"segment\" in ('A', 'B', 'C', 'D')"
+          "value": "\"message_templates\".\"segment\" in ('A', 'B', 'C') or \"message_templates\".\"deleted_at\" is not null"
         },
-        "message_templates_timing_type_values": {
-          "name": "message_templates_timing_type_values",
-          "value": "\"message_templates\".\"timing_type\" in ('after_entry', 'day_time', 'before_expiry', 'night_notice', 'occasion')"
-        },
-        "message_templates_occasion_shape": {
-          "name": "message_templates_occasion_shape",
-          "value": "(\"message_templates\".\"timing_type\" = 'occasion') = (\"message_templates\".\"segment\" = 'D') and (\"message_templates\".\"timing_type\" <> 'occasion' or (\"message_templates\".\"timing_value\" = 0 and \"message_templates\".\"statuses\" is not null))"
+        "message_templates_timing_value_range": {
+          "name": "message_templates_timing_value_range",
+          "value": "\"message_templates\".\"timing_value\" between 0 and 1439"
         },
         "message_templates_attempts_values": {
           "name": "message_templates_attempts_values",
           "value": "\"message_templates\".\"attempts\" is null or (cardinality(\"message_templates\".\"attempts\") > 0 and \"message_templates\".\"attempts\" <@ array[1, 2, 3, 4, 5, 6, 7, 8]::smallint[] and \"message_templates\".\"segment\" in ('A', 'B'))"
-        },
-        "message_templates_night_notice_shape": {
-          "name": "message_templates_night_notice_shape",
-          "value": "\"message_templates\".\"timing_type\" <> 'night_notice' or (\"message_templates\".\"timing_value\" = 0 and \"message_templates\".\"segment\" in ('A', 'B'))"
         },
         "message_templates_statuses_values": {
           "name": "message_templates_statuses_values",
@@ -1193,10 +1141,6 @@
         "message_templates_media_pair": {
           "name": "message_templates_media_pair",
           "value": "(\"message_templates\".\"media_type\" is null) = (\"message_templates\".\"media_file_id\" is null)"
-        },
-        "message_templates_day_time_range": {
-          "name": "message_templates_day_time_range",
-          "value": "\"message_templates\".\"timing_type\" <> 'day_time' or \"message_templates\".\"timing_value\" between 420 and 1379"
         }
       },
       "isRLSEnabled": false

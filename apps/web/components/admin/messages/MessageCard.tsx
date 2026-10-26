@@ -40,7 +40,7 @@ export function MessageCard({ item, videoMarks, onEdit, onToggle, onMoveUp, onMo
         <span
           className={`w-[4.5rem] shrink-0 pt-px text-[13px] font-semibold tabular-nums text-siyoh sm:w-24 ${item.isActive ? "" : "opacity-60"}`}
         >
-          {timelineLabel(item.timing)}
+          {timelineLabel(item.day, item.minute)}
         </span>
         <span className={`flex min-w-0 flex-1 flex-col gap-1 ${item.isActive ? "" : "opacity-60"}`}>
           {(item.statuses || item.attempts) && (

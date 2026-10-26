@@ -145,7 +145,6 @@ describe.skipIf(!testDbUrl)("Message dispatcher", () => {
         day: 1,
         position: 0,
         text: "Salom, <b>{ism}</b>!",
-        timingType: "after_entry",
         timingValue: 60,
         ...overrides,
       })
@@ -694,7 +693,7 @@ describe.skipIf(!testDbUrl)("Message dispatcher", () => {
       expect(sends().map((call) => call.payload.text)).toEqual(["Ikkinchi kun"]);
     });
 
-    it("caps B at four a day and seven in total", async () => {
+    it("caps B at four a day without a total cap", async () => {
       await watcher(100, entry);
       for (let position = 0; position < 10; position += 1) {
         await makeTemplate({ segment: "B", position, text: `d1-${position}`, timingValue: 60 + position });
@@ -705,8 +704,8 @@ describe.skipIf(!testDbUrl)("Message dispatcher", () => {
       for (let minute = 60; minute <= 80; minute += 1) await tick(at(minute));
       expect(sends()).toHaveLength(4);
       for (let minute = 23 * 60; minute <= 23 * 60 + 10; minute += 1) await tick(at(minute));
-      expect(sends()).toHaveLength(7);
-      expect(sends().slice(4).map((call) => call.payload.text)).toEqual(["d2-0", "d2-1", "d2-2"]);
+      expect(sends()).toHaveLength(8);
+      expect(sends().slice(4).map((call) => call.payload.text)).toEqual(["d2-0", "d2-1", "d2-2", "d2-3"]);
     });
 
     it("applies caps edited in the settings", async () => {

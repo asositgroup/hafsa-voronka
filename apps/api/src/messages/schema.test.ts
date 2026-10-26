@@ -13,7 +13,7 @@ const base = {
   day: 1,
   text: "Salom {ism}",
   media: null,
-  timing: { type: "after_entry", value: 60 },
+  minute: 60,
   buttons: [],
   isActive: true,
 };
@@ -32,8 +32,12 @@ describe("messageTemplateInputSchema", () => {
   it("surfaces text and timing errors", () => {
     const text = messageTemplateInputSchema.safeParse({ ...base, text: "{x}" });
     expect(text.success ? null : text.error.issues[0]).toMatchObject({ message: "unknown_variable", path: ["text"] });
-    const timing = messageTemplateInputSchema.safeParse({ ...base, timing: { type: "day_time", value: 1410 } });
-    expect(timing.success ? null : timing.error.issues[0]).toMatchObject({ message: "night", path: ["timing", "value"] });
+    const timing = messageTemplateInputSchema.safeParse({ ...base, minute: 1440 });
+    expect(timing.success ? null : timing.error.issues[0]).toMatchObject({ message: "out_of_range", path: ["minute"] });
+  });
+
+  it("accepts a night clock time", () => {
+    expect(messageTemplateInputSchema.safeParse({ ...base, day: 3, minute: 30 }).success).toBe(true);
   });
 
   it("defaults the audience filter to everyone", () => {

@@ -189,7 +189,6 @@ export const adminUz = {
   messages: {
     dayLabel: "{n}-kun",
     addMessage: "Eslatma qo‘shish",
-    expiryGroup: "Havola yopilishidan oldin",
     emptyTitle: "Hali xabar yo‘q",
     emptyHint: "Bu bosqich uchun birinchi xabarni yozing.",
     writeFirst: "Birinchi xabarni yozish",
@@ -214,14 +213,12 @@ export const adminUz = {
     edit: "Tahrirlash",
     mediaBadge: { photo: "Rasm", video: "Video", voice: "Ovoz" },
     timing: {
-      after_entry: {
+      afterEntry: {
         A: "Havolani olganidan {time} keyin",
         B: "To‘xtaganidan {time} keyin",
         C: "Narxni ko‘rganidan {time} keyin",
       },
-      day_time: "Soat {time}",
-      before_expiry: "Havola yopilishiga {time} qoldi",
-      night_notice: "Havola yopiladigan kun arafasida, soat {time} da",
+      clock: "{n}-kun, soat {time}",
     },
     attempts: {
       title: "Qaysi havola",
@@ -229,14 +226,6 @@ export const adminUz = {
       item: "{n}-havola",
       hint: "1 — birinchi berilgan havola. Dars har safar qayta ochilganda raqam bittaga oshadi. «8+» — 8-havola va undan keyingilari.",
       badge: "{list}-havola",
-    },
-    nightNotice: {
-      title: "Tungi qoidalar",
-      rules: "Tunda (23:00–07:00) eslatma bormaydi. Tunga to‘g‘ri kelganlaridan eng shoshilinchisi ertalab 07:30 da bitta xabar bo‘lib boradi.",
-      noticeTitle: "Kechki ogohlantirish (22:00)",
-      noticeHint: "Tun 2 va undan ko‘p eslatmani «yutsa», kechqurun bitta xabar boradi.",
-      add: "Qo‘shish",
-      defaultText: "Bugun ulgurmasangiz, ertaga soat {link_tugash_soati} gacha vaqtingiz bor.",
     },
     reorderFailed: "Tartib boshqa joyda o‘zgargan. Ro‘yxat yangilandi.",
     stopPoints: {
@@ -298,36 +287,15 @@ export const adminUz = {
       mediaDisabled: "Media yuklash serverda yoqilmagan. Dasturchiga ayting.",
       mediaPreviewUnavailable: "Ko‘rib bo‘lmadi",
       timingTitle: "Qachon yuboriladi",
-      timingKind: "Vaqt turi",
-      customTiming: "Boshqacha vaqt",
-      standardTiming: "Odatiy vaqtga qaytish",
       extraTitle: "Qo‘shimcha",
-      timingTypes: {
-        after_entry: {
-          A: "Havolani olganidan keyin",
-          B: "To‘xtaganidan keyin",
-          C: "Narxni ko‘rganidan keyin",
-        },
-        day_time: "Belgilangan kun va soatda",
-        before_expiry: "Havola yopilishidan oldin",
-        night_notice: "Tungi ogohlantirish (22:00)",
+      timingHints: {
+        A: "Masalan: havolani olganidan 1 soat o‘tib",
+        B: "Videoni to‘xtatganidan keyin hisoblanadi. Yana ko‘rib, yana to‘xtasa, vaqt qaytadan hisoblanadi",
+        C: "Masalan: narxni ko‘rganidan 1 soat o‘tib",
+        clock: "Toshkent vaqti bilan",
       },
-      timingExamples: {
-        after_entry: {
-          A: "Masalan: havolani olganidan 30 daqiqa o‘tib",
-          B: "Masalan: videoni to‘xtatganidan 30 daqiqa o‘tib. Yana ko‘rib, yana to‘xtasa, vaqt qaytadan hisoblanadi",
-          C: "Masalan: narxni ko‘rganidan 1 soat o‘tib",
-        },
-        day_time: "Masalan: 2-kun, soat 09:00 da",
-        before_expiry: "Masalan: havola yopilishidan 3 soat oldin",
-        night_notice:
-          "Havola yopilishidan oldingi tun 2 va undan ko‘p eslatmani «yutsa», shu kuni soat 22:00 da bir marta yuboriladi. Tunda qolgan eslatmalardan eng shoshilinchisi ertalab 07:30 da boradi.",
-      },
-      days: "kun",
       hours: "soat",
       minutes: "daqiqa",
-      before: "oldin",
-      hoursBefore: "soat oldin",
       buttonsTitle: "Tugmalar",
       buttonKinds: {
         resume: "Davom ettirish",
@@ -366,10 +334,6 @@ export const adminUz = {
       invalid_link: "Havola noto‘g‘ri (faqat https:// yoki tg://)",
       unknown_variable: "Noma’lum o‘zgaruvchi: {variable}",
       out_of_range: "Vaqt ruxsat etilgan oraliqdan tashqarida",
-      outside_day: "Vaqt tanlangan kunga to‘g‘ri kelmaydi",
-      night: "Tungi vaqt (23:00–07:00) mumkin emas",
-      linked_only: "Tungi ogohlantirish faqat havolaga bog‘liq bo‘limlarda ishlaydi",
-      night_notice_exists: "Bu bo‘limda tungi ogohlantirish allaqachon bor",
       statuses_invalid: "To‘xtagan joy bo‘yicha tanlash faqat «Ko‘rib to‘xtaganlar» uchun",
       attempts_invalid: "Havola tanlovi faqat «Videoni ochmaganlar» va «Ko‘rib to‘xtaganlar» uchun",
       button_not_allowed: "Bu tugma bu bo‘limda ishlamaydi",

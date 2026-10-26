@@ -29,7 +29,6 @@ import {
   segmentEndReasons,
   type TemplateButton,
   templateMediaTypes,
-  timingTypes,
   type Utm,
 } from "@funnel/shared";
 
@@ -362,7 +361,6 @@ export const messageTemplates = pgTable(
     text: text("text").notNull(),
     mediaType: text("media_type", { enum: templateMediaTypes }),
     mediaFileId: text("media_file_id"),
-    timingType: text("timing_type", { enum: timingTypes }).notNull(),
     timingValue: integer("timing_value").notNull(),
     buttons: jsonb("buttons").$type<TemplateButton[]>().default([]).notNull(),
     statuses: text("statuses").array().$type<FunnelStatus[]>(),
@@ -377,38 +375,17 @@ export const messageTemplates = pgTable(
       .on(t.segment, t.day, t.position)
       .where(sql`${t.deletedAt} is null`),
     check("message_templates_day_range", sql`${t.day} between 1 and 7`),
-    check("message_templates_segment_values", sql`${t.segment} in ('A', 'B', 'C', 'D')`),
-    check(
-      "message_templates_timing_type_values",
-      sql`${t.timingType} in ('after_entry', 'day_time', 'before_expiry', 'night_notice', 'occasion')`,
-    ),
-    check(
-      "message_templates_occasion_shape",
-      sql`(${t.timingType} = 'occasion') = (${t.segment} = 'D') and (${t.timingType} <> 'occasion' or (${t.timingValue} = 0 and ${t.statuses} is not null))`,
-    ),
-    uniqueIndex("message_templates_occasion_slot_idx")
-      .on(t.day, t.statuses)
-      .where(sql`${t.segment} = 'D' and ${t.deletedAt} is null`),
+    check("message_templates_segment_values", sql`${t.segment} in ('A', 'B', 'C') or ${t.deletedAt} is not null`),
+    check("message_templates_timing_value_range", sql`${t.timingValue} between 0 and 1439`),
     check(
       "message_templates_attempts_values",
       sql`${t.attempts} is null or (cardinality(${t.attempts}) > 0 and ${t.attempts} <@ array[1, 2, 3, 4, 5, 6, 7, 8]::smallint[] and ${t.segment} in ('A', 'B'))`,
     ),
     check(
-      "message_templates_night_notice_shape",
-      sql`${t.timingType} <> 'night_notice' or (${t.timingValue} = 0 and ${t.segment} in ('A', 'B'))`,
-    ),
-    uniqueIndex("message_templates_night_notice_idx")
-      .on(t.segment)
-      .where(sql`${t.timingType} = 'night_notice' and ${t.deletedAt} is null`),
-    check(
       "message_templates_statuses_values",
       sql`${t.statuses} is null or (cardinality(${t.statuses}) > 0 and ${t.statuses} <@ array['link_berildi', 'korishni_boshladi', 'dars_yarmida', 'sotuvda_toxtadi', 'narxni_kurdi', 'adminga_yozdi']::text[])`,
     ),
     check("message_templates_media_pair", sql`(${t.mediaType} is null) = (${t.mediaFileId} is null)`),
-    check(
-      "message_templates_day_time_range",
-      sql`${t.timingType} <> 'day_time' or ${t.timingValue} between 420 and 1379`,
-    ),
   ],
 );
 

@@ -193,7 +193,7 @@ describe.skipIf(!isolatedDb.url)("Reopening a closed lesson", () => {
   async function template(values: Partial<typeof messageTemplates.$inferInsert>) {
     const [row] = await db()
       .insert(messageTemplates)
-      .values({ segment: "A", day: 1, position: 0, text: "Matn", timingType: "after_entry", timingValue: 60, ...values })
+      .values({ segment: "A", day: 1, position: 0, text: "Matn", timingValue: 60, ...values })
       .returning();
     return row;
   }

@@ -25,7 +25,7 @@ const draft = {
   day: 1,
   text: "Salom, <b>{ism}</b>!",
   media: null,
-  timing: { type: "after_entry", value: 60 },
+  minute: 60,
   buttons: [],
   isActive: true,
 };
@@ -151,9 +151,9 @@ describe.skipIf(!testDbUrl)("Message constructor", () => {
     const second = await create();
     expect([first.position, second.position]).toEqual([0, 1]);
 
-    const moved = await send(`/${first.id}`, "PUT", { ...draft, day: 2, timing: { type: "after_entry", value: 1500 } });
+    const moved = await send(`/${first.id}`, "PUT", { ...draft, day: 2, minute: 60 });
     expect(await moved.json()).toMatchObject({ day: 2, position: 0 });
-    const other = await create({ day: 2, timing: { type: "after_entry", value: 1600 } });
+    const other = await create({ day: 2, minute: 160 });
     expect(other.position).toBe(1);
   });
 
@@ -173,17 +173,21 @@ describe.skipIf(!testDbUrl)("Message constructor", () => {
     expect((await list()).map((item) => item.id)).toEqual([c.id, a.id, b.id]);
   });
 
-  it("rejects unknown variables and night timings with 422", async () => {
+  it("rejects unknown variables and out-of-day minutes with 422 but accepts night times", async () => {
     const unknown = await send("", "POST", { ...draft, text: "Salom {familiya}" });
     expect(unknown.status).toBe(422);
     expect(await unknown.json()).toEqual({ error: "unknown_variable", variable: "familiya" });
 
-    const night = await send("", "POST", { ...draft, timing: { type: "day_time", value: 23 * 60 + 30 } });
-    expect(night.status).toBe(422);
-    expect(await night.json()).toEqual({ error: "night" });
+    const outside = await send("", "POST", { ...draft, minute: 1440 });
+    expect(outside.status).toBe(422);
+    expect(await outside.json()).toEqual({ error: "out_of_range" });
 
     expect((await send("", "POST", { ...draft, day: 9 })).status).toBe(400);
     expect(await list()).toEqual([]);
+
+    const night = await send("", "POST", { ...draft, day: 3, minute: 23 * 60 + 30 });
+    expect(night.status).toBe(201);
+    expect(await night.json()).toMatchObject({ day: 3, minute: 23 * 60 + 30 });
   });
 
   it("saves a stop-point filter in B and refuses it elsewhere", async () => {
@@ -223,34 +227,6 @@ describe.skipIf(!testDbUrl)("Message constructor", () => {
     expect(everyone.attempts).toBeNull();
     const inC = await send("", "POST", { ...draft, segment: "C", attempts: [1] });
     expect(await inC.json()).toEqual({ error: "attempts_invalid" });
-  });
-
-  describe("night notice", () => {
-    const notice = { ...draft, text: "Ertaga soat {link_tugash_soati} gacha", timing: { type: "night_notice", value: 0 } };
-
-    it("allows one per linked segment", async () => {
-      const first = await create(notice);
-      const second = await send("", "POST", notice);
-      expect(second.status).toBe(409);
-      expect(await second.json()).toEqual({ error: "night_notice_exists" });
-      expect((await send("", "POST", { ...notice, segment: "B" })).status).toBe(201);
-
-      const plain = await create();
-      const moved = await send(`/${plain.id}`, "PUT", notice);
-      expect(moved.status).toBe(409);
-
-      expect((await request(`/${first.id}`, { method: "DELETE" })).status).toBe(200);
-      expect((await send(`/${plain.id}`, "PUT", notice)).status).toBe(200);
-    });
-
-    it("refuses segment C and a non-zero value", async () => {
-      const segmentC = await send("", "POST", { ...notice, segment: "C" });
-      expect(segmentC.status).toBe(422);
-      expect(await segmentC.json()).toEqual({ error: "linked_only" });
-      const valued = await send("", "POST", { ...notice, timing: { type: "night_notice", value: 5 } });
-      expect(valued.status).toBe(422);
-      expect(await valued.json()).toEqual({ error: "out_of_range" });
-    });
   });
 
   it("uploads media through the media chat and removes it there", async () => {

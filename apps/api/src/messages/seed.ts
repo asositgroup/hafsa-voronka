@@ -4,6 +4,7 @@ import {
   type FunnelStatus,
   type MessageTemplateInput,
   type TemplateButton,
+  type TemplateKind,
 } from "@funnel/shared";
 import { db } from "@/db";
 import { messageTemplates } from "@/db/schema";
@@ -11,6 +12,7 @@ import { messageTemplates } from "@/db/schema";
 type SeedTemplate = {
   day: number;
   minute: number;
+  kind?: TemplateKind;
   text: string;
   buttons: TemplateButton[];
   statuses?: FunnelStatus[];
@@ -22,6 +24,7 @@ const watchButton: TemplateButton = { kind: "resume", text: "▶ Videoni ko‘ri
 const continueButton: TemplateButton = { kind: "resume", text: "▶ Davom ettirish" };
 const courseOnlyButton: TemplateButton = { kind: "offer", text: "Faqat kurs haqidagi qism" };
 const priceButton: TemplateButton = { kind: "offer", text: "Narx va shartlarni ko‘rish" };
+const reopenButton: TemplateButton = { kind: "again", text: "✅ Ha, bugun ko‘raman" };
 const adminButton: TemplateButton = { kind: "admin", text: "✍️ Adminga yozish", prefill: "Bonus darsni ko‘rdim" };
 
 const segmentA: SeedTemplate[] = [
@@ -129,9 +132,10 @@ const segmentB: SeedTemplate[] = [
   },
   {
     day: 2,
-    minute: 8 * MINUTES_PER_HOUR,
-    text: "Kecha <b>{toxtagan_joy}</b> da to'xtagan edingiz, qolgani atigi <b>{qolgan_daqiqa} daqiqa</b>. Davom ettiring 👇",
-    buttons: [continueButton],
+    minute: 10 * MINUTES_PER_HOUR,
+    kind: "trigger",
+    text: "Kecha <b>{toxtagan_joy}</b> da to'xtagan edingiz va 24 soatlik ruxsat yopildi 🔒. Darsni yana 24 soatga ochib beraylikmi?",
+    buttons: [reopenButton],
   },
   {
     day: 1,
@@ -196,7 +200,9 @@ export function seedInputs(segment: FunnelSegment): MessageTemplateInput[] {
     buttons: template.buttons,
     isActive: true,
     statuses: template.statuses ?? null,
-    attempts: null,
+    kind: template.kind ?? "reminder",
+    atExpiry: false,
+    isPermanent: false,
   }));
 }
 
@@ -220,6 +226,7 @@ async function seedSegment(segment: FunnelSegment) {
         buttons: input.buttons,
         isActive: input.isActive,
         statuses: input.statuses,
+        kind: input.kind,
       };
     });
     await tx.insert(messageTemplates).values(rows);

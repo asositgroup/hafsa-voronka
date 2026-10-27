@@ -2,9 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   messageTemplateBaseSchema,
   messageTemplateInputSchema,
-  normalizeAttempts,
   normalizeStatuses,
-  templatesForAttempt,
   validateTemplateInput,
 } from "@funnel/shared";
 
@@ -80,26 +78,18 @@ describe("messageTemplateInputSchema", () => {
     expect(messageTemplateBaseSchema.safeParse({ ...base, segment: "D" }).success).toBe(false);
   });
 
-  describe("link attempts", () => {
-    it("targets texts at specific links in A and B only", () => {
-      expect(messageTemplateInputSchema.safeParse({ ...base, attempts: [1] }).success).toBe(true);
-      expect(messageTemplateInputSchema.safeParse({ ...base, segment: "B", attempts: [2, 3] }).success).toBe(true);
-      const inC = messageTemplateInputSchema.safeParse({ ...base, segment: "C", attempts: [1] });
-      expect(inC.success ? null : inC.error.issues[0]).toMatchObject({ message: "attempts_invalid", path: ["attempts"] });
-      expect(messageTemplateInputSchema.safeParse({ ...base, attempts: [9] }).success).toBe(false);
-      expect(messageTemplateInputSchema.safeParse({ ...base, attempts: [] }).success).toBe(false);
-    });
-
-    it("accepts link 8 as 8 and later", () => {
-      expect(messageTemplateInputSchema.safeParse({ ...base, attempts: [8] }).success).toBe(true);
-      expect(templatesForAttempt([{ attempts: [8] }], 9)).toHaveLength(1);
-      expect(templatesForAttempt([{ attempts: [7] }], 9)).toHaveLength(0);
-    });
-
-    it("stores every link as everyone", () => {
-      expect(normalizeAttempts("A", [3, 1, 3])).toEqual([1, 3]);
-      expect(normalizeAttempts("A", [8, 7, 6, 5, 4, 3, 2, 1])).toBeNull();
-      expect(normalizeAttempts("C", [1])).toBeNull();
+  it("allows triggers only in A/B on days 2 to 7 and at-expiry only on triggers", () => {
+    const trigger = { ...base, day: 2, kind: "trigger" };
+    expect(messageTemplateInputSchema.safeParse(trigger).success).toBe(true);
+    expect(messageTemplateInputSchema.safeParse({ ...trigger, segment: "B", day: 7, atExpiry: true }).success).toBe(true);
+    for (const wrong of [{ ...trigger, day: 1 }, { ...trigger, segment: "C" }]) {
+      const parsed = messageTemplateInputSchema.safeParse(wrong);
+      expect(parsed.success ? null : parsed.error.issues[0]).toMatchObject({ message: "trigger_not_allowed", path: ["kind"] });
+    }
+    const reminder = messageTemplateInputSchema.safeParse({ ...base, atExpiry: true });
+    expect(reminder.success ? null : reminder.error.issues[0]).toMatchObject({
+      message: "at_expiry_trigger_only",
+      path: ["atExpiry"],
     });
   });
 });

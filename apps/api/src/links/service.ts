@@ -1,12 +1,12 @@
 import { and, eq, sql } from "drizzle-orm";
-import type { FunnelStatus, LinkGrantKind } from "@funnel/shared";
+import { type FunnelStatus, type LinkGrantKind, linkBoundSegments } from "@funnel/shared";
 import { db } from "@/db";
 import { type LinkGrant, linkGrants, type User, users, videos, watchProgress } from "@/db/schema";
 import { syncSegment } from "@/funnel/segments";
 import { isLessonClosed, NO_VIDEO_MARKS, segmentFor, statusFor } from "@/funnel/status";
 import { logEvent } from "@/funnel/users";
 import { refreshUserLeadCards } from "@/leads/service";
-import { linkExpiryFor } from "@/messages/plan";
+import { funnelDayAt, linkExpiryFor } from "@/messages/plan";
 import { linkTtlHours } from "@/settings/service";
 import { cancelPendingAppointments } from "./appointmentStore";
 
@@ -18,6 +18,7 @@ export type GrantRequest = {
   offerFirst: boolean;
   now: Date;
   ttlHours: number;
+  day: number;
   silent?: boolean;
 };
 
@@ -33,6 +34,7 @@ export async function insertGrant(tx: Tx, userId: number, request: GrantRequest)
       userId,
       epoch,
       attempt: sql`(select coalesce(max(${linkGrants.attempt}), 0) + 1 from ${linkGrants} where ${linkGrants.userId} = ${userId} and ${linkGrants.epoch} = ${epoch})`,
+      day: request.day,
       kind: request.kind,
       offerFirst: request.offerFirst,
       silent: request.silent ?? false,
@@ -45,6 +47,16 @@ export async function insertGrant(tx: Tx, userId: number, request: GrantRequest)
     .set({ linkId: grant.id, linkGivenAt: request.now, linkExpiresAt: expiresAt })
     .where(eq(users.id, userId));
   return grant;
+}
+
+export async function currentFunnelDay(
+  executor: Reader,
+  user: Pick<User, "linkId" | "linkExpiresAt">,
+  now: Date,
+): Promise<number> {
+  if (user.linkId === null) return 1;
+  const [grant] = await executor.select({ day: linkGrants.day }).from(linkGrants).where(eq(linkGrants.id, user.linkId));
+  return grant ? funnelDayAt({ day: grant.day, expiresAt: user.linkExpiresAt }, now) : 1;
 }
 
 export type LessonState = { status: FunnelStatus | null; closed: boolean };
@@ -69,19 +81,23 @@ export async function reopenWithin(
   kind: "again" | "scheduled",
   now: Date,
   ttlHours: number,
+  restart = false,
 ): Promise<ReopenResult> {
   const [user] = await tx.select().from(users).where(eq(users.id, userId)).for("update");
   if (!user || user.registeredAt === null || user.wroteAdminAt !== null || user.botBlocked) return "closed";
   const state = await lessonState(tx, user, now);
-  if (!state.closed) return "open";
-  await insertGrant(tx, userId, { kind, offerFirst: segmentFor(state.status) === "B", now, ttlHours });
+  const segment = segmentFor(state.status);
+  const restartable = restart && user.completedAt === null && segment !== null && linkBoundSegments.includes(segment);
+  if (!state.closed && !restartable) return "open";
+  const day = restartable ? 1 : await currentFunnelDay(tx, user, now);
+  await insertGrant(tx, userId, { kind, offerFirst: segment === "B", now, ttlHours, day });
   return "reopened";
 }
 
 export async function reopenLesson(userId: number, source: ReopenSource, now = new Date()): Promise<ReopenResult> {
   const ttlHours = await linkTtlHours();
   const result = await db().transaction(async (tx) => {
-    const outcome = await reopenWithin(tx, userId, "again", now, ttlHours);
+    const outcome = await reopenWithin(tx, userId, "again", now, ttlHours, source === "start");
     if (outcome === "reopened") await cancelPendingAppointments(tx, userId, now, ["reopen"]);
     return outcome;
   });

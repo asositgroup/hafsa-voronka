@@ -70,7 +70,7 @@ export async function markRegistered(
       .where(and(eq(users.id, userId), isNull(users.registeredAt)))
       .returning();
     if (!updated) return undefined;
-    const grant = await insertGrant(tx, userId, { kind: "initial", offerFirst: false, now, ttlHours });
+    const grant = await insertGrant(tx, userId, { kind: "initial", offerFirst: false, now, ttlHours, day: 1 });
     return { ...updated, linkId: grant.id, linkGivenAt: grant.givenAt, linkExpiresAt: grant.expiresAt };
   });
 }

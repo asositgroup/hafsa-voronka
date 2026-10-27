@@ -183,6 +183,13 @@
       "when": 1793000037409,
       "tag": "0025_reminder_timeline",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1793080793693,
+      "tag": "0026_funnel_day_triggers",
+      "breakpoints": true
     }
   ]
 }

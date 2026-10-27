@@ -3,7 +3,6 @@ import {
   type FunnelSegment,
   type MessageTemplate,
   type MessageTemplateInput,
-  normalizeAttempts,
   normalizeStatuses,
 } from "@funnel/shared";
 import { db } from "@/db";
@@ -12,6 +11,33 @@ import { type MessageTemplateRow, messageTemplates } from "@/db/schema";
 export class StaleOrderError extends Error {
   constructor() {
     super("stale_order");
+  }
+}
+
+export class TriggerExistsError extends Error {
+  constructor() {
+    super("trigger_exists");
+  }
+}
+
+const ONE_TRIGGER_INDEX = "message_templates_one_trigger_idx";
+
+function isTriggerConflict(error: unknown): boolean {
+  const cause = error instanceof Error && "cause" in error ? error.cause : error;
+  return (
+    typeof cause === "object" &&
+    cause !== null &&
+    (cause as { code?: string }).code === "23505" &&
+    (cause as { constraint_name?: string }).constraint_name === ONE_TRIGGER_INDEX
+  );
+}
+
+async function guardTrigger<T>(write: () => Promise<T>): Promise<T> {
+  try {
+    return await write();
+  } catch (error) {
+    if (isTriggerConflict(error)) throw new TriggerExistsError();
+    throw error;
   }
 }
 
@@ -29,7 +55,9 @@ export function toTemplate(row: MessageTemplateRow): MessageTemplate {
     buttons: row.buttons,
     isActive: row.isActive,
     statuses: row.statuses,
-    attempts: row.attempts,
+    kind: row.kind,
+    atExpiry: row.atExpiry,
+    isPermanent: row.isPermanent,
     updatedAt: row.updatedAt.toISOString(),
   };
 }
@@ -43,7 +71,9 @@ function columns(input: MessageTemplateInput) {
     buttons: input.buttons,
     isActive: input.isActive,
     statuses: normalizeStatuses(input.segment, input.statuses),
-    attempts: normalizeAttempts(input.segment, input.attempts),
+    kind: input.kind,
+    atExpiry: input.kind === "trigger" && input.atExpiry,
+    isPermanent: input.isPermanent,
   };
 }
 
@@ -82,18 +112,18 @@ export async function findTemplate(id: number) {
 }
 
 export async function createTemplate(input: MessageTemplateInput) {
-  return db().transaction(async (tx) => {
+  return guardTrigger(() => db().transaction(async (tx) => {
     const position = await nextPosition(tx, input.segment, input.day);
     const [row] = await tx
       .insert(messageTemplates)
       .values({ segment: input.segment, day: input.day, position, ...columns(input) })
       .returning();
     return toTemplate(row);
-  });
+  }));
 }
 
 export async function updateTemplate(id: number, input: MessageTemplateInput) {
-  return db().transaction(async (tx) => {
+  return guardTrigger(() => db().transaction(async (tx) => {
     const [current] = await tx
       .select()
       .from(messageTemplates)
@@ -108,15 +138,17 @@ export async function updateTemplate(id: number, input: MessageTemplateInput) {
       .where(eq(messageTemplates.id, id))
       .returning();
     return toTemplate(row);
-  });
+  }));
 }
 
 export async function setActive(id: number, isActive: boolean) {
-  const [row] = await db()
-    .update(messageTemplates)
-    .set({ isActive, updatedAt: new Date() })
-    .where(and(eq(messageTemplates.id, id), isNull(messageTemplates.deletedAt)))
-    .returning();
+  const [row] = await guardTrigger(() =>
+    db()
+      .update(messageTemplates)
+      .set({ isActive, updatedAt: new Date() })
+      .where(and(eq(messageTemplates.id, id), isNull(messageTemplates.deletedAt)))
+      .returning(),
+  );
   return row ? toTemplate(row) : null;
 }
 

@@ -63,7 +63,6 @@ import {
   pickNext,
   type PlanItem,
   planChain,
-  segmentChainInput,
   type SendUsage,
   tashkentDayStart,
   type WatchSnapshot,
@@ -96,12 +95,11 @@ type Candidate = {
   userId: number;
   segment: FunnelSegment;
   enteredAt: Date;
-  attempt: number;
   telegramId: number;
   linkId: number | null;
   linkExpiresAt: Date | null;
+  linkDay: number | null;
   sentTemplateIds: number[];
-  deferredSent: boolean;
   usage: SendUsage;
   status: FunnelStatus | null;
   watch: WatchSnapshot;
@@ -139,6 +137,8 @@ export function trackedWrap(
   };
 }
 
+const replaceable = sql`not exists (select 1 from ${messageTemplates} where ${messageTemplates.id} = ${sentMessages.templateId} and ${messageTemplates.isPermanent})`;
+
 const chainAllowed = sql`not exists (select 1 from ${linkGrants} where ${linkGrants.id} = ${users.linkId} and ${linkGrants.silent})`;
 
 async function loadCandidates(now: Date, userId?: number): Promise<Candidate[]> {
@@ -150,10 +150,10 @@ async function loadCandidates(now: Date, userId?: number): Promise<Candidate[]> 
       userId: segmentRuns.userId,
       segment: segmentRuns.segment,
       enteredAt: segmentRuns.enteredAt,
-      attempt: segmentRuns.attempt,
       telegramId: users.telegramId,
       linkId: users.linkId,
       linkExpiresAt: users.linkExpiresAt,
+      linkDay: sql<number | null>`(select ${linkGrants.day} from ${linkGrants} where ${linkGrants.id} = ${users.linkId})`,
       registeredAt: users.registeredAt,
       wroteAdminAt: users.wroteAdminAt,
       offerWatchedAt: users.offerWatchedAt,
@@ -166,7 +166,6 @@ async function loadCandidates(now: Date, userId?: number): Promise<Candidate[]> 
       courseStartSec: videos.courseStartSec,
       priceSec: videos.priceSec,
       sentTemplateIds: sql<string[]>`coalesce(array_agg(${sentMessages.templateId}) filter (where ${sentMessages.templateId} is not null), '{}')::bigint[]`,
-      deferredSent: sql<boolean>`coalesce(bool_or(${sentMessages.templateId} is not null and ${sentMessages.dueAt} = ${users.linkExpiresAt}), false)`,
       sentToday: sql<number>`(select count(*) from sent_messages c where c.user_id = ${segmentRuns.userId} and c.template_id is not null and c.sent_at >= ${dayStart}::timestamptz)::int`,
       runToday: sql<number>`(count(*) filter (where ${sentMessages.templateId} is not null and ${sentMessages.sentAt} >= ${dayStart}::timestamptz))::int`,
       runTotal: sql<number>`(count(${sentMessages.sentAt}) filter (where ${sentMessages.templateId} is not null))::int`,
@@ -193,12 +192,11 @@ async function loadCandidates(now: Date, userId?: number): Promise<Candidate[]> 
     userId: row.userId,
     segment: row.segment,
     enteredAt: row.enteredAt,
-    attempt: row.attempt,
     telegramId: row.telegramId,
     linkId: row.linkId,
     linkExpiresAt: row.linkExpiresAt,
+    linkDay: row.linkDay === null ? null : Number(row.linkDay),
     sentTemplateIds: row.sentTemplateIds.map(Number),
-    deferredSent: row.deferredSent,
     usage: { today: row.sentToday, runToday: row.runToday, runTotal: row.runTotal },
     status: statusFor(
       row.maxPosition === null ? undefined : { maxPosition: row.maxPosition, startedAt: row.startedAt },
@@ -285,6 +283,7 @@ async function deletePrevious(
         isNotNull(sentMessages.telegramMessageId),
         isNull(sentMessages.deletedAt),
         isNull(sentMessages.deleteError),
+        replaceable,
       ),
     )
     .orderBy(asc(sentMessages.id));
@@ -447,17 +446,13 @@ async function sendSystem(
 }
 
 function chainFor(candidate: Candidate, templates: MessageTemplateRow[]) {
-  return planChain(
-    segmentChainInput(templates, {
-      segment: candidate.segment,
-      enteredAt: candidate.enteredAt,
-      status: candidate.status,
-      watch: candidate.watch,
-      attempt: candidate.attempt,
-      linkExpiresAt: candidate.linkExpiresAt,
-      deferredSent: candidate.deferredSent,
-    }),
-  );
+  return planChain(templates, {
+    segment: candidate.segment,
+    enteredAt: candidate.enteredAt,
+    status: candidate.status,
+    watch: candidate.watch,
+    grant: { day: candidate.linkDay ?? 1, expiresAt: candidate.linkExpiresAt },
+  });
 }
 
 async function sendDue(api: Api, now: Date, pace: Pace, candidates: Candidate[]) {
@@ -509,6 +504,7 @@ async function sweepExpiredLinkMessages(api: Api, now: Date, pace: Pace) {
         isNotNull(sentMessages.telegramMessageId),
         isNull(sentMessages.deletedAt),
         isNull(sentMessages.deleteError),
+        replaceable,
       ),
     )
     .orderBy(asc(sentMessages.id))
@@ -782,6 +778,7 @@ async function sweep(api: Api, now: Date, pace: Pace) {
         isNotNull(sentMessages.telegramMessageId),
         isNull(sentMessages.deletedAt),
         isNull(sentMessages.deleteError),
+        replaceable,
       ),
     )
     .orderBy(asc(sentMessages.sentAt))

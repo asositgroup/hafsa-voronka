@@ -130,7 +130,7 @@ describe.skipIf(!isolatedDb.url)("«Keyinroq» time picker and appointments", ()
       .returning();
     const [grant] = await db()
       .insert(linkGrants)
-      .values({ userId: user.id, attempt: 1, kind: "initial", givenAt, expiresAt: options.expiresAt })
+      .values({ userId: user.id, attempt: 1, day: 1, kind: "initial", givenAt, expiresAt: options.expiresAt })
       .returning();
     await db().update(users).set({ linkId: grant.id }).where(eq(users.id, user.id));
     if (options.maxPosition !== undefined) {
@@ -287,8 +287,9 @@ describe.skipIf(!isolatedDb.url)("«Keyinroq» time picker and appointments", ()
     return { user, sentId: row.id };
   }
 
-  it("reminds an hour before, reopens at the chosen time and restarts the chain", async () => {
+  it("reminds an hour before, reopens at the chosen time and runs the next day's chain", async () => {
     const { user, sentId } = await closedReminderUser();
+    await template({ day: 2, text: "A2" });
     const expiry = at(24 * 60);
     await tap(user.telegramId, `mt:l:s${sentId}`, expiry);
     await tap(user.telegramId, "lt:q:m", expiry);
@@ -318,9 +319,9 @@ describe.skipIf(!isolatedDb.url)("«Keyinroq» time picker and appointments", ()
     expect(lastKeyboard()[0][0].web_app?.url).toMatch(/\/app\?m=\d+$/);
 
     const grants = await grantsOf(user.id);
-    expect(grants.map((grant) => [grant.attempt, grant.kind])).toEqual([
-      [1, "initial"],
-      [2, "scheduled"],
+    expect(grants.map((grant) => [grant.attempt, grant.kind, grant.day])).toEqual([
+      [1, "initial", 1],
+      [2, "scheduled", 2],
     ]);
     expect(grants[1].expiresAt).toEqual(at(24 * 60, chosen));
     const [fresh] = await db().select().from(users).where(eq(users.id, user.id));
@@ -333,7 +334,7 @@ describe.skipIf(!isolatedDb.url)("«Keyinroq» time picker and appointments", ()
 
     calls.length = 0;
     await tick(at(61, chosen));
-    expect(sentTexts()).toEqual(["A1"]);
+    expect(sentTexts()).toEqual(["A2"]);
     await tick(at(62, chosen));
     expect(sends()).toHaveLength(1);
     expect((await db().select().from(events).where(eq(events.type, "later_reopened"))).length).toBe(1);

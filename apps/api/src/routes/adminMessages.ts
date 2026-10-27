@@ -28,6 +28,7 @@ import {
   setActive,
   softDelete,
   StaleOrderError,
+  TriggerExistsError,
   updateTemplate,
 } from "@/messages/repo";
 import { sendRendered } from "@/messages/send";
@@ -63,6 +64,17 @@ async function adminOptions() {
   });
 }
 
+async function triggerChecked<T>(write: () => Promise<T>): Promise<{ ok: T } | { conflict: true }> {
+  try {
+    return { ok: await write() };
+  } catch (error) {
+    if (error instanceof TriggerExistsError) return { conflict: true };
+    throw error;
+  }
+}
+
+const TRIGGER_EXISTS = { error: "trigger_exists" } as const;
+
 function invalidInput(input: MessageTemplateInput) {
   const issue = validateTemplateInput(input);
   if (!issue) return null;
@@ -86,7 +98,8 @@ adminMessageRoutes.post("/", async (c) => {
   if (!body.success) return c.json({ error: "invalid_request" }, 400);
   const invalid = invalidInput(body.data);
   if (invalid) return c.json(invalid, 422);
-  return c.json(await createTemplate(body.data), 201);
+  const created = await triggerChecked(() => createTemplate(body.data));
+  return "ok" in created ? c.json(created.ok, 201) : c.json(TRIGGER_EXISTS, 409);
 });
 
 adminMessageRoutes.put("/order", async (c) => {
@@ -151,15 +164,17 @@ adminMessageRoutes.put("/:id{[0-9]+}", async (c) => {
   if (!body.success) return c.json({ error: "invalid_request" }, 400);
   const invalid = invalidInput(body.data);
   if (invalid) return c.json(invalid, 422);
-  const updated = await updateTemplate(Number(c.req.param("id")), body.data);
-  return updated ? c.json(updated) : c.json({ error: "not_found" }, 404);
+  const updated = await triggerChecked(() => updateTemplate(Number(c.req.param("id")), body.data));
+  if (!("ok" in updated)) return c.json(TRIGGER_EXISTS, 409);
+  return updated.ok ? c.json(updated.ok) : c.json({ error: "not_found" }, 404);
 });
 
 adminMessageRoutes.patch("/:id{[0-9]+}/active", async (c) => {
   const body = activeSchema.safeParse(await c.req.json().catch(() => null));
   if (!body.success) return c.json({ error: "invalid_request" }, 400);
-  const updated = await setActive(Number(c.req.param("id")), body.data.isActive);
-  return updated ? c.json(updated) : c.json({ error: "not_found" }, 404);
+  const updated = await triggerChecked(() => setActive(Number(c.req.param("id")), body.data.isActive));
+  if (!("ok" in updated)) return c.json(TRIGGER_EXISTS, 409);
+  return updated.ok ? c.json(updated.ok) : c.json({ error: "not_found" }, 404);
 });
 
 adminMessageRoutes.delete("/:id{[0-9]+}", async (c) => {

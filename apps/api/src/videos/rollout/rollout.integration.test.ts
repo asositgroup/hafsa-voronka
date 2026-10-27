@@ -176,7 +176,7 @@ describe.skipIf(!isolatedDb.url)("Video rollout", () => {
       .returning();
     const [grant] = await db()
       .insert(linkGrants)
-      .values({ userId: user.id, attempt: 1, kind: "initial", givenAt: registeredAt, expiresAt })
+      .values({ userId: user.id, attempt: 1, day: 1, kind: "initial", givenAt: registeredAt, expiresAt })
       .returning();
     await db().update(users).set({ linkId: grant.id }).where(eq(users.id, user.id));
     if (fixture.position !== undefined && fixture.position !== null) {
@@ -527,7 +527,7 @@ describe.skipIf(!isolatedDb.url)("Video rollout", () => {
         .returning({ id: users.id });
       const grants = await db()
         .insert(linkGrants)
-        .values(created.map(({ id }) => ({ userId: id, attempt: 1, kind: "initial" as const, givenAt, expiresAt })))
+        .values(created.map(({ id }) => ({ userId: id, attempt: 1, day: 1, kind: "initial" as const, givenAt, expiresAt })))
         .returning({ id: linkGrants.id, userId: linkGrants.userId });
       for (const grant of grants) await db().update(users).set({ linkId: grant.id }).where(eq(users.id, grant.userId));
       await startRollout();
@@ -590,17 +590,17 @@ describe.skipIf(!isolatedDb.url)("Video rollout", () => {
       const oldAt = at(-2 * DAY / MINUTE);
       const [second] = await db()
         .insert(linkGrants)
-        .values({ userId: user.id, attempt: 2, kind: "again", givenAt: oldAt, expiresAt: at(-DAY / MINUTE) })
+        .values({ userId: user.id, attempt: 2, day: 2, kind: "again", givenAt: oldAt, expiresAt: at(-DAY / MINUTE) })
         .returning();
       await db().update(users).set({ linkId: second.id, linkExpiresAt: second.expiresAt }).where(eq(users.id, user.id));
       await syncSegment(user.id, at(-DAY / MINUTE));
       return second;
     }
 
-    it("restarts attempt templates for rolled-out users only", async () => {
+    it("restarts day 1 for rolled-out users only", async () => {
       const segment: FunnelSegment = "B";
-      await template({ segment, text: "Birinchi link", attempts: [1], buttons: watchButton });
-      await template({ segment, text: "Uchinchi link", attempts: [3], buttons: watchButton });
+      await template({ segment, text: "Birinchi kun", buttons: watchButton });
+      await template({ segment, day: 3, text: "Uchinchi kun", buttons: watchButton });
 
       const rolled = await makeUser({ position: 150 });
       const untouched = await makeUser({ position: 150, createdAt: at(-30 * DAY / MINUTE) });
@@ -614,20 +614,20 @@ describe.skipIf(!isolatedDb.url)("Video rollout", () => {
 
       calls.length = 0;
       await tick(at(61));
-      expect(sendsTo(rolled.telegramId).map(textOf)).toEqual(["Birinchi link"]);
+      expect(sendsTo(rolled.telegramId).map(textOf)).toEqual(["Birinchi kun"]);
 
       const expiry = (await userRow(rolled.id)).linkExpiresAt!;
 
       const before = await userRow(untouched.id);
       expect(before.funnelEpoch).toBe(0);
       const grant = await db().transaction((tx) =>
-        insertGrant(tx, untouched.id, { kind: "again", offerFirst: false, now: at(6, expiry), ttlHours: 24 }),
+        insertGrant(tx, untouched.id, { kind: "again", offerFirst: false, now: at(6, expiry), ttlHours: 24, day: 3 }),
       );
       expect(grant).toMatchObject({ epoch: 0, attempt: 3 });
       await syncSegment(untouched.id, at(6, expiry));
       calls.length = 0;
       await tick(at(70, expiry));
-      expect(sendsTo(untouched.telegramId).map(textOf)).toEqual(["Uchinchi link"]);
+      expect(sendsTo(untouched.telegramId).map(textOf)).toEqual(["Uchinchi kun"]);
     });
   });
 

@@ -56,6 +56,7 @@ describe.skipIf(!isolatedDb.url)("Short course video on a second chance", () => 
       .values({
         userId: user.id,
         attempt: 1,
+        day: 1,
         kind: options.offerFirst ? "again" : "initial",
         offerFirst: options.offerFirst,
         givenAt: START,

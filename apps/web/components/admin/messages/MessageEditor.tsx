@@ -3,7 +3,6 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import {
-  attemptTargetSegments,
   defaultMinute,
   type FunnelSegment,
   type FunnelStatus,
@@ -26,7 +25,6 @@ import { Disclosure } from "@/components/admin/ui/Disclosure";
 import { Notice } from "@/components/admin/ui/Notice";
 import { Segmented } from "@/components/admin/ui/Segmented";
 import { Switch } from "@/components/admin/ui/Switch";
-import { AttemptPicker, attemptsLabel } from "@/components/admin/messages/AttemptPicker";
 import { ButtonsEditor } from "@/components/admin/messages/ButtonsEditor";
 import { MessagePreview } from "@/components/admin/messages/MessagePreview";
 import { StopPointPicker, stopPointLabel, type VideoMarks } from "@/components/admin/messages/StopPointPicker";
@@ -50,7 +48,6 @@ const mediaIcons = { photo: PhotoIcon, video: VideoIcon, voice: VoiceIcon };
 const acceptedMedia = Object.values(TEMPLATE_MEDIA_MIME_TYPES).flat().join(",");
 const extraErrorCodes = new Set([
   "statuses_invalid",
-  "attempts_invalid",
   "unsupported_type",
   "too_large",
   "media_not_configured",
@@ -61,7 +58,6 @@ function usesExtras(segment: FunnelSegment, draft: MessageTemplateInput) {
   return (
     draft.media !== null ||
     !draft.isActive ||
-    draft.attempts !== null ||
     (statusTargetSegments.includes(segment) && draft.statuses !== null) ||
     draft.buttons.length > 0
   );
@@ -74,7 +70,6 @@ function extrasSummary(segment: FunnelSegment, draft: MessageTemplateInput, vide
     statusTargetSegments.includes(segment) && draft.statuses
       ? draft.statuses.map((status) => stopPointLabel(status, videoMarks)).join(", ")
       : null,
-    draft.attempts ? attemptsLabel(draft.attempts) : null,
     draft.isActive ? null : adminUz.messages.inactive,
   ]
     .filter((part): part is string => part !== null)
@@ -132,7 +127,9 @@ export function MessageEditor({
           buttons: item.buttons,
           isActive: item.isActive,
           statuses: item.statuses,
-          attempts: item.attempts,
+          kind: item.kind,
+          atExpiry: item.atExpiry,
+          isPermanent: item.isPermanent,
         }
       : {
           segment,
@@ -143,7 +140,9 @@ export function MessageEditor({
           buttons: preset?.buttons ?? [],
           isActive: true,
           statuses: preset?.statuses ?? null,
-          attempts: null,
+          kind: "reminder",
+          atExpiry: false,
+          isPermanent: false,
         },
   );
   const [busy, setBusy] = useState<"save" | "upload" | "delete" | "test" | null>(null);
@@ -395,9 +394,6 @@ export function MessageEditor({
                       marks={videoMarks}
                       onChange={(statuses) => patch({ statuses })}
                     />
-                  )}
-                  {attemptTargetSegments.includes(segment) && (
-                    <AttemptPicker value={draft.attempts} onChange={(attempts) => patch({ attempts })} />
                   )}
 
                   <Switch checked={draft.isActive} onChange={(isActive) => patch({ isActive })} label={copy.active} showLabel />

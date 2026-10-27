@@ -4,10 +4,9 @@ import { type MessageTemplate, plainTextPreview, renderPlainText, SAMPLE_CONTEXT
 import { Badge } from "@/components/admin/ui/Badge";
 import { IconButton } from "@/components/admin/ui/IconButton";
 import { Switch } from "@/components/admin/ui/Switch";
-import { attemptsLabel } from "@/components/admin/messages/AttemptPicker";
 import { stopPointLabel, type VideoMarks } from "@/components/admin/messages/StopPointPicker";
-import { timelineLabel } from "@/components/admin/messages/TimingPicker";
-import { ButtonsIcon, ChevronDownIcon, ChevronUpIcon, PhotoIcon, VideoIcon, VoiceIcon } from "@/components/icons";
+import { ButtonsIcon, PinIcon, ChevronDownIcon, ChevronUpIcon, PhotoIcon, VideoIcon, VoiceIcon } from "@/components/icons";
+import { timelineLabel } from "@/lib/admin/messageTiming";
 import { adminUz } from "@/lib/i18n/admin";
 
 const copy = adminUz.messages;
@@ -17,6 +16,15 @@ const mediaIcons = { photo: PhotoIcon, video: VideoIcon, voice: VoiceIcon };
 function MediaIcon({ type }: { type: keyof typeof mediaIcons }) {
   const Icon = mediaIcons[type];
   return <Icon className="h-4 w-4" />;
+}
+
+export function PermanentBadge() {
+  return (
+    <Badge>
+      <PinIcon className="mr-1 h-3 w-3" />
+      {copy.permanentBadge}
+    </Badge>
+  );
 }
 
 type MessageCardProps = {
@@ -40,15 +48,15 @@ export function MessageCard({ item, videoMarks, onEdit, onToggle, onMoveUp, onMo
         <span
           className={`w-[4.5rem] shrink-0 pt-px text-[13px] font-semibold tabular-nums text-siyoh sm:w-24 ${item.isActive ? "" : "opacity-60"}`}
         >
-          {timelineLabel(item.day, item.minute)}
+          {timelineLabel(item)}
         </span>
         <span className={`flex min-w-0 flex-1 flex-col gap-1 ${item.isActive ? "" : "opacity-60"}`}>
-          {(item.statuses || item.attempts) && (
+          {(item.statuses || item.isPermanent) && (
             <span className="flex flex-wrap gap-1">
+              {item.isPermanent && <PermanentBadge />}
               {item.statuses?.map((status) => (
                 <Badge key={status}>{stopPointLabel(status, videoMarks)}</Badge>
               ))}
-              {item.attempts && <Badge>{attemptsLabel(item.attempts)}</Badge>}
             </span>
           )}
           <span className="line-clamp-2 text-sm text-siyoh">

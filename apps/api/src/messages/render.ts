@@ -58,6 +58,8 @@ function renderButton(
       return { text: button.text, url: wrap ? wrap.url(button.url, index) : button.url };
     case "later":
       return { text: button.text, callback_data: `mt:l:${ref}` };
+    case "dismiss":
+      return { text: button.text, callback_data: `mt:d:${ref}` };
   }
 }
 

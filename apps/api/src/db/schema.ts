@@ -31,6 +31,7 @@ import {
   rolloutStatuses,
   segmentEndReasons,
   type TemplateButton,
+  templateKinds,
   templateMediaTypes,
   type Utm,
 } from "@funnel/shared";
@@ -132,6 +133,7 @@ export const linkGrants = pgTable(
       .references((): AnyPgColumn => users.id),
     epoch: integer("epoch").default(0).notNull(),
     attempt: smallint("attempt").notNull(),
+    day: smallint("day").notNull(),
     kind: text("kind", { enum: linkGrantKinds }).notNull(),
     offerFirst: boolean("offer_first").default(false).notNull(),
     silent: boolean("silent").default(false).notNull(),
@@ -143,6 +145,7 @@ export const linkGrants = pgTable(
     uniqueIndex("link_grants_user_epoch_attempt_idx").on(t.userId, t.epoch, t.attempt),
     index("link_grants_expires_at_idx").on(t.expiresAt),
     check("link_grants_attempt_range", sql`${t.attempt} >= 1`),
+    check("link_grants_day_range", sql`${t.day} >= 1`),
   ],
 );
 
@@ -370,7 +373,9 @@ export const messageTemplates = pgTable(
     timingValue: integer("timing_value").notNull(),
     buttons: jsonb("buttons").$type<TemplateButton[]>().default([]).notNull(),
     statuses: text("statuses").array().$type<FunnelStatus[]>(),
-    attempts: smallint("attempts").array().$type<number[]>(),
+    kind: text("kind", { enum: templateKinds }).default("reminder").notNull(),
+    atExpiry: boolean("at_expiry").default(false).notNull(),
+    isPermanent: boolean("is_permanent").default(false).notNull(),
     isActive: boolean("is_active").default(true).notNull(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -383,9 +388,12 @@ export const messageTemplates = pgTable(
     check("message_templates_day_range", sql`${t.day} between 1 and 7`),
     check("message_templates_segment_values", sql`${t.segment} in ('A', 'B', 'C') or ${t.deletedAt} is not null`),
     check("message_templates_timing_value_range", sql`${t.timingValue} between 0 and 1439`),
+    uniqueIndex("message_templates_one_trigger_idx")
+      .on(t.segment, t.day)
+      .where(sql`${t.kind} = 'trigger' and ${t.isActive} and ${t.deletedAt} is null`),
     check(
-      "message_templates_attempts_values",
-      sql`${t.attempts} is null or (cardinality(${t.attempts}) > 0 and ${t.attempts} <@ array[1, 2, 3, 4, 5, 6, 7, 8]::smallint[] and ${t.segment} in ('A', 'B'))`,
+      "message_templates_kind_shape",
+      sql`(${t.kind} = 'reminder' and not ${t.atExpiry}) or (${t.kind} = 'trigger' and ${t.segment} in ('A', 'B') and ${t.day} between 2 and 7)`,
     ),
     check(
       "message_templates_statuses_values",

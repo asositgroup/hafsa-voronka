@@ -29,8 +29,6 @@ export const startModes = ["resume", "offer", "again"] as const;
 
 export type StartMode = (typeof startModes)[number];
 
-export const LINK_ATTEMPT_OPTIONS = 8;
-
 export const linkGrantKinds = ["initial", "again", "scheduled", "rollout"] as const;
 
 export type LinkGrantKind = (typeof linkGrantKinds)[number];

@@ -1,11 +1,5 @@
 import { z } from "zod";
-import {
-  type FunnelSegment,
-  funnelSegments,
-  type FunnelStatus,
-  funnelStatuses,
-  LINK_ATTEMPT_OPTIONS,
-} from "./funnel";
+import { type FunnelSegment, funnelSegments, type FunnelStatus, funnelStatuses } from "./funnel";
 import { formatMmSs } from "./time";
 
 export const templateVariables = [
@@ -48,9 +42,17 @@ export const segmentStatuses: Record<FunnelSegment, readonly FunnelStatus[]> = {
 
 export const statusTargetSegments: readonly FunnelSegment[] = ["B"];
 
-export const attemptTargetSegments: readonly FunnelSegment[] = ["A", "B"];
+export const templateKinds = ["reminder", "trigger"] as const;
 
-export const linkAttempts: readonly number[] = Array.from({ length: LINK_ATTEMPT_OPTIONS }, (_, index) => index + 1);
+export type TemplateKind = (typeof templateKinds)[number];
+
+export const TRIGGER_FIRST_DAY = 2;
+
+export const triggerSegments: readonly FunnelSegment[] = linkBoundSegments;
+
+export function triggerAllowed(segment: FunnelSegment, day: number): boolean {
+  return triggerSegments.includes(segment) && day >= TRIGGER_FIRST_DAY && day <= TEMPLATE_DAYS;
+}
 
 export function normalizeStatuses(
   segment: FunnelSegment,
@@ -65,27 +67,6 @@ export function statusesError(segment: FunnelSegment, statuses: readonly FunnelS
   if (statuses === null) return false;
   if (!statusTargetSegments.includes(segment) || statuses.length === 0) return true;
   return statuses.some((status) => !segmentStatuses[segment].includes(status));
-}
-
-export function normalizeAttempts(segment: FunnelSegment, attempts: readonly number[] | null): number[] | null {
-  if (attempts === null || !attemptTargetSegments.includes(segment)) return null;
-  const chosen = linkAttempts.filter((attempt) => attempts.includes(attempt));
-  return chosen.length === linkAttempts.length ? null : chosen;
-}
-
-export function attemptsError(segment: FunnelSegment, attempts: readonly number[] | null): boolean {
-  if (attempts === null) return false;
-  if (!attemptTargetSegments.includes(segment) || attempts.length === 0) return true;
-  return attempts.some((attempt) => !linkAttempts.includes(attempt)) || new Set(attempts).size !== attempts.length;
-}
-
-export function attemptBucket(attempt: number): number {
-  return Math.min(attempt, LINK_ATTEMPT_OPTIONS);
-}
-
-export function templatesForAttempt<T extends { attempts?: readonly number[] | null }>(templates: T[], attempt: number): T[] {
-  const bucket = attemptBucket(attempt);
-  return templates.filter((template) => !template.attempts || template.attempts.includes(bucket));
 }
 
 export type TemplateContext = {
@@ -497,6 +478,8 @@ export const buttonPresets = {
   later: "Keyinroq, ko'raman",
 } as const;
 
+export const TRIGGER_DEFAULT_BUTTON = "✅ Ha, bugun ko'raman";
+
 const buttonText = z
   .string()
   .min(1)
@@ -514,6 +497,7 @@ export const templateButtonSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("admin"), text: buttonText, prefill: z.string().max(200).optional() }),
   z.object({ kind: z.literal("again"), text: buttonText }),
   z.object({ kind: z.literal("later"), text: buttonText }),
+  z.object({ kind: z.literal("dismiss"), text: buttonText }),
   z.object({ kind: z.literal("link"), text: buttonText, url: httpsUrl }),
 ]);
 
@@ -521,7 +505,7 @@ export type TemplateButton = z.infer<typeof templateButtonSchema>;
 
 export type TemplateButtonKind = TemplateButton["kind"];
 
-export const templateButtonKinds = ["resume", "offer", "again", "admin", "later", "link"] as const;
+export const templateButtonKinds = ["resume", "offer", "again", "admin", "later", "dismiss", "link"] as const;
 
 export const templateMediaSchema = z.object({
   type: z.enum(templateMediaTypes),
@@ -539,7 +523,9 @@ export const messageTemplateBaseSchema = z.object({
   buttons: z.array(templateButtonSchema).max(MAX_TEMPLATE_BUTTONS),
   isActive: z.boolean(),
   statuses: z.array(z.enum(funnelStatuses)).min(1).max(funnelStatuses.length).nullable().default(null),
-  attempts: z.array(z.number().int()).min(1).max(LINK_ATTEMPT_OPTIONS).nullable().default(null),
+  kind: z.enum(templateKinds).default("reminder"),
+  atExpiry: z.boolean().default(false),
+  isPermanent: z.boolean().default(false),
 });
 
 export type MessageTemplateInput = z.infer<typeof messageTemplateBaseSchema>;
@@ -548,7 +534,8 @@ export type TemplateValidationIssue =
   | { path: "text"; error: TemplateTextError["error"]; variable?: string }
   | { path: "minute"; error: TimingError }
   | { path: "statuses"; error: "statuses_invalid" }
-  | { path: "attempts"; error: "attempts_invalid" };
+  | { path: "kind"; error: "trigger_not_allowed" }
+  | { path: "atExpiry"; error: "at_expiry_trigger_only" };
 
 export function validateTemplateInput(input: MessageTemplateInput): TemplateValidationIssue | null {
   const textError = validateTemplateText(input.text, input.media !== null);
@@ -556,7 +543,10 @@ export function validateTemplateInput(input: MessageTemplateInput): TemplateVali
   const timingError = validateTiming(input.day, input.minute);
   if (timingError) return { path: "minute", error: timingError };
   if (statusesError(input.segment, input.statuses)) return { path: "statuses", error: "statuses_invalid" };
-  if (attemptsError(input.segment, input.attempts)) return { path: "attempts", error: "attempts_invalid" };
+  if (input.kind === "trigger" && !triggerAllowed(input.segment, input.day)) {
+    return { path: "kind", error: "trigger_not_allowed" };
+  }
+  if (input.atExpiry && input.kind !== "trigger") return { path: "atExpiry", error: "at_expiry_trigger_only" };
   return null;
 }
 

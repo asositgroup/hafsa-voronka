@@ -13,7 +13,7 @@ import {
   videos,
 } from "@/db/schema";
 import { cancelPendingAppointments } from "@/links/appointmentStore";
-import { insertGrant } from "@/links/service";
+import { currentFunnelDay, insertGrant } from "@/links/service";
 import { moveUserToVideo } from "@/videos/adminService";
 import { rolloutAudienceOf, snapshotRolloutAudience } from "./audience";
 import { openRolloutStatuses, rolloutFilterOf } from "./service";
@@ -142,11 +142,16 @@ export async function restartRecipient(
         .set({ endedAt: now, endReason: "rollout" })
         .where(and(eq(segmentRuns.userId, recipient.userId), isNull(segmentRuns.endedAt)));
     }
+    const [holder] = await tx
+      .select({ linkId: users.linkId, linkExpiresAt: users.linkExpiresAt })
+      .from(users)
+      .where(eq(users.id, recipient.userId));
     const grant = await insertGrant(tx, recipient.userId, {
       kind: "rollout",
       offerFirst: false,
       now,
       ttlHours,
+      day: chain || !holder ? 1 : await currentFunnelDay(tx, holder, now),
       silent: !chain,
     });
     await tx

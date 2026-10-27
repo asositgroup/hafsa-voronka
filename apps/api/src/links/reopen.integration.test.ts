@@ -11,7 +11,6 @@ import {
   secondChanceOffers,
   segmentRuns,
   sentMessages,
-  settings,
   users,
   videos,
   watchAppointments,
@@ -37,7 +36,6 @@ describe.skipIf(!isolatedDb.url)("Reopening a closed lesson", () => {
   let syncSegment: typeof import("@/funnel/segments").syncSegment;
   let reopenLesson: typeof import("@/links/service").reopenLesson;
   let markWroteAdmin: typeof import("@/funnel/channel").markWroteAdmin;
-  let invalidateSettings: typeof import("@/settings/service").invalidateSettings;
   let messageSeq = 1000;
   let telegramSeq = 80_000;
   let updateId = 1;
@@ -70,7 +68,6 @@ describe.skipIf(!isolatedDb.url)("Reopening a closed lesson", () => {
     ({ syncSegment } = await import("@/funnel/segments"));
     ({ reopenLesson } = await import("@/links/service"));
     ({ markWroteAdmin } = await import("@/funnel/channel"));
-    ({ invalidateSettings } = await import("@/settings/service"));
     app = (await import("@/app")).createApp();
     await ensureActiveTestVideo();
   });
@@ -124,7 +121,7 @@ describe.skipIf(!isolatedDb.url)("Reopening a closed lesson", () => {
       .returning();
     const [grant] = await db()
       .insert(linkGrants)
-      .values({ userId: user.id, attempt: 1, kind: "initial", givenAt, expiresAt })
+      .values({ userId: user.id, attempt: 1, day: 1, kind: "initial", givenAt, expiresAt })
       .returning();
     await db().update(users).set({ linkId: grant.id }).where(eq(users.id, user.id));
     if (options.maxPosition !== undefined) {
@@ -202,16 +199,16 @@ describe.skipIf(!isolatedDb.url)("Reopening a closed lesson", () => {
     return db().select().from(events).where(eq(events.type, "lesson_reopened"));
   }
 
-  it("reopens a closed lesson on «Ha» with a fresh link and restarts the stage at day 1", async () => {
+  it("reopens a closed lesson on «Ha» with a fresh link on the next funnel day", async () => {
     const user = await closedUser();
     const body = await sessionJson(user.telegramId, { reason: "open", start: "again" });
     expect(sessionResponseSchema.parse(body)).toMatchObject({ expired: false });
     expect(body).not.toHaveProperty("secondChance");
 
     const grants = await grantsOf(user.id);
-    expect(grants.map((grant) => [grant.attempt, grant.kind])).toEqual([
-      [1, "initial"],
-      [2, "again"],
+    expect(grants.map((grant) => [grant.attempt, grant.kind, grant.day])).toEqual([
+      [1, "initial", 1],
+      [2, "again", 2],
     ]);
     const fresh = await userOf(user.id);
     expect(fresh.linkId).toBe(grants[1].id);
@@ -264,7 +261,10 @@ describe.skipIf(!isolatedDb.url)("Reopening a closed lesson", () => {
     await sendStart(user.telegramId);
 
     const grants = await grantsOf(user.id);
-    expect(grants.map((grant) => grant.attempt)).toEqual([1, 2]);
+    expect(grants.map((grant) => [grant.attempt, grant.day])).toEqual([
+      [1, 1],
+      [2, 1],
+    ]);
     expect(String(sends()[0].payload.text)).toContain("Qaytganingizdan xursandmiz");
     expect((await reopenEvents())[0].meta).toMatchObject({ source: "start" });
   });
@@ -305,50 +305,27 @@ describe.skipIf(!isolatedDb.url)("Reopening a closed lesson", () => {
     }
   });
 
-  it("sends the reopened run the texts for its attempt with the new link and keeps the watch progress", async () => {
-    const user = await closedUser({ maxPosition: 30 });
-    await db().update(watchProgress).set({ lastPosition: 20 }).where(eq(watchProgress.userId, user.id));
-    await template({ segment: "B", position: 0, text: "Birinchi link", timingValue: 10, attempts: [1] });
-    await template({ segment: "B", position: 1, text: "Qayta ochildi", timingValue: 10, attempts: [2] });
+  it("runs the day-3 reminders from the tap and sends the day-4 trigger at the expiry", async () => {
+    const user = await closedUser();
+    await db().update(users).set({ linkExpiresAt: at(-25 * 60) }).where(eq(users.id, user.id));
+    await template({ text: "Kun 1", timingValue: 30 });
+    await template({ day: 3, text: "Kun 3 +30", timingValue: 30 });
+    await template({ day: 3, kind: "trigger", atExpiry: true, text: "Kun 3 taklif" });
+    await template({ day: 4, kind: "trigger", atExpiry: true, text: "Kun 4 taklif" });
 
     expect(await reopenLesson(user.id, "again", entry)).toBe("reopened");
-    const [, fresh] = await grantsOf(user.id);
-    expect((await runsOf(user.id)).at(-1)).toMatchObject({ segment: "B", attempt: 2, endedAt: null });
+    expect((await grantsOf(user.id)).at(-1)).toMatchObject({ attempt: 2, day: 3 });
 
-    await tick(at(10));
-    await tick(at(11));
-    expect(sentTexts()).toEqual(["Qayta ochildi"]);
-    const sent = await db().select().from(sentMessages).where(eq(sentMessages.userId, user.id));
-    expect(sent.map((row) => row.linkId)).toEqual([fresh.id]);
-    const [progress] = await db().select().from(watchProgress).where(eq(watchProgress.userId, user.id));
-    expect(progress).toMatchObject({ maxPosition: 30, lastPosition: 20 });
-  });
+    await tick(at(29));
+    await tick(at(30));
+    await tick(at(31));
+    expect(sentTexts()).toEqual(["Kun 3 +30"]);
 
-  it("resets the stage total cap after a reopen", async () => {
-    const value = JSON.stringify({ A: { daily: 10, total: null }, B: { daily: 10, total: 2 }, C: { daily: 10, total: null } });
-    await db().insert(settings).values({ key: "MESSAGE_CAPS", value }).onConflictDoUpdate({ target: settings.key, set: { value } });
-    invalidateSettings();
-    try {
-      const user = await closedUser({ maxPosition: 30 });
-      await db().update(users).set({ linkExpiresAt: at(24 * 60) }).where(eq(users.id, user.id));
-      await db().update(segmentRuns).set({ enteredAt: entry }).where(eq(segmentRuns.userId, user.id));
-      for (const position of [0, 1, 2]) {
-        await template({ segment: "B", position, text: `B${position}`, timingValue: 10 + position });
-      }
-      for (let minute = 10; minute <= 20; minute += 1) await tick(at(minute));
-      expect(sentTexts()).toEqual(["B0", "B1"]);
-
-      await expireLink(user.id);
-      const reopenedAt = at(60);
-      vi.setSystemTime(reopenedAt);
-      expect(await reopenLesson(user.id, "again", reopenedAt)).toBe("reopened");
-      calls.length = 0;
-      for (let minute = 10; minute <= 20; minute += 1) await tick(at(minute, reopenedAt));
-      expect(sentTexts()).toEqual(["B0", "B1"]);
-    } finally {
-      await db().delete(settings).where(eq(settings.key, "MESSAGE_CAPS"));
-      invalidateSettings();
-    }
+    const expiry = (await userOf(user.id)).linkExpiresAt!;
+    calls.length = 0;
+    await tick(expiry);
+    await tick(at(1, expiry));
+    expect(sentTexts()).toEqual(["Kun 4 taklif"]);
   });
 
   it("reopens once under concurrent taps", async () => {

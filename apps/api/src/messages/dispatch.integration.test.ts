@@ -158,7 +158,7 @@ describe.skipIf(!testDbUrl)("Message dispatcher", () => {
 
   async function setup(overrides: Partial<typeof messageTemplates.$inferInsert> = {}) {
     const user = await makeUser();
-    const run = await openRun(user.id);
+    const run = await openRun(user.id, overrides.segment ?? "A");
     const template = await makeTemplate(overrides);
     return { user, run, template };
   }
@@ -167,7 +167,7 @@ describe.skipIf(!testDbUrl)("Message dispatcher", () => {
     const user = await makeUser({ linkExpiresAt: expiresAt, ...overrides });
     const [grant] = await db()
       .insert(linkGrants)
-      .values({ userId: user.id, attempt: 1, kind: "initial", givenAt: entry, expiresAt })
+      .values({ userId: user.id, attempt: 1, day: 1, kind: "initial", givenAt: entry, expiresAt })
       .returning();
     await db().update(users).set({ linkId: grant.id }).where(eq(users.id, user.id));
     const run = await openRun(user.id, segment);
@@ -253,6 +253,17 @@ describe.skipIf(!testDbUrl)("Message dispatcher", () => {
     expect(second.deletedAt).toBeNull();
   });
 
+  it("keeps a permanent message when the next ones are sent and deletes only replaceable ones", async () => {
+    await setup({ text: "Bir", position: 0, timingValue: 60 });
+    await makeTemplate({ text: "Qiroat", position: 1, timingValue: 61, isPermanent: true });
+    await makeTemplate({ text: "Uch", position: 2, timingValue: 62 });
+    await makeTemplate({ text: "To'rt", position: 3, timingValue: 63 });
+    for (let minute = 60; minute <= 63; minute += 1) await tick(at(minute));
+    expect(sends().map((call) => call.payload.text)).toEqual(["Bir", "Qiroat", "Uch", "To'rt"]);
+    expect(deletes().map((call) => call.payload.message_id)).toEqual([1001, 1003]);
+    expect((await rows()).map((row) => row.deletedAt !== null)).toEqual([true, false, true, false]);
+  });
+
   it("treats an already deleted message as deleted", async () => {
     await setup({ position: 0 });
     await makeTemplate({ position: 1 });
@@ -280,70 +291,13 @@ describe.skipIf(!testDbUrl)("Message dispatcher", () => {
   it("caps sends at ten per local day and resets on the next day", async () => {
     await setup({ position: 0 });
     for (let position = 1; position < 11; position += 1) await makeTemplate({ position });
-    await makeTemplate({ day: 2, position: 0, timingValue: 600 });
+    await makeTemplate({ position: 0, timingValue: 14 * 60 + 30 });
     for (let minute = 60; minute <= 70; minute += 1) await tick(at(minute));
     expect(sends()).toHaveLength(10);
     await tick(at(71));
     expect(sends()).toHaveLength(10);
-    await tick(at(24 * 60));
+    await tick(at(14 * 60 + 30));
     expect(sends()).toHaveLength(11);
-  });
-
-  it("sends day-2 clock reminders after the link has closed", async () => {
-    const { user } = await linkedRunUser("A", at(24 * 60));
-    await makeTemplate({ day: 2, text: "Ikkinchi kun", timingValue: 600 });
-    await tick(at(24 * 60 - 1));
-    expect(sends()).toHaveLength(0);
-    await tick(at(24 * 60 + 5));
-    expect(sends().map((call) => call.payload.text)).toEqual(["Ikkinchi kun"]);
-    const runs = await db().select().from(segmentRuns).where(eq(segmentRuns.userId, user.id));
-    expect(runs.map((run) => [run.segment, run.endedAt])).toEqual([["A", null]]);
-  });
-
-  it("sends a day-2 reminder due while the link is open when it closes and keeps it", async () => {
-    await linkedRunUser("A", at(29 * 60));
-    await makeTemplate({ day: 2, text: "Afsus, dars yopildi", timingValue: 600 });
-    await tick(at(24 * 60));
-    await tick(at(29 * 60 - 1));
-    expect(sends()).toHaveLength(0);
-    await tick(at(29 * 60));
-    expect(sends().map((call) => call.payload.text)).toEqual(["Afsus, dars yopildi"]);
-    await tick(at(29 * 60 + 1));
-    await tick(at(30 * 60));
-    expect(sends()).toHaveLength(1);
-    expect(deletes()).toHaveLength(0);
-    const [row] = await rows();
-    expect(row.dueAt).toEqual(at(29 * 60));
-    expect(row.sentAt).toEqual(at(29 * 60));
-    expect(row.deletedAt).toBeNull();
-  });
-
-  it("sends only the first reminder deferred to the link expiry, even after it is turned off", async () => {
-    await linkedRunUser("A", at(29 * 60));
-    const first = await makeTemplate({ day: 2, text: "Afsus", timingValue: 600 });
-    await makeTemplate({ day: 2, text: "Ikkinchi", timingValue: 660 });
-    await makeTemplate({ day: 2, text: "Uchinchi", timingValue: 720 });
-    await makeTemplate({ day: 2, text: "Kechki", timingValue: 960 });
-    await tick(at(29 * 60));
-    await db().update(messageTemplates).set({ isActive: false }).where(eq(messageTemplates.id, first.id));
-    for (let minute = 29 * 60 + 1; minute <= 29 * 60 + 5; minute += 1) await tick(at(minute));
-    await tick(at(29 * 60 + 59));
-    expect(sends().map((call) => call.payload.text)).toEqual(["Afsus"]);
-    expect(deletes()).toHaveLength(0);
-    await tick(at(30 * 60));
-    expect(sends().map((call) => call.payload.text)).toEqual(["Afsus", "Kechki"]);
-  });
-
-  it("never sends a reminder added before the deferred one after it went out", async () => {
-    await linkedRunUser("A", at(29 * 60));
-    await makeTemplate({ day: 2, text: "Afsus", timingValue: 600 });
-    await makeTemplate({ day: 2, text: "Ikkinchi", timingValue: 720 });
-    await tick(at(29 * 60));
-    await makeTemplate({ day: 2, text: "Yangi", timingValue: 540 });
-    for (let minute = 29 * 60 + 1; minute <= 29 * 60 + 5; minute += 1) await tick(at(minute));
-    await tick(at(29 * 60 + 59));
-    expect(sends().map((call) => call.payload.text)).toEqual(["Afsus"]);
-    expect(deletes()).toHaveLength(0);
   });
 
   it("sends a day-1 reminder at night as scheduled", async () => {
@@ -480,17 +434,6 @@ describe.skipIf(!testDbUrl)("Message dispatcher", () => {
     expect(sends()).toHaveLength(0);
   });
 
-  it("stays silent on days without templates", async () => {
-    await setup({ text: "Kun 1" });
-    await makeTemplate({ day: 3, text: "Kun 3", timingValue: 11 * 60 });
-    await tick(at(61));
-    await tick(at(1440 + 61));
-    await tick(at(1440 + 300));
-    expect(sends().map((call) => call.payload.text)).toEqual(["Kun 1"]);
-    await tick(at(2 * 1440 + 61));
-    expect(sends().map((call) => call.payload.text)).toEqual(["Kun 1", "Kun 3"]);
-  });
-
   describe("48 hour sweep", () => {
     const sentAt = () => at(60);
     const afterSend = (hours: number, extraMinutes = 0) => new Date(sentAt().getTime() + hours * HOUR + extraMinutes * MINUTE);
@@ -505,8 +448,8 @@ describe.skipIf(!testDbUrl)("Message dispatcher", () => {
     });
 
     it("keeps it while a send due soon will delete it", async () => {
-      await setup({ position: 0 });
-      await makeTemplate({ day: 3, position: 1, timingValue: 10 * 60 + 30 });
+      await setup({ segment: "C", position: 0 });
+      await makeTemplate({ segment: "C", day: 3, position: 1, timingValue: 10 * 60 + 30 });
       await tick(sentAt());
       await tick(afterSend(47));
       expect(deletes()).toHaveLength(0);
@@ -517,8 +460,8 @@ describe.skipIf(!testDbUrl)("Message dispatcher", () => {
     });
 
     it("deletes unconditionally from 47h50m", async () => {
-      await setup({ position: 0 });
-      await makeTemplate({ day: 3, position: 1, timingValue: 10 * 60 + 58 });
+      await setup({ segment: "C", position: 0 });
+      await makeTemplate({ segment: "C", day: 3, position: 1, timingValue: 10 * 60 + 58 });
       await tick(sentAt());
       await tick(afterSend(47, 55));
       expect(deletes()).toHaveLength(1);
@@ -729,43 +672,14 @@ describe.skipIf(!testDbUrl)("Message dispatcher", () => {
       expect(sends().map((call) => call.payload.text)).toEqual(["0-5", "15-narx"]);
     });
 
-    it("never sends day-1 texts after the link closed to a migrated B person who paused recently", async () => {
-      const now = at(2 * 1440);
-      const yesterdayStart = at(1440 - 600);
-      const user = await makeUser({ videoId: lesson.id, linkGivenAt: entry, linkExpiresAt: at(24 * 60) });
-      await db().insert(watchProgress).values({ userId: user.id, maxPosition: 400, lastPosition: 400, startedAt: entry, lastBeatAt: at(-120, now), playing: false });
-      await openRun(user.id, "B", yesterdayStart);
-      await makeTemplate({ segment: "B", day: 1, text: "Dars ochiq", timingValue: 90 });
-      await makeTemplate({ segment: "B", day: 2, text: "Ikkinchi kun", timingValue: 600 });
-
-      await tick(now);
-      await tick(at(1, now));
-      expect(sends().map((call) => call.payload.text)).toEqual(["Ikkinchi kun"]);
-    });
-
     it("sends nothing while the person is watching and keeps the item due", async () => {
       const { user } = await watcher(400, at(24 * 60 - 1), true);
-      await makeTemplate({ segment: "B", day: 2, text: "Ikkinchi kun", timingValue: 600 });
+      await makeTemplate({ segment: "B", day: 2, kind: "trigger", text: "Ikkinchi kun", timingValue: 600 });
       await tick(at(24 * 60));
       expect(sends()).toHaveLength(0);
       await moveTo(user.id, 420, at(24 * 60 + 1), false);
       await tick(at(24 * 60 + 2));
       expect(sends().map((call) => call.payload.text)).toEqual(["Ikkinchi kun"]);
-    });
-
-    it("keeps day-3 reminders within the B cap when day 2 is deferred to a night-extended expiry", async () => {
-      const user = await makeUser({ videoId: lesson.id, linkGivenAt: entry, linkExpiresAt: at(47 * 60) });
-      await db().insert(watchProgress).values({ userId: user.id, maxPosition: 100, lastPosition: 100, startedAt: entry, lastBeatAt: entry, playing: false });
-      await openRun(user.id, "B");
-      for (let position = 0; position < 5; position += 1) {
-        await makeTemplate({ segment: "B", day: 2, position, text: `d2-${position}`, timingValue: 600 + position * 60 });
-      }
-      for (let position = 0; position < 3; position += 1) {
-        await makeTemplate({ segment: "B", day: 3, position, text: `d3-${position}`, timingValue: 600 + position });
-      }
-      for (let minute = 47 * 60; minute <= 47 * 60 + 5; minute += 1) await tick(at(minute));
-      for (let minute = 48 * 60; minute <= 48 * 60 + 5; minute += 1) await tick(at(minute));
-      expect(sends().map((call) => call.payload.text)).toEqual(["d2-0", "d3-0", "d3-1", "d3-2"]);
     });
 
     it("caps B at four a day without a total cap", async () => {
@@ -774,11 +688,11 @@ describe.skipIf(!testDbUrl)("Message dispatcher", () => {
         await makeTemplate({ segment: "B", position, text: `d1-${position}`, timingValue: 60 + position });
       }
       for (let position = 0; position < 6; position += 1) {
-        await makeTemplate({ segment: "B", day: 2, position, text: `d2-${position}`, timingValue: 600 + position });
+        await makeTemplate({ segment: "B", position: 10 + position, text: `d2-${position}`, timingValue: 14 * 60 + 10 + position });
       }
       for (let minute = 60; minute <= 80; minute += 1) await tick(at(minute));
       expect(sends()).toHaveLength(4);
-      for (let minute = 24 * 60; minute <= 24 * 60 + 10; minute += 1) await tick(at(minute));
+      for (let minute = 14 * 60 + 10; minute <= 14 * 60 + 20; minute += 1) await tick(at(minute));
       expect(sends()).toHaveLength(8);
       expect(sends().slice(4).map((call) => call.payload.text)).toEqual(["d2-0", "d2-1", "d2-2", "d2-3"]);
     });

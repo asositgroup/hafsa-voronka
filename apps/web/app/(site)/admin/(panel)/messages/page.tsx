@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
-import { defaultMinute, type FunnelSegment, funnelSegments, type MessageTemplate } from "@funnel/shared";
+import {
+  type FunnelSegment,
+  funnelSegments,
+  type MessageTemplate,
+  type TemplateKind,
+  TRIGGER_DEFAULT_BUTTON,
+} from "@funnel/shared";
 import { MessageEditor, type MessagePreset } from "@/components/admin/messages/MessageEditor";
 import { DayTimeline } from "@/components/admin/messages/DayTimeline";
 import { StageOverview } from "@/components/admin/messages/StageOverview";
@@ -14,6 +20,7 @@ import { Page, PageHeader } from "@/components/admin/ui/Page";
 import { ErrorState, LoadingState } from "@/components/admin/ui/States";
 import { ChevronLeftIcon } from "@/components/icons";
 import { fetchMessages, reorderMessages, setMessageActive } from "@/lib/admin/messages";
+import { defaultMinuteFor } from "@/lib/admin/messageTiming";
 import { fetchSettings } from "@/lib/admin/settings";
 import { adminUz } from "@/lib/i18n/admin";
 
@@ -31,6 +38,21 @@ type Editing = { segment: FunnelSegment; item: MessageTemplate | null; preset?: 
 
 function parseStage(value: string | null): FunnelSegment | null {
   return funnelSegments.find((segment) => segment === value) ?? null;
+}
+
+function errorMessage(code: string | undefined) {
+  return copy.errors[code as keyof typeof copy.errors] ?? copy.errors.generic;
+}
+
+function newMessagePreset(segment: FunnelSegment, day: number, kind: TemplateKind): MessagePreset {
+  const atExpiry = kind === "trigger";
+  return {
+    day,
+    kind,
+    atExpiry,
+    minute: defaultMinuteFor({ segment, day, kind, atExpiry }),
+    buttons: kind === "trigger" ? [{ kind: "again", text: TRIGGER_DEFAULT_BUTTON }] : [],
+  };
 }
 
 function byPosition(items: MessageTemplate[]) {
@@ -142,7 +164,7 @@ function AdminMessagesContent() {
     const result = await setMessageActive(item.id, isActive);
     if (!result.ok) {
       apply(!isActive);
-      setNotice(copy.errors.generic);
+      setNotice(errorMessage(result.error));
     }
   }
 
@@ -205,7 +227,12 @@ function AdminMessagesContent() {
           videoMarks={loaded.videoMarks}
           day={day}
           onDayChange={setDay}
-          onAdd={(targetDay) => setEditing({ segment: stage, item: null, preset: { day: targetDay, minute: defaultMinute(targetDay) } })}
+          onAddReminder={(targetDay) =>
+            setEditing({ segment: stage, item: null, preset: newMessagePreset(stage, targetDay, "reminder") })
+          }
+          onAddTrigger={(targetDay) =>
+            setEditing({ segment: stage, item: null, preset: newMessagePreset(stage, targetDay, "trigger") })
+          }
           onEdit={(item) => setEditing({ segment: stage, item })}
           onToggle={(item, isActive) => void toggle(item, isActive)}
           onMove={(group, index, direction) => void move(group, index, direction)}
@@ -214,7 +241,7 @@ function AdminMessagesContent() {
 
       {editing && editingSource && (
         <MessageEditor
-          key={editing.item?.id ?? `new-${editing.segment}-${day}`}
+          key={editing.item?.id ?? `new-${editing.segment}-${day}-${editing.preset?.kind}`}
           segment={editing.segment}
           item={editing.item}
           preset={editing.preset}

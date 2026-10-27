@@ -5,23 +5,32 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
-import { runMigrations } from "@/db/migrate";
 import { isolatedDatabase } from "@/test/isolatedDb";
 
 const LEGACY_TAG = "0024_video_rollouts";
+const MIGRATION_TAG = "0025_reminder_timeline";
 const NOT_OPENED = "{link_berildi}";
 const NO_PRICE = "{korishni_boshladi,dars_yarmida,sotuvda_toxtadi}";
 
 type Journal = { entries: { tag: string }[] };
 
-function legacyMigrationsFolder() {
+function migrationsFolderThrough(tag: string) {
   const folder = mkdtempSync(join(tmpdir(), "vf-legacy-drizzle-"));
   cpSync(resolve("drizzle"), folder, { recursive: true });
   const journalPath = join(folder, "meta", "_journal.json");
   const journal = JSON.parse(readFileSync(journalPath, "utf8")) as Journal;
-  const cut = journal.entries.findIndex((entry) => entry.tag === LEGACY_TAG);
+  const cut = journal.entries.findIndex((entry) => entry.tag === tag);
   writeFileSync(journalPath, JSON.stringify({ ...journal, entries: journal.entries.slice(0, cut + 1) }));
   return folder;
+}
+
+async function migrateThrough(client: postgres.Sql, tag: string) {
+  const folder = migrationsFolderThrough(tag);
+  try {
+    await migrate(drizzle({ client }), { migrationsFolder: folder });
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
 }
 
 function legacyDatabase(name: string) {
@@ -33,11 +42,14 @@ function legacyDatabase(name: string) {
     setUp: async () => {
       await database.create();
       client = postgres(database.url!, { max: 1, onnotice: () => {} });
-      const folder = legacyMigrationsFolder();
+      await migrateThrough(client, LEGACY_TAG);
+    },
+    migrate: async () => {
+      const runner = postgres(database.url!, { max: 1, onnotice: () => {} });
       try {
-        await migrate(drizzle({ client }), { migrationsFolder: folder });
+        await migrateThrough(runner, MIGRATION_TAG);
       } finally {
-        rmSync(folder, { recursive: true, force: true });
+        await runner.end();
       }
     },
     tearDown: async () => {
@@ -173,7 +185,7 @@ describe.skipIf(!main.url)("0025 reminder timeline migration", () => {
     grantsBefore = await sql`select * from link_grants order by id`;
     usersBefore = await sql`select id, link_id, link_expires_at from users order by id`;
 
-    await runMigrations(main.url!);
+    await main.migrate();
   });
 
   afterAll(async () => {
@@ -295,7 +307,7 @@ describe.skipIf(!custom.url)("0025 reminder timeline migration with admin settin
       returning id
     `;
     expiryId = Number(row.id);
-    await runMigrations(custom.url!);
+    await custom.migrate();
   });
 
   afterAll(async () => {

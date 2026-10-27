@@ -220,13 +220,18 @@ describe.skipIf(!testDbUrl)("Message constructor", () => {
     expect((await request("?segment=D")).status).toBe(400);
   });
 
-  it("stores the link attempts a chain text is meant for", async () => {
-    const saved = await create({ ...draft, attempts: [2, 1] });
-    expect(saved.attempts).toEqual([1, 2]);
-    const everyone = await create({ ...draft, attempts: [1, 2, 3, 4, 5, 6, 7, 8] });
-    expect(everyone.attempts).toBeNull();
-    const inC = await send("", "POST", { ...draft, segment: "C", attempts: [1] });
-    expect(await inC.json()).toEqual({ error: "attempts_invalid" });
+  it("stores triggers and allows one active trigger per stage day", async () => {
+    const trigger = { ...draft, day: 3, kind: "trigger", atExpiry: true, isPermanent: true };
+    const saved = await create(trigger);
+    expect(saved).toMatchObject({ kind: "trigger", atExpiry: true, isPermanent: true });
+    const second = await send("", "POST", trigger);
+    expect(second.status).toBe(409);
+    expect(await second.json()).toEqual({ error: "trigger_exists" });
+    const inactive = await create({ ...trigger, isActive: false });
+    const activated = await send(`/${inactive.id}/active`, "PATCH", { isActive: true });
+    expect(activated.status).toBe(409);
+    const inC = await send("", "POST", { ...trigger, segment: "C" });
+    expect(await inC.json()).toEqual({ error: "trigger_not_allowed" });
   });
 
   it("uploads media through the media chat and removes it there", async () => {

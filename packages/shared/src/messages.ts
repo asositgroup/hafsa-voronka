@@ -478,6 +478,8 @@ export const buttonPresets = {
   later: "Keyinroq, ko'raman",
 } as const;
 
+export const TRIGGER_DEFAULT_BUTTON = "✅ Ha, bugun ko'raman";
+
 const buttonText = z
   .string()
   .min(1)

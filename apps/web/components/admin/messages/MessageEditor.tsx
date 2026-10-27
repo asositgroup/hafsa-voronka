@@ -3,7 +3,6 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import {
-  defaultMinute,
   type FunnelSegment,
   type FunnelStatus,
   type MessageTemplate,
@@ -11,6 +10,7 @@ import {
   TEMPLATE_MEDIA_MIME_TYPES,
   templateTextLimit,
   type TemplateButton,
+  type TemplateKind,
   validateTemplateText,
   validateTiming,
   visibleLength,
@@ -29,7 +29,7 @@ import { ButtonsEditor } from "@/components/admin/messages/ButtonsEditor";
 import { MessagePreview } from "@/components/admin/messages/MessagePreview";
 import { StopPointPicker, stopPointLabel, type VideoMarks } from "@/components/admin/messages/StopPointPicker";
 import { TextEditor } from "@/components/admin/messages/editor/TextEditor";
-import { TimingPicker, timingSummary } from "@/components/admin/messages/TimingPicker";
+import { TimingPicker } from "@/components/admin/messages/TimingPicker";
 import {
   createMessage,
   deleteMessage,
@@ -39,7 +39,8 @@ import {
   updateMessage,
   uploadMessageMedia,
 } from "@/lib/admin/messages";
-import { PhotoIcon, PlusIcon, VideoIcon, VoiceIcon } from "@/components/icons";
+import { PhotoIcon, PinIcon, PlusIcon, VideoIcon, VoiceIcon } from "@/components/icons";
+import { defaultMinuteFor, timingSummary } from "@/lib/admin/messageTiming";
 import { adminUz } from "@/lib/i18n/admin";
 
 const copy = adminUz.messages.editor;
@@ -81,11 +82,18 @@ function errorText(code: string | undefined, variable?: string) {
   return template.replace("{variable}", variable ?? "");
 }
 
+function editorTitle(kind: TemplateKind, editing: boolean) {
+  if (kind === "trigger") return editing ? copy.editTriggerTitle : copy.newTriggerTitle;
+  return editing ? copy.editTitle : copy.newTitle;
+}
+
 type Admin = { telegramId: number; label: string };
 
 export type MessagePreset = {
   day: number;
   minute: number;
+  kind: TemplateKind;
+  atExpiry: boolean;
   text?: string;
   statuses?: FunnelStatus[] | null;
   buttons?: TemplateButton[];
@@ -136,12 +144,14 @@ export function MessageEditor({
           day: preset?.day ?? 1,
           text: preset?.text ?? "",
           media: null,
-          minute: preset?.minute ?? defaultMinute(preset?.day ?? 1),
+          minute:
+            preset?.minute ??
+            defaultMinuteFor({ segment, day: preset?.day ?? 1, kind: preset?.kind ?? "reminder", atExpiry: preset?.atExpiry ?? false }),
           buttons: preset?.buttons ?? [],
           isActive: true,
           statuses: preset?.statuses ?? null,
-          kind: "reminder",
-          atExpiry: false,
+          kind: preset?.kind ?? "reminder",
+          atExpiry: preset?.atExpiry ?? false,
           isPermanent: false,
         },
   );
@@ -261,7 +271,7 @@ export function MessageEditor({
 
   return (
     <>
-      <Sheet open onClose={onClose} title={item !== null ? copy.editTitle : copy.newTitle} size="wide" footer={footer}>
+      <Sheet open onClose={onClose} title={editorTitle(draft.kind, item !== null)} size="wide" footer={footer}>
         <div className="flex flex-col gap-4">
           <div className="lg:hidden">
             <Segmented
@@ -293,18 +303,21 @@ export function MessageEditor({
 
               <Disclosure
                 title={copy.timingTitle}
-                summary={timingSummary(segment, draft.day, draft.minute)}
+                summary={timingSummary(draft)}
                 open={timingOpen || timingError !== null}
                 onOpenChange={setTimingOpen}
               >
-                <TimingPicker
-                  segment={segment}
-                  day={draft.day}
-                  minute={draft.minute}
-                  onChange={(minute) => patch({ minute })}
-                  error={timingError}
-                />
+                <TimingPicker subject={draft} minute={draft.minute} onChange={patch} error={timingError} />
               </Disclosure>
+
+              <div className="flex items-center gap-3 rounded-[12px] border border-chiziq py-2 pl-3 pr-2">
+                <PinIcon className="h-5 w-5 text-qalam" />
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="text-[15px] font-semibold text-siyoh">{copy.permanent}</span>
+                  <span className="text-[13px] text-qalam/70">{copy.permanentHint}</span>
+                </span>
+                <Switch checked={draft.isPermanent} onChange={(isPermanent) => patch({ isPermanent })} label={copy.permanent} />
+              </div>
 
               <input
                 ref={fileInput}

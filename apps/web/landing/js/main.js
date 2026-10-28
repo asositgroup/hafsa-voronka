@@ -2,6 +2,7 @@ const API_URL = __API_URL__;
 const BOT_USERNAME = __BOT_USERNAME__;
 const CLARITY_ID = __CLARITY_ID__;
 const TIMER_MS = 60 * 60 * 1000;
+const APP_OPEN_FALLBACK_MS = 2500;
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-";
 
 function visitorId() {
@@ -16,6 +17,33 @@ function visitorId() {
 
 function botLink(vid) {
   return `https://t.me/${BOT_USERNAME}?start=v_${vid}`;
+}
+
+function detectPlatform() {
+  const ua = navigator.userAgent;
+  if (/Android/i.test(ua)) return "android";
+  if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return "ios";
+  return "other";
+}
+
+function appLink(vid, platform, fallbackUrl) {
+  const query = `domain=${BOT_USERNAME}&start=v_${vid}`;
+  if (platform === "android") {
+    return `intent://resolve?${query}#Intent;scheme=tg;S.browser_fallback_url=${encodeURIComponent(fallbackUrl)};end`;
+  }
+  return `tg://resolve?${query}`;
+}
+
+function openApp(url, fallbackUrl) {
+  const timer = setTimeout(() => {
+    if (!document.hidden) location.href = fallbackUrl;
+  }, APP_OPEN_FALLBACK_MS);
+  const cancel = () => {
+    if (document.hidden) clearTimeout(timer);
+  };
+  document.addEventListener("visibilitychange", cancel);
+  window.addEventListener("pagehide", () => clearTimeout(timer), { once: true });
+  location.href = url;
 }
 
 function utmParams() {
@@ -120,12 +148,17 @@ if (CLARITY_ID) {
 const botUrl = botLink(vid);
 for (const cta of document.querySelectorAll("[data-cta]")) cta.href = botUrl;
 
+const platform = detectPlatform();
+
 document.addEventListener("click", (event) => {
   if (!event.target.closest("[data-cta]")) return;
   track({ visitor_id: vid, type: "cta_click" });
   pixel("trackCustom", "CTAClick");
   pixel("track", "CompleteRegistration");
   clarity("event", "cta_click");
+  if (platform === "other" || event.metaKey || event.ctrlKey || event.shiftKey) return;
+  event.preventDefault();
+  openApp(appLink(vid, platform, botUrl), botUrl);
 });
 
 const sticky = document.getElementById("sticky");
